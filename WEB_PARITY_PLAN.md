@@ -50,9 +50,13 @@ The most visible gap: you can browse and find a vendor, but you can't book them.
   - Editing is hidden once money has moved (`payment_confirmed`, or paid /
     released / refunded / disputed), mirroring the iOS rule.
 
-- [ ] **A3. Events**
-  - `GET /events`, `POST /events`, event detail with its bundles/bookings.
-  - Remember: a booking reaches its event only via its bundle.
+- [x] **A3. Events** — `/events` and `/event?id=`
+  - List + inline create; detail shows the event's bundles and their bookings,
+    with a running total. Delete makes clear the bundles survive.
+  - There is **no `GET /events/{id}`** — the list is the source of detail.
+  - A booking has no `event_id`, so the event's vendors are assembled by matching
+    **bundles** on `event_id` (iOS additionally falls back to matching the event
+    *name*, which would wrongly merge two events sharing a name — not copied).
 
 ## Phase B — make a vendor operable on the web
 

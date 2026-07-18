@@ -33,10 +33,16 @@ export function SiteHeader() {
           {loading ? null : user ? (
             <>
               <Link
+                href="/events"
+                className="hidden px-2 text-sm font-semibold text-ink-soft transition hover:text-ink sm:inline"
+              >
+                Events
+              </Link>
+              <Link
                 href="/bundles"
                 className="px-2 text-sm font-semibold text-ink-soft transition hover:text-ink"
               >
-                My bundles
+                Bundles
               </Link>
               <LinkButton href="/plan" size="md">
                 Plan
