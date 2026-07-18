@@ -86,6 +86,36 @@ export async function apiFetch<T>(path: string, opts: RequestOpts = {}): Promise
   return (await res.json()) as T;
 }
 
+/**
+ * Multipart upload, with the same auth + one-retry refresh behaviour.
+ *
+ * Deliberately does NOT set Content-Type — the browser has to write that itself
+ * so it can include the multipart boundary. Setting it by hand yields a body
+ * the server can't parse.
+ */
+export async function apiUpload<T>(
+  path: string,
+  form: FormData,
+  opts: { method?: string; retry?: boolean } = {},
+): Promise<T> {
+  const { method = "POST", retry = true } = opts;
+  const headers: Record<string, string> = {};
+  const access = tokens.getAccess();
+  if (access) headers.Authorization = `Bearer ${access}`;
+
+  const res = await fetch(`${API_BASE}${path}`, { method, headers, body: form });
+
+  if (res.status === 401 && retry && tokens.getRefresh()) {
+    const refreshed = await tryRefresh();
+    if (refreshed) return apiUpload<T>(path, form, { ...opts, retry: false });
+    tokens.onAuthLost();
+  }
+
+  if (!res.ok) throw new ApiError(res.status, await parseError(res));
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
+}
+
 async function tryRefresh(): Promise<boolean> {
   const refresh_token = tokens.getRefresh();
   if (!refresh_token) return false;
