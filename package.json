@@ -1,0 +1,15 @@
+{
+  "name": "jornaevents-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "jornaevents.com — the marketing page plus the Jorna web app, served by one Cloudflare Worker.",
+  "scripts": {
+    "install:app": "npm --prefix web install",
+    "build": "npm --prefix web run build",
+    "preview": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.112.0"
+  }
+}
