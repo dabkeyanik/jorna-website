@@ -1,5 +1,6 @@
 {
-  // Static-asset-only Worker: no server code, Cloudflare just serves ./public.
+  // Static-asset-only Worker: no server code, Cloudflare just serves ./public
+  // (the marketing page at / and the exported web app at /app).
   // The name must stay "misty-water-0dbb" — that's the Worker the dashboard
   // created, and changing it here would deploy a second, separate Worker
   // rather than update the live one.
@@ -7,5 +8,9 @@
   "compatibility_date": "2026-07-17",
   "assets": {
     "directory": "./public"
-  }
+  },
+  // Serve the real domain from this Worker. Without this the Worker is only
+  // reachable at its workers.dev URL and jornaevents.com keeps serving an
+  // older, separately-hosted copy of the site.
+  "routes": [{ "pattern": "jornaevents.com", "custom_domain": true }]
 }
