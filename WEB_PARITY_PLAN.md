@@ -63,9 +63,13 @@ The most visible gap: you can browse and find a vendor, but you can't book them.
 Today a vendor cannot function on web at all. B1–B4 are what a vendor needs to
 take money; B5–B6 complete their side.
 
-- [ ] **B1. Become a vendor / vendor profile**
-  - `POST /vendors`, `GET /vendors/me`, `PATCH /vendors/me`.
-  - Category + subcategory, bio, travel radius, negotiation prefs.
+- [x] **B1. Become a vendor / vendor profile** — `/vendor-profile`
+  - Create or edit: category, speciality, bio, travel radius, long-distance and
+    price-negotiation preferences, Instagram.
+  - Options come from `GET /vendors/categories`, added for this step. The
+    taxonomy is validated server-side, so a hardcoded copy that drifts produces
+    400s the user can't act on. Changing category clears the speciality rather
+    than sending a stale pair.
 
 - [ ] **B2. Services CRUD**
   - `POST/PATCH/DELETE /services`, `GET /services?vendor_id=`.
@@ -123,10 +127,12 @@ These can't be a straight port; decide per item rather than assuming parity.
 - Never show a rate as if it were a total; carry `price_unit` through.
 - Verify against the real backend before ticking a box; `npm run deploy` publishes
   the marketing page and the app together.
-- **Always curl the routes after deploying.** A deploy has silently shipped
-  without a new route's `index.html` before — `wrangler deploy` reported success
-  and the page 404'd in production. Re-running the deploy fixed it, but nothing
-  surfaced the problem except checking:
+- **Give a deploy ~30–60s before verifying, then curl the routes.** Checking
+  immediately after "Deployed" has twice shown 404s that resolved on their own —
+  the second time, the "fix" was a redeploy that uploaded *nothing*
+  ("No updated asset files to upload"), which proves the assets were already
+  there and only propagation was outstanding. So a 404 straight after deploy
+  means *wait and re-check*, not *redeploy*. Still always check:
 
   ```bash
   for p in / /app/ /app/browse/ /app/book/ /app/plan/ /app/bundles/; do
