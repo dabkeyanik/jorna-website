@@ -111,3 +111,17 @@ These can't be a straight port; decide per item rather than assuming parity.
 - Never show a rate as if it were a total; carry `price_unit` through.
 - Verify against the real backend before ticking a box; `npm run deploy` publishes
   the marketing page and the app together.
+- **Always curl the routes after deploying.** A deploy has silently shipped
+  without a new route's `index.html` before — `wrangler deploy` reported success
+  and the page 404'd in production. Re-running the deploy fixed it, but nothing
+  surfaced the problem except checking:
+
+  ```bash
+  for p in / /app/ /app/browse/ /app/book/ /app/plan/ /app/bundles/; do
+    echo "$p -> $(curl -s -o /dev/null -w '%{http_code}' -L https://jornaevents.com$p)"
+  done
+  ```
+
+- Client-rendered pages ship a Suspense fallback in their static HTML, so
+  grepping the deployed HTML for page copy proves nothing — check the status
+  code and that the JS bundle is referenced.
