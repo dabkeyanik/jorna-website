@@ -2,6 +2,7 @@
 
 import { apiFetch } from "./api";
 import type {
+  BundleDetail,
   BundleRequest,
   MultiBundleResponse,
   Paginated,
@@ -58,4 +59,41 @@ export function listServices(params: {
 
 export function getVendorReviews(vendorId: string): Promise<Paginated<Review>> {
   return apiFetch<Paginated<Review>>(`/reviews/vendor/${vendorId}`, { auth: false });
+}
+
+// ── Bundles & payments (all authenticated) ───────────────────────────
+
+/** The signed-in user's bundles. Returns full bundle objects, not summaries. */
+export function listBundles(): Promise<BundleDetail[]> {
+  return apiFetch<BundleDetail[]>("/bundles");
+}
+
+export function getBundle(bundleId: string): Promise<BundleDetail> {
+  return apiFetch<BundleDetail>(`/bundles/${bundleId}`);
+}
+
+/** Keep one bundle from a 3-option comparison group and discard the others. */
+export function selectBundle(bundleId: string): Promise<unknown> {
+  return apiFetch(`/bundles/${bundleId}/select`, { method: "POST" });
+}
+
+/**
+ * Start a Stripe-hosted Checkout Session for one booking. `client=web` makes
+ * Stripe return into this app rather than the iOS deep-link bridge.
+ */
+export function createCheckoutSession(
+  bookingId: string,
+): Promise<{ checkout_url: string }> {
+  return apiFetch<{ checkout_url: string }>(
+    `/payments/bookings/${bookingId}/checkout-session?client=web`,
+    { method: "POST" },
+  );
+}
+
+/**
+ * Reconcile a booking's payment straight from Stripe. Idempotent — a safety net
+ * for a delayed webhook, called when the customer returns from Checkout.
+ */
+export function syncBookingPayment(bookingId: string): Promise<unknown> {
+  return apiFetch(`/payments/bookings/${bookingId}/sync-payment`, { method: "POST" });
 }

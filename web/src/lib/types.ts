@@ -191,6 +191,71 @@ export interface VendorSearchParams {
   offset?: number;
 }
 
+// ── Bundles & bookings ───────────────────────────────────────────────
+
+export interface BundleEventInfo {
+  event_id: string;
+  name: string;
+  date_iso?: string | null;
+  location?: string | null;
+  guest_count?: number | null;
+}
+
+export interface BundleBooking {
+  booking_id: string;
+  status: string;
+  payment_status?: string | null;
+  date_iso?: string | null;
+  time_start?: string | null;
+  time_end?: string | null;
+  location?: string | null;
+  service_name?: string | null;
+  service_category?: string | null;
+  service_subcategory?: string | null;
+  vendor_name?: string | null;
+  vendor_id?: string | null;
+  price: number;
+  amount_cents?: number | null;
+  price_unit?: string | null;
+  /** True when the total still needs a quantity (guests/dates) before paying. */
+  price_pending_quantity?: boolean;
+}
+
+export interface BundleDetail {
+  bundle_id: string;
+  user_id: string;
+  name: string;
+  event_name?: string | null;
+  status: string;
+  event_id?: string | null;
+  event?: BundleEventInfo | null;
+  bookings: BundleBooking[];
+  booking_count: number;
+  total_estimated_cost: number;
+  status_breakdown?: Record<string, number>;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+/** Booking lifecycle labels. Mirrors the backend BookingStatus values. */
+export const BOOKING_STATUS_LABELS: Record<string, string> = {
+  pending: "Awaiting vendor",
+  negotiation_ongoing: "Negotiating",
+  approved: "Approved",
+  rejected: "Declined",
+  payment_confirmed: "Paid",
+};
+
+/** Escrow states. Mirrors the backend payment_status values. */
+export const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  unpaid: "Not paid",
+  processing: "Processing",
+  paid: "Held in escrow",
+  released: "Released to vendor",
+  refunded: "Refunded",
+  disputed: "Disputed",
+};
+
 /** Human label for a price unit, e.g. "per person"; "" for flat/event pricing. */
 export function priceUnitLabel(unit?: string | null): string {
   if (!unit) return "";

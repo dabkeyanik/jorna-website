@@ -1,13 +1,21 @@
 "use client";
 
 import { categoryLabel, type BundleOption } from "@/lib/types";
-import { Card } from "./ui";
+import { Button, Card } from "./ui";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
 }
 
-function BundleCard({ option }: { option: BundleOption }) {
+function BundleCard({
+  option,
+  onChoose,
+  choosing,
+}: {
+  option: BundleOption;
+  onChoose?: (option: BundleOption) => void;
+  choosing?: boolean;
+}) {
   const { bundle } = option;
   const unfilled = bundle.unfilled_categories ?? [];
   return (
@@ -48,15 +56,39 @@ function BundleCard({ option }: { option: BundleOption }) {
           add {unfilled.length === 1 ? "it" : "one"} later if a vendor opens up.
         </p>
       ) : null}
+
+      {onChoose ? (
+        <Button
+          className="mt-4 w-full"
+          disabled={choosing || !option.bundle_id}
+          onClick={() => onChoose(option)}
+        >
+          {choosing ? "Setting up…" : "Choose this bundle"}
+        </Button>
+      ) : null}
     </Card>
   );
 }
 
-export function BundleResults({ options }: { options: BundleOption[] }) {
+export function BundleResults({
+  options,
+  onChoose,
+  choosingLabel,
+}: {
+  options: BundleOption[];
+  onChoose?: (option: BundleOption) => void;
+  /** Label of the option currently being selected, so only its button spins. */
+  choosingLabel?: string | null;
+}) {
   return (
     <div className="grid gap-4 md:grid-cols-3">
       {options.map((o) => (
-        <BundleCard key={o.label} option={o} />
+        <BundleCard
+          key={o.label}
+          option={o}
+          onChoose={onChoose}
+          choosing={choosingLabel === o.label}
+        />
       ))}
     </div>
   );

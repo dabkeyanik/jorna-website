@@ -22,9 +22,12 @@ export function SiteHeader() {
           </Link>
           {loading ? null : user ? (
             <>
-              <span className="hidden text-sm text-ink-soft sm:inline">
-                {user.f_name || user.username}
-              </span>
+              <Link
+                href="/bundles"
+                className="px-2 text-sm font-semibold text-ink-soft transition hover:text-ink"
+              >
+                My bundles
+              </Link>
               <LinkButton href="/plan" size="md">
                 Plan
               </LinkButton>

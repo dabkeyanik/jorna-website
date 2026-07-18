@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
-import { generateBundles } from "@/lib/jorna";
+import { generateBundles, selectBundle } from "@/lib/jorna";
 import { CATEGORY_LABELS, categoryLabel, type BundleOption } from "@/lib/types";
 import { Button, Card, Chip, Field } from "@/components/ui";
 import { BundleResults } from "@/components/BundleResults";
@@ -37,6 +37,27 @@ export default function PlanPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [options, setOptions] = useState<BundleOption[] | null>(null);
+  const [choosingLabel, setChoosingLabel] = useState<string | null>(null);
+
+  /**
+   * Keep one of the three options. The backend persisted all three as drafts
+   * sharing a bundle_group_id; selecting keeps this one and discards the rest,
+   * then we go to the bundle to book and pay.
+   */
+  async function choose(option: BundleOption) {
+    if (!option.bundle_id) return;
+    setChoosingLabel(option.label);
+    setError(null);
+    try {
+      await selectBundle(option.bundle_id);
+      router.push(`/bundle?id=${option.bundle_id}`);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Couldn't select that bundle. Try again.",
+      );
+      setChoosingLabel(null);
+    }
+  }
 
   function toggle(list: string[], setList: (v: string[]) => void, value: string) {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
@@ -173,7 +194,11 @@ export default function PlanPage() {
               Try a different date or fewer categories.
             </p>
           ) : (
-            <BundleResults options={options} />
+            <BundleResults
+              options={options}
+              onChoose={choose}
+              choosingLabel={choosingLabel}
+            />
           )}
         </section>
       ) : null}
