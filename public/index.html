@@ -143,6 +143,21 @@
   }
   .hero-note { color: var(--ink-faint); font-size: .95rem; margin: 1.4rem 0 0; }
 
+  /* ---------- Call to action ---------- */
+  .cta-row { display: flex; flex-wrap: wrap; gap: .7rem; justify-content: center; margin: .4rem 0 .2rem; }
+  .btn {
+    display: inline-flex; align-items: center; gap: .5rem;
+    font-weight: 600; text-decoration: none;
+    padding: .85rem 1.7rem; border-radius: 999px; font-size: 1rem;
+    transition: filter .2s, transform .2s, box-shadow .2s;
+  }
+  .btn-primary {
+    background: var(--maroon); color: var(--ground);
+    box-shadow: 0 12px 26px -14px color-mix(in srgb, var(--maroon) 75%, transparent);
+  }
+  .btn-primary:hover { filter: brightness(1.08); transform: translateY(-1px); }
+  @media (prefers-color-scheme: dark){ .btn-primary { background: var(--gold); color: #2A0C19; } }
+
   /* ---------- Intro ---------- */
   .intro { padding: clamp(2rem, 5vw, 3.4rem) 0; }
   .intro p { font-size: 1.14rem; color: var(--ink-soft); margin: 0 auto; }
@@ -325,8 +340,11 @@
     <span class="eyebrow">The South Asian celebration marketplace</span>
     <h1 class="wordmark">Jorna</h1>
     <p class="lede">Your whole celebration in one place — a matched team of vendors, booked and paid for safely, from the first idea to the last dance.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="/app/">Try it now — build a bundle</a>
+    </div>
     <div class="rule"><i></i></div>
-    <p class="hero-note">A short guide for whichever side of the aisle you're on.</p>
+    <p class="hero-note">Or read the short guide for whichever side of the aisle you're on.</p>
   </header>
 
   <!-- INTRO -->

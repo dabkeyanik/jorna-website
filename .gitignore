@@ -1,0 +1,19 @@
+node_modules/
+
+# Next.js build artifacts for the web app
+web/.next/
+web/out/
+web/next-env.d.ts
+
+# Generated: the web app's static export, copied here at build time and served
+# by the Worker at /app. Built by `npm run build`, so it isn't committed.
+public/app/
+
+# Local env (values are public, but keep them out of git by convention)
+.env
+.env.local
+web/.env
+web/.env.local
+
+.wrangler/
+.DS_Store

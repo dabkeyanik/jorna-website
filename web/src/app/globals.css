@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+/*
+  Jorna design system — ported from the marketing site (jornaevents.com).
+  Palette is defined once here; Tailwind v4 exposes each --color-* token as a
+  utility (bg-maroon, text-gold, border-line, …). Light + dark via a data-theme
+  attribute (set by the theme script) with a prefers-color-scheme fallback.
+*/
+
+@theme {
+  --color-ground: #f6eee1;
+  --color-ground-2: #fcf7ee;
+  --color-panel: #fbf4e7;
+  --color-card: #ffffff;
+  --color-ink: #35101b;
+  --color-ink-soft: #6b4a45;
+  --color-ink-faint: #7a5a52;
+  --color-maroon: #6b1226;
+  --color-maroon-deep: #4a0b1a;
+  --color-gold: #a9791f;
+  --color-gold-bright: #c69329;
+  --color-green: #3f6b4e;
+  --color-line: rgba(107, 18, 38, 0.16);
+  --color-line-soft: rgba(107, 18, 38, 0.09);
+  --color-card-edge: rgba(107, 18, 38, 0.12);
+
+  --font-serif: "Didot", "Bodoni 72", "Hoefler Text", "Iowan Old Style",
+    "Palatino Linotype", Palatino, Georgia, serif;
+  --font-sans: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  --shadow-card: 0 1px 2px rgba(74, 11, 26, 0.05),
+    0 12px 34px -18px rgba(74, 11, 26, 0.28);
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+[data-theme="dark"] {
+  --color-ground: #1c0610;
+  --color-ground-2: #250a16;
+  --color-panel: #2a0c19;
+  --color-card: #2b0d1a;
+  --color-ink: #f3e6d6;
+  --color-ink-soft: #d8b79c;
+  --color-ink-faint: #b08e7e;
+  --color-maroon: #8a1b34;
+  --color-maroon-deep: #3a0c1b;
+  --color-gold: #e0b457;
+  --color-gold-bright: #f0c971;
+  --color-green: #7fb48e;
+  --color-line: rgba(224, 180, 87, 0.2);
+  --color-line-soft: rgba(224, 180, 87, 0.11);
+  --color-card-edge: rgba(224, 180, 87, 0.16);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 18px 44px -20px rgba(0, 0, 0, 0.65);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-ground: #1c0610;
+    --color-ground-2: #250a16;
+    --color-panel: #2a0c19;
+    --color-card: #2b0d1a;
+    --color-ink: #f3e6d6;
+    --color-ink-soft: #d8b79c;
+    --color-ink-faint: #b08e7e;
+    --color-maroon: #8a1b34;
+    --color-maroon-deep: #3a0c1b;
+    --color-gold: #e0b457;
+    --color-gold-bright: #f0c971;
+    --color-green: #7fb48e;
+    --color-line: rgba(224, 180, 87, 0.2);
+    --color-line-soft: rgba(224, 180, 87, 0.11);
+    --color-card-edge: rgba(224, 180, 87, 0.16);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3),
+      0 18px 44px -20px rgba(0, 0, 0, 0.65);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+.serif {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  line-height: 1.14;
+  text-wrap: balance;
+}
+
+.eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
