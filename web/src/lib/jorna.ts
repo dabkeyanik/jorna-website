@@ -97,3 +97,30 @@ export function createCheckoutSession(
 export function syncBookingPayment(bookingId: string): Promise<unknown> {
   return apiFetch(`/payments/bookings/${bookingId}/sync-payment`, { method: "POST" });
 }
+
+// ── Escrow release ───────────────────────────────────────────────────
+
+/**
+ * Confirm the event happened. The backend derives your role (customer vs
+ * vendor) from your identity. Funds release automatically once *both* sides
+ * have confirmed — and never before the event's last day.
+ */
+export function confirmBookingEvent(bookingId: string): Promise<unknown> {
+  return apiFetch(`/payments/bookings/${bookingId}/confirm`, { method: "POST" });
+}
+
+/** Full refund, available for 24 hours after payment. Customer only. */
+export function refundBooking(bookingId: string): Promise<unknown> {
+  return apiFetch(`/payments/bookings/${bookingId}/refund`, { method: "POST" });
+}
+
+/**
+ * Freeze this one booking's funds for review. Customer only, and only while the
+ * money is still held (payment_status "paid"). Siblings are unaffected.
+ */
+export function disputeBooking(bookingId: string, reason?: string): Promise<unknown> {
+  return apiFetch(`/payments/bookings/${bookingId}/dispute`, {
+    method: "POST",
+    body: { reason: reason || null },
+  });
+}
