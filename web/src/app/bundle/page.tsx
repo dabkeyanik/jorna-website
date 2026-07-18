@@ -5,12 +5,20 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
-import { createCheckoutSession, getBundle } from "@/lib/jorna";
+import {
+  confirmBookingEvent,
+  createCheckoutSession,
+  disputeBooking,
+  getBundle,
+  refundBooking,
+} from "@/lib/jorna";
 import {
   BOOKING_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
   categoryLabel,
+  eventHasPassed,
   priceUnitLabel,
+  withinRefundWindow,
   type BundleBooking,
   type BundleDetail,
 } from "@/lib/types";
@@ -19,6 +27,9 @@ import { Button, Card, LinkButton } from "@/components/ui";
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
 }
+
+type PanelKind = "refund" | "dispute";
+type Panel = { bookingId: string; kind: PanelKind } | null;
 
 /** Escrow-aware status line for one booking. */
 function statusLine(b: BundleBooking): { text: string; tone: string } {
@@ -40,16 +51,31 @@ function statusLine(b: BundleBooking): { text: string; tone: string } {
 
 function BookingRow({
   booking,
+  busyId,
+  panel,
   onPay,
-  paying,
+  onConfirm,
+  onOpenPanel,
+  onClosePanel,
+  onRefund,
+  onDispute,
 }: {
   booking: BundleBooking;
+  busyId: string | null;
+  panel: Panel;
   onPay: (b: BundleBooking) => void;
-  paying: boolean;
+  onConfirm: (b: BundleBooking) => void;
+  onOpenPanel: (bookingId: string, kind: PanelKind) => void;
+  onClosePanel: () => void;
+  onRefund: (b: BundleBooking) => void;
+  onDispute: (b: BundleBooking, reason: string) => void;
 }) {
+  const [reason, setReason] = useState("");
   const pay = booking.payment_status ?? "unpaid";
   const unit = priceUnitLabel(booking.price_unit);
   const status = statusLine(booking);
+  const busy = busyId === booking.booking_id;
+  const openPanel = panel?.bookingId === booking.booking_id ? panel.kind : null;
 
   // Mirror the backend's checkout guards so we never offer a button that must
   // fail: only an approved, not-yet-paid booking with a resolvable total.
@@ -57,13 +83,17 @@ function BookingRow({
     booking.status === "approved" && (pay === "unpaid" || pay === "processing");
   const blockedOnQuantity = payable && booking.price_pending_quantity;
 
+  // Escrow actions only exist while the money is held on the platform.
+  const held = pay === "paid";
+  const youConfirmed = Boolean(booking.customer_confirmed_at);
+  const canConfirm = held && !youConfirmed && eventHasPassed(booking.date_iso);
+  const refundable = held && withinRefundWindow(booking.paid_at);
+
   return (
     <Card className="p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="serif text-lg text-ink">
-            {booking.service_name || "Service"}
-          </h3>
+          <h3 className="serif text-lg text-ink">{booking.service_name || "Service"}</h3>
           <p className="mt-0.5 text-sm text-ink-soft">
             {booking.vendor_name}
             {booking.service_category
@@ -72,13 +102,13 @@ function BookingRow({
           </p>
           <p className={`mt-1.5 text-sm font-medium ${status.tone}`}>{status.text}</p>
         </div>
-
         <div className="text-right">
           <p className="serif text-lg text-ink">{money(booking.price)}</p>
           {unit ? <p className="text-xs text-ink-faint">{unit}</p> : null}
         </div>
       </div>
 
+      {/* Payment */}
       {blockedOnQuantity ? (
         <p className="mt-3 rounded-lg bg-gold/10 px-3 py-2 text-xs text-ink-soft">
           This service is priced {unit || "per unit"}. Its total needs a guest count
@@ -86,9 +116,96 @@ function BookingRow({
         </p>
       ) : payable ? (
         <div className="mt-3 flex justify-end">
-          <Button onClick={() => onPay(booking)} disabled={paying}>
-            {paying ? "Opening checkout…" : `Pay ${money(booking.price)}`}
+          <Button onClick={() => onPay(booking)} disabled={busy}>
+            {busy ? "Opening checkout…" : `Pay ${money(booking.price)}`}
           </Button>
+        </div>
+      ) : null}
+
+      {/* Escrow release */}
+      {held ? (
+        <div className="mt-3 border-t border-line-soft pt-3">
+          {youConfirmed ? (
+            <p className="text-xs text-ink-soft">
+              You&apos;ve confirmed. The vendor still needs to confirm before the
+              payment is released.
+            </p>
+          ) : !eventHasPassed(booking.date_iso) ? (
+            <p className="text-xs text-ink-soft">
+              You can confirm after the event
+              {booking.date_iso && booking.date_iso !== "TBD"
+                ? ` (${booking.date_iso})`
+                : ""}
+              . Funds are never released before then.
+            </p>
+          ) : null}
+
+          {openPanel === "refund" ? (
+            <div className="rounded-lg bg-panel p-3">
+              <p className="text-xs text-ink-soft">
+                Request a full refund of {money(booking.price)}? This cancels the
+                booking with this vendor. Only the rest of your bundle is unaffected.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <Button size="md" disabled={busy} onClick={() => onRefund(booking)}>
+                  {busy ? "Requesting…" : "Confirm refund"}
+                </Button>
+                <Button variant="ghost" size="md" onClick={onClosePanel}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : openPanel === "dispute" ? (
+            <div className="rounded-lg bg-panel p-3">
+              <p className="text-xs text-ink-soft">
+                Tell us what went wrong. This freezes only this booking&apos;s payment
+                for our team to review — the rest of your bundle carries on.
+              </p>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={3}
+                placeholder="What happened?"
+                className="mt-2 w-full rounded-lg border border-card-edge bg-ground-2 px-3 py-2 text-sm text-ink outline-none focus:border-gold"
+              />
+              <div className="mt-2 flex gap-2">
+                <Button
+                  size="md"
+                  disabled={busy}
+                  onClick={() => onDispute(booking, reason)}
+                >
+                  {busy ? "Submitting…" : "Submit report"}
+                </Button>
+                <Button variant="ghost" size="md" onClick={onClosePanel}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {refundable ? (
+                <Button
+                  variant="ghost"
+                  size="md"
+                  onClick={() => onOpenPanel(booking.booking_id, "refund")}
+                >
+                  Request refund
+                </Button>
+              ) : null}
+              <Button
+                variant="ghost"
+                size="md"
+                onClick={() => onOpenPanel(booking.booking_id, "dispute")}
+              >
+                Report a problem
+              </Button>
+              {canConfirm ? (
+                <Button disabled={busy} onClick={() => onConfirm(booking)}>
+                  {busy ? "Confirming…" : "Confirm & release"}
+                </Button>
+              ) : null}
+            </div>
+          )}
         </div>
       ) : null}
     </Card>
@@ -104,7 +221,8 @@ function BundleInner() {
   const [bundle, setBundle] = useState<BundleDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [payingId, setPayingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [panel, setPanel] = useState<Panel>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -128,18 +246,38 @@ function BundleInner() {
     void load();
   }, [load]);
 
+  /** Run an escrow action, then refresh so the new state is authoritative. */
+  async function run(
+    booking: BundleBooking,
+    action: () => Promise<unknown>,
+    success: string,
+    failure: string,
+  ) {
+    setBusyId(booking.booking_id);
+    setNotice(null);
+    try {
+      await action();
+      setPanel(null);
+      setNotice(success);
+      await load();
+    } catch (err) {
+      setNotice(err instanceof ApiError ? err.message : failure);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function pay(booking: BundleBooking) {
-    setPayingId(booking.booking_id);
+    setBusyId(booking.booking_id);
     setNotice(null);
     try {
       const { checkout_url } = await createCheckoutSession(booking.booking_id);
-      // Hand off to Stripe's hosted page; it returns to /app/payment-complete.
       window.location.href = checkout_url;
     } catch (err) {
       setNotice(
         err instanceof ApiError ? err.message : "Couldn't start checkout. Try again.",
       );
-      setPayingId(null);
+      setBusyId(null);
       if (err instanceof ApiError && err.status === 409) void load();
     }
   }
@@ -190,8 +328,38 @@ function BundleInner() {
           <BookingRow
             key={b.booking_id}
             booking={b}
-            paying={payingId === b.booking_id}
+            busyId={busyId}
+            panel={panel}
             onPay={pay}
+            onOpenPanel={(bookingId, kind) => {
+              setNotice(null);
+              setPanel({ bookingId, kind });
+            }}
+            onClosePanel={() => setPanel(null)}
+            onConfirm={(bk) =>
+              run(
+                bk,
+                () => confirmBookingEvent(bk.booking_id),
+                "Thanks — your confirmation is recorded. The payment releases once the vendor confirms too.",
+                "Couldn't confirm this booking. Please try again.",
+              )
+            }
+            onRefund={(bk) =>
+              run(
+                bk,
+                () => refundBooking(bk.booking_id),
+                "Refund requested. It should appear on your statement within a few days.",
+                "Couldn't process the refund. Please try again.",
+              )
+            }
+            onDispute={(bk, reason) =>
+              run(
+                bk,
+                () => disputeBooking(bk.booking_id, reason),
+                "Reported. This booking's payment is frozen while our team reviews it.",
+                "Couldn't submit the report. Please try again.",
+              )
+            }
           />
         ))}
       </section>

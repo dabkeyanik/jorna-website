@@ -219,6 +219,50 @@ export interface BundleBooking {
   price_unit?: string | null;
   /** True when the total still needs a quantity (guests/dates) before paying. */
   price_pending_quantity?: boolean;
+  // Escrow lifecycle (ISO timestamps, null until they happen).
+  /** When Stripe payment succeeded. The 24h refund window runs from here. */
+  paid_at?: string | null;
+  customer_confirmed_at?: string | null;
+  vendor_confirmed_at?: string | null;
+  funds_released_at?: string | null;
+}
+
+/** How long after paying a full refund is still available. */
+export const REFUND_WINDOW_HOURS = 24;
+
+/**
+ * Parse a timestamp from the API to epoch ms, or null if unusable.
+ *
+ * These come from Python's `datetime.isoformat()`. The values are written as
+ * UTC, but the columns aren't timezone-aware, so a round-trip may hand back
+ * either "…T10:00:00+00:00" or a bare "…T10:00:00". Naive strings are read as
+ * UTC; anything already carrying Z or ±HH:MM is left alone (appending "Z" to
+ * an offset would produce an unparseable string).
+ */
+export function parseServerTime(ts?: string | null): number | null {
+  if (!ts) return null;
+  const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(ts);
+  const parsed = Date.parse(hasZone ? ts : `${ts}Z`);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+/** True while the booking is still inside its 24h post-payment refund window. */
+export function withinRefundWindow(paidAt?: string | null): boolean {
+  const paid = parseServerTime(paidAt);
+  if (paid === null) return false;
+  return Date.now() - paid < REFUND_WINDOW_HOURS * 3600 * 1000;
+}
+
+/**
+ * Whether the event is far enough along to confirm. Mirrors the backend's
+ * event_confirmable_date: funds never release before the event's last day, and
+ * a TBD date isn't confirmable at all.
+ */
+export function eventHasPassed(dateIso?: string | null): boolean {
+  if (!dateIso || dateIso === "TBD") return false;
+  const day = Date.parse(`${dateIso}T23:59:59Z`);
+  if (Number.isNaN(day)) return false;
+  return Date.now() > day;
 }
 
 export interface BundleDetail {
