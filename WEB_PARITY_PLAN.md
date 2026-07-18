@@ -84,9 +84,15 @@ take money; B5–B6 complete their side.
   - Image upload needed `apiUpload` in the API client: multipart must **not**
     set Content-Type by hand, or the boundary is missing and the body won't parse.
 
-- [ ] **B3. Booking requests (approve / decline)**
-  - `GET /bookings/vendor/{vendor_id}`, `PUT /bookings/{id}/status`.
-  - Handle the **409 date-conflict** case (a vendor can't take two events on one day).
+- [x] **B3. Booking requests (approve / decline)** — `/my-bookings`
+  - Filtered by what needs an answer vs. accepted vs. all, with the pending count
+    up top. Declining goes through a confirmation.
+  - Accepting can 409 when the vendor already has an accepted or paid booking on
+    an overlapping date (one event per day) — the server's message is shown
+    rather than a generic failure.
+  - Flags a request whose total is still pending a quantity, so a vendor isn't
+    surprised when the client can't pay yet.
+  - Seller pages now share a `VendorNav` (Requests / Services / Profile).
 
 - [ ] **B4. Stripe onboarding + earnings**
   - `POST /payments/vendors/{id}/stripe-onboard` (hosted redirect),

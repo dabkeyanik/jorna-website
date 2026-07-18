@@ -22,6 +22,7 @@ import {
   type VendorDetail,
 } from "@/lib/types";
 import { Button, Card, Field, LinkButton } from "@/components/ui";
+import { VendorNav } from "@/components/VendorNav";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -228,6 +229,7 @@ export default function MyServicesPage() {
 
   return (
     <div className="mx-auto w-[min(880px,100%-2rem)] py-10">
+      <VendorNav />
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <span className="eyebrow">Selling</span>

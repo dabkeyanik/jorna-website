@@ -317,6 +317,42 @@ export interface VendorUpdateInput {
   instagram_username?: string | null;
 }
 
+// ── Vendor-side bookings ─────────────────────────────────────────────
+
+/** A booking as the vendor sees it (the fuller `_booking_dict` payload). */
+export interface VendorBooking {
+  booking_id: string;
+  user_id: string;
+  client_name?: string | null;
+  service_id?: string | null;
+  service_name?: string | null;
+  service_category?: string | null;
+  service_subcategory?: string | null;
+  price: number;
+  price_unit?: string | null;
+  price_pending_quantity?: boolean;
+  guest_count?: number | null;
+  bundle_id?: string | null;
+  event_name?: string | null;
+  date_iso?: string | null;
+  date_end?: string | null;
+  time_start?: string | null;
+  time_end?: string | null;
+  location?: string | null;
+  venue_latitude?: number | null;
+  venue_longitude?: number | null;
+  status: string;
+  payment_status?: string | null;
+  amount_cents?: number | null;
+  negotiable?: boolean;
+  paid_at?: string | null;
+  customer_confirmed_at?: string | null;
+  vendor_confirmed_at?: string | null;
+  funds_released_at?: string | null;
+  vendor_checked_in_at?: string | null;
+  client_checked_in_at?: string | null;
+}
+
 // ── Events ───────────────────────────────────────────────────────────
 
 export interface EventItem {

@@ -45,7 +45,7 @@ export function SiteHeader() {
                 Bundles
               </Link>
               <Link
-                href="/vendor-profile"
+                href="/my-bookings"
                 className="hidden px-2 text-sm font-semibold text-ink-soft transition hover:text-ink sm:inline"
               >
                 Selling

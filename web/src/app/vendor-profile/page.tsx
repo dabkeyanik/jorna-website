@@ -12,6 +12,7 @@ import {
 } from "@/lib/jorna";
 import type { TaxonomyCategory, VendorDetail } from "@/lib/types";
 import { Button, Card, Field, LinkButton } from "@/components/ui";
+import { VendorNav } from "@/components/VendorNav";
 
 export default function VendorProfilePage() {
   const { user, loading: authLoading } = useAuth();
@@ -108,6 +109,7 @@ export default function VendorProfilePage() {
 
   return (
     <div className="mx-auto w-[min(680px,100%-2rem)] py-10">
+      <VendorNav />
       <header>
         <span className="eyebrow">{vendor ? "Vendor profile" : "Become a vendor"}</span>
         <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold">

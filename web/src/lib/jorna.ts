@@ -7,6 +7,7 @@ import type {
   EventCreateInput,
   EventItem,
   TaxonomyCategory,
+  VendorBooking,
   VendorCreateInput,
   VendorUpdateInput,
   MultiBundleResponse,
@@ -242,6 +243,34 @@ export function deleteServiceImage(
     `/services/${serviceId}/images?image_url=${encodeURIComponent(imageUrl)}`,
     { method: "DELETE" },
   );
+}
+
+// ── Vendor-side bookings ─────────────────────────────────────────────
+
+export function listVendorBookings(
+  vendorId: string,
+  params: { limit?: number; offset?: number } = {},
+): Promise<Paginated<VendorBooking>> {
+  return apiFetch<Paginated<VendorBooking>>(
+    `/bookings/vendor/${vendorId}${query({ ...params })}`,
+  );
+}
+
+/**
+ * Approve or decline a booking request.
+ *
+ * Approving can fail with 409 when the vendor already has an approved or paid
+ * booking on an overlapping date — one event per day. Surface that message
+ * rather than a generic error.
+ */
+export function setBookingStatus(
+  bookingId: string,
+  status: "approved" | "rejected",
+): Promise<unknown> {
+  return apiFetch(`/bookings/${bookingId}/status`, {
+    method: "PUT",
+    body: { status },
+  });
 }
 
 // ── Events ───────────────────────────────────────────────────────────
