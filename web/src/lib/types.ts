@@ -163,7 +163,11 @@ export interface ServiceItem {
   subcategory?: string | null;
   description?: string | null;
   negotiable?: boolean;
+  // Venue services carry an address + map pin; the event's check-in anchor is
+  // derived from the venue booking, so these get mirrored onto the booking.
   location?: string | null;
+  venue_latitude?: number | null;
+  venue_longitude?: number | null;
   vendor_name?: string | null;
   vendor_rating?: number | null;
   vendor_pfp_url?: string | null;
@@ -299,6 +303,19 @@ export const PAYMENT_STATUS_LABELS: Record<string, string> = {
   refunded: "Refunded",
   disputed: "Disputed",
 };
+
+/**
+ * What quantity a service's rate is multiplied by. The booking must capture
+ * that quantity up front or its total can't be resolved and checkout refuses
+ * (see resolve_total_cents / price_pending_quantity on the backend).
+ */
+export type PriceUnitKind = "person" | "day" | "hour" | "event";
+
+export function priceUnitKind(unit?: string | null): PriceUnitKind {
+  if (!unit) return "event";
+  const u = unit.toLowerCase().replace(/^per\s+/, "").trim();
+  return u === "person" || u === "day" || u === "hour" ? u : "event";
+}
 
 /** Human label for a price unit, e.g. "per person"; "" for flat/event pricing. */
 export function priceUnitLabel(unit?: string | null): string {

@@ -25,13 +25,16 @@ each one should leave the app in a working state.
 
 The most visible gap: you can browse and find a vendor, but you can't book them.
 
-- [ ] **A1. Book a service from a vendor profile**
-  - `POST /bookings` — needs `service_id`, `event_name`, `date_iso`, `time_start`,
-    `time_end`, `location`; optional `date_end`, `guest_count`, `bundle_id`.
-  - Per-person/per-day services **must** capture quantity here or the booking
-    can't be paid later (`price_pending_quantity`).
-  - Add to a new or existing bundle; land on `/bundle?id=`.
-  - Done when: browse → vendor → book → the booking appears in a bundle.
+- [x] **A1. Book a service from a vendor profile** — `/book?service=`
+  - "Book this" on each service → a request form → `POST /bookings` → `/bundle?id=`.
+  - Guest count is **required** for per-person services (otherwise the total can
+    never resolve and checkout would refuse). Multi-day toggle sets `date_end`.
+  - Shows a live estimated total using the backend's own arithmetic
+    (rate × quantity; per-day counts the end date inclusively, per-hour handles
+    a window crossing midnight). Verified against `estimate_amount_cents`.
+  - A venue service prefills its address and passes its map pin, so the event is
+    anchored for check-in.
+  - Adds to a new bundle or an existing one.
 
 - [ ] **A2. Edit a bundle**
   - Swap a service (`/services?category=&subcategory=` for candidates),

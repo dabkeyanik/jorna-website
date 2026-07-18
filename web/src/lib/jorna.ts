@@ -61,6 +61,41 @@ export function getVendorReviews(vendorId: string): Promise<Paginated<Review>> {
   return apiFetch<Paginated<Review>>(`/reviews/vendor/${vendorId}`, { auth: false });
 }
 
+export function getService(serviceId: string): Promise<ServiceItem> {
+  return apiFetch<ServiceItem>(`/services/${serviceId}`, { auth: false });
+}
+
+// ── Booking ──────────────────────────────────────────────────────────
+
+export interface BookingCreateInput {
+  service_id: string;
+  event_name: string;
+  date_iso: string;
+  time_start: string;
+  time_end: string;
+  location: string;
+  /** Multi-day events only. Per-day pricing counts the end date inclusively. */
+  date_end?: string | null;
+  /** Required for per-person services, or the total can't be resolved. */
+  guest_count?: number | null;
+  venue_latitude?: number | null;
+  venue_longitude?: number | null;
+  /** Omit to have the backend create a bundle for this booking. */
+  bundle_id?: string | null;
+}
+
+export interface BookingCreateResult {
+  message: string;
+  booking_id: string;
+  bundle_id: string;
+  status: string;
+}
+
+/** Request a service. Creates a `pending` booking for the vendor to approve. */
+export function createBooking(input: BookingCreateInput): Promise<BookingCreateResult> {
+  return apiFetch<BookingCreateResult>("/bookings", { method: "POST", body: input });
+}
+
 // ── Bundles & payments (all authenticated) ───────────────────────────
 
 /** The signed-in user's bundles. Returns full bundle objects, not summaries. */

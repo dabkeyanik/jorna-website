@@ -44,7 +44,7 @@ function ServiceRow({ service }: { service: ServiceItem }) {
           {service.description ? (
             <p className="mt-1.5 text-sm text-ink-soft">{service.description}</p>
           ) : null}
-          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
             {service.category ? (
               <span className="rounded-full border border-card-edge px-2.5 py-1 text-ink-faint">
                 {categoryLabel(service.subcategory || service.category)}
@@ -60,6 +60,13 @@ function ServiceRow({ service }: { service: ServiceItem }) {
                 Open to offers
               </span>
             ) : null}
+            <LinkButton
+              href={`/book?service=${service.service_id}`}
+              size="md"
+              className="ml-auto"
+            >
+              Book this
+            </LinkButton>
           </div>
         </div>
       </div>
