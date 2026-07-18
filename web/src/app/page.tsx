@@ -17,12 +17,13 @@ export default function Home() {
           <LinkButton href="/plan" size="lg">
             Try it now — build a bundle
           </LinkButton>
-          <LinkButton href="/login" variant="ghost" size="lg">
-            Sign in
+          <LinkButton href="/browse" variant="ghost" size="lg">
+            Browse vendors
           </LinkButton>
         </div>
         <p className="mt-5 text-sm text-ink-faint">
-          Answer a few questions and get three ready-to-book vendor teams.
+          Answer a few questions and get three ready-to-book vendor teams — or
+          browse every vendor yourself, no account needed.
         </p>
       </section>
 

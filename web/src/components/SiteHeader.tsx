@@ -14,6 +14,12 @@ export function SiteHeader() {
           Jorna
         </Link>
         <nav className="flex items-center gap-2">
+          <Link
+            href="/browse"
+            className="px-2 text-sm font-semibold text-ink-soft transition hover:text-ink"
+          >
+            Browse
+          </Link>
           {loading ? null : user ? (
             <>
               <span className="hidden text-sm text-ink-soft sm:inline">
