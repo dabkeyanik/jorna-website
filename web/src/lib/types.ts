@@ -289,6 +289,35 @@ export interface BundleDetail {
   updated_at?: string | null;
 }
 
+// ── Events ───────────────────────────────────────────────────────────
+
+export interface EventItem {
+  event_id: string;
+  user_id: string;
+  name: string;
+  date_iso?: string | null;
+  location?: string | null;
+  event_type?: string | null;
+  description?: string | null;
+  guest_count?: number | null;
+  budget?: number | null;
+  services_needed?: string[] | null;
+  /** The event's check-in anchor, derived from its live venue booking. */
+  venue_latitude?: number | null;
+  venue_longitude?: number | null;
+}
+
+export interface EventCreateInput {
+  name: string;
+  date_iso: string;
+  location: string;
+  event_type?: string | null;
+  description?: string | null;
+  guest_count?: number | null;
+  budget?: number | null;
+  services_needed?: string[] | null;
+}
+
 /** Booking lifecycle labels. Mirrors the backend BookingStatus values. */
 export const BOOKING_STATUS_LABELS: Record<string, string> = {
   pending: "Awaiting vendor",

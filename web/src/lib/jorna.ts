@@ -4,6 +4,8 @@ import { apiFetch } from "./api";
 import type {
   BundleDetail,
   BundleRequest,
+  EventCreateInput,
+  EventItem,
   MultiBundleResponse,
   Paginated,
   Review,
@@ -149,6 +151,31 @@ export function createCheckoutSession(
  */
 export function syncBookingPayment(bookingId: string): Promise<unknown> {
   return apiFetch(`/payments/bookings/${bookingId}/sync-payment`, { method: "POST" });
+}
+
+// ── Events ───────────────────────────────────────────────────────────
+//
+// There's no GET /events/{id}; the list is the source of detail. A booking has
+// no event_id of its own either — it reaches its event through its bundle — so
+// an event's bookings are assembled by matching bundles on event_id.
+
+export function listEvents(): Promise<EventItem[]> {
+  return apiFetch<EventItem[]>("/events");
+}
+
+export function createEvent(input: EventCreateInput): Promise<EventItem> {
+  return apiFetch<EventItem>("/events", { method: "POST", body: input });
+}
+
+export function updateEvent(
+  eventId: string,
+  updates: Partial<EventCreateInput>,
+): Promise<EventItem> {
+  return apiFetch<EventItem>(`/events/${eventId}`, { method: "PATCH", body: updates });
+}
+
+export function deleteEvent(eventId: string): Promise<void> {
+  return apiFetch<void>(`/events/${eventId}`, { method: "DELETE" });
 }
 
 // ── Escrow release ───────────────────────────────────────────────────
