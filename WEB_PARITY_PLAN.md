@@ -134,12 +134,15 @@ These can't be a straight port; decide per item rather than assuming parity.
 - Never show a rate as if it were a total; carry `price_unit` through.
 - Verify against the real backend before ticking a box; `npm run deploy` publishes
   the marketing page and the app together.
-- **Give a deploy ~30–60s before verifying, then curl the routes.** Checking
-  immediately after "Deployed" has twice shown 404s that resolved on their own —
-  the second time, the "fix" was a redeploy that uploaded *nothing*
-  ("No updated asset files to upload"), which proves the assets were already
-  there and only propagation was outstanding. So a 404 straight after deploy
-  means *wait and re-check*, not *redeploy*. Still always check:
+- **`wrangler deploy` fails intermittently, and a failed deploy leaves `/` serving
+  while `/app` 404s.** Confirmed: a run errored with a Cloudflare API failure on
+  `assets-upload-session` (`code: 10013`), printed no "Deployed" line, and
+  production then served the marketing page but 404'd every app route. Re-running
+  uploaded `/app/index.html` and friends as **new** files and fixed it.
+
+  So: **read the deploy output.** Success ends with `Deployed … triggers` and a
+  Version ID; a failure ends with a log-file path. If `/app` 404s, re-run the
+  deploy — don't assume propagation. Then check the routes:
 
   ```bash
   for p in / /app/ /app/browse/ /app/book/ /app/plan/ /app/bundles/; do
