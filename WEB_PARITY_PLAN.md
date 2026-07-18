@@ -94,10 +94,18 @@ take money; B5–B6 complete their side.
     surprised when the client can't pay yet.
   - Seller pages now share a `VendorNav` (Requests / Services / Profile).
 
-- [ ] **B4. Stripe onboarding + earnings**
-  - `POST /payments/vendors/{id}/stripe-onboard` (hosted redirect),
-    `GET /payments/vendors/{id}/stripe-status`, `GET /payments/vendors/{id}/earnings`.
-  - Clients can't pay a vendor who hasn't onboarded — surface that clearly.
+- [x] **B4. Stripe onboarding + earnings** — `/my-earnings`
+  - Connect onboarding as a hosted redirect, with the un-onboarded state saying
+    plainly that a booking can be accepted but checkout will refuse.
+  - Paid out / held in escrow / upcoming, plus disputed and refunded when they
+    apply, and a payment history. Amounts are net — the platform fee is already
+    out — and the page says so.
+  - Onboarding needed the same `client=web` split as checkout: the return page
+    otherwise bounces to `jorna://` and strands a browser mid-setup.
+  - The return path is **fixed by the backend** as
+    `{WEB_APP_URL}/vendor/stripe-onboard/return` (and `/refresh`), so the app has
+    routes at exactly those paths — without them a vendor 404s right after
+    finishing setup. They just forward to Earnings, which re-checks live status.
 
 - [ ] **B5. Vendor confirm + check-in**
   - `POST /payments/bookings/{id}/confirm`; GPS check-in via browser geolocation

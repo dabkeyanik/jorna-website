@@ -4,8 +4,10 @@ import { ApiError, apiFetch, apiUpload } from "./api";
 import type {
   BundleDetail,
   BundleRequest,
+  Earnings,
   EventCreateInput,
   EventItem,
+  StripeStatus,
   TaxonomyCategory,
   VendorBooking,
   VendorCreateInput,
@@ -243,6 +245,30 @@ export function deleteServiceImage(
     `/services/${serviceId}/images?image_url=${encodeURIComponent(imageUrl)}`,
     { method: "DELETE" },
   );
+}
+
+// ── Vendor payments ──────────────────────────────────────────────────
+
+/**
+ * Start Stripe Connect onboarding. `client=web` makes Stripe return into this
+ * app rather than the iOS deep-link bridge. Returns a hosted URL to redirect to.
+ */
+export function startStripeOnboarding(
+  vendorId: string,
+): Promise<{ onboarding_url: string }> {
+  return apiFetch<{ onboarding_url: string }>(
+    `/payments/vendors/${vendorId}/stripe-onboard?client=web`,
+    { method: "POST" },
+  );
+}
+
+/** Live status from Stripe. Clients can't pay a vendor who hasn't finished. */
+export function getStripeStatus(vendorId: string): Promise<StripeStatus> {
+  return apiFetch<StripeStatus>(`/payments/vendors/${vendorId}/stripe-status`);
+}
+
+export function getEarnings(vendorId: string): Promise<Earnings> {
+  return apiFetch<Earnings>(`/payments/vendors/${vendorId}/earnings`);
 }
 
 // ── Vendor-side bookings ─────────────────────────────────────────────

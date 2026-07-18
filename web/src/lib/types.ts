@@ -353,6 +353,38 @@ export interface VendorBooking {
   client_checked_in_at?: string | null;
 }
 
+// ── Vendor payments ──────────────────────────────────────────────────
+
+export interface StripeStatus {
+  stripe_account_id?: string | null;
+  stripe_onboarding_complete: boolean;
+}
+
+export interface EarningsEntry {
+  booking_id: string;
+  event_name?: string | null;
+  client_name?: string | null;
+  amount_cents: number;
+  platform_fee_cents: number;
+  /** What actually reaches the vendor: amount minus the platform fee. */
+  net_cents: number;
+  payment_status?: string | null;
+  paid_at?: string | null;
+  funds_released_at?: string | null;
+}
+
+export interface Earnings {
+  vendor_id: string;
+  total_released_cents: number;
+  in_escrow_cents: number;
+  upcoming_cents: number;
+  upcoming_count: number;
+  disputed_cents: number;
+  refunded_cents: number;
+  platform_fees_cents: number;
+  history: EarningsEntry[];
+}
+
 // ── Events ───────────────────────────────────────────────────────────
 
 export interface EventItem {
