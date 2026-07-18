@@ -44,6 +44,12 @@ export function SiteHeader() {
               >
                 Bundles
               </Link>
+              <Link
+                href="/vendor-profile"
+                className="hidden px-2 text-sm font-semibold text-ink-soft transition hover:text-ink sm:inline"
+              >
+                Selling
+              </Link>
               <LinkButton href="/plan" size="md">
                 Plan
               </LinkButton>

@@ -289,6 +289,34 @@ export interface BundleDetail {
   updated_at?: string | null;
 }
 
+// ── Vendor taxonomy & profile ────────────────────────────────────────
+
+export interface TaxonomyOption {
+  value: string;
+  label: string;
+}
+
+export interface TaxonomyCategory extends TaxonomyOption {
+  subcategories: TaxonomyOption[];
+}
+
+export interface VendorCreateInput {
+  bio: string;
+  category: string;
+  subcategory?: string | null;
+}
+
+export interface VendorUpdateInput {
+  bio?: string;
+  category?: string;
+  subcategory?: string | null;
+  travel_radius_miles?: number | null;
+  open_to_long_distance?: boolean;
+  open_to_price_negotiation?: boolean;
+  open_to_location_negotiation?: boolean;
+  instagram_username?: string | null;
+}
+
 // ── Events ───────────────────────────────────────────────────────────
 
 export interface EventItem {

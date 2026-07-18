@@ -1,11 +1,14 @@
 // High-level Jorna API calls used by the UI.
 
-import { apiFetch } from "./api";
+import { ApiError, apiFetch } from "./api";
 import type {
   BundleDetail,
   BundleRequest,
   EventCreateInput,
   EventItem,
+  TaxonomyCategory,
+  VendorCreateInput,
+  VendorUpdateInput,
   MultiBundleResponse,
   Paginated,
   Review,
@@ -151,6 +154,38 @@ export function createCheckoutSession(
  */
 export function syncBookingPayment(bookingId: string): Promise<unknown> {
   return apiFetch(`/payments/bookings/${bookingId}/sync-payment`, { method: "POST" });
+}
+
+// ── Vendor profile ───────────────────────────────────────────────────
+
+/**
+ * The authoritative category taxonomy. Public, and read rather than hardcoded:
+ * the backend rejects an invalid category/subcategory pair, so a local copy
+ * that drifts would produce 400s the user can't act on.
+ */
+export function listVendorCategories(): Promise<{ categories: TaxonomyCategory[] }> {
+  return apiFetch<{ categories: TaxonomyCategory[] }>("/vendors/categories", {
+    auth: false,
+  });
+}
+
+/** The signed-in user's vendor profile, or null if they aren't a vendor yet. */
+export async function getMyVendor(): Promise<VendorDetail | null> {
+  try {
+    return await apiFetch<VendorDetail>("/vendors/me");
+  } catch (err) {
+    // 404 is the normal "not a vendor yet" answer, not a failure.
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+export function createVendor(input: VendorCreateInput): Promise<VendorDetail> {
+  return apiFetch<VendorDetail>("/vendors", { method: "POST", body: input });
+}
+
+export function updateMyVendor(updates: VendorUpdateInput): Promise<VendorDetail> {
+  return apiFetch<VendorDetail>("/vendors/me", { method: "PATCH", body: updates });
 }
 
 // ── Events ───────────────────────────────────────────────────────────
