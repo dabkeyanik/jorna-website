@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
   title: "Jorna — Plan your celebration",
@@ -18,6 +19,7 @@ export default function RootLayout({
         <AuthProvider>
           <SiteHeader />
           <main className="flex-1">{children}</main>
+          <SiteFooter />
         </AuthProvider>
       </body>
     </html>
