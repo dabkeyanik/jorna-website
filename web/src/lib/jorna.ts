@@ -112,6 +112,24 @@ export function selectBundle(bundleId: string): Promise<unknown> {
   return apiFetch(`/bundles/${bundleId}/select`, { method: "POST" });
 }
 
+export function renameBundle(bundleId: string, name: string): Promise<unknown> {
+  return apiFetch(`/bundles/${bundleId}`, { method: "PATCH", body: { name } });
+}
+
+export function deleteBundle(bundleId: string): Promise<void> {
+  return apiFetch<void>(`/bundles/${bundleId}`, { method: "DELETE" });
+}
+
+/** Take a booking out of a bundle. Returns the refreshed bundle. */
+export function removeBookingFromBundle(
+  bundleId: string,
+  bookingId: string,
+): Promise<BundleDetail> {
+  return apiFetch<BundleDetail>(`/bundles/${bundleId}/bookings/${bookingId}`, {
+    method: "DELETE",
+  });
+}
+
 /**
  * Start a Stripe-hosted Checkout Session for one booking. `client=web` makes
  * Stripe return into this app rather than the iOS deep-link bridge.

@@ -36,11 +36,19 @@ The most visible gap: you can browse and find a vendor, but you can't book them.
     anchored for check-in.
   - Adds to a new bundle or an existing one.
 
-- [ ] **A2. Edit a bundle**
-  - Swap a service (`/services?category=&subcategory=` for candidates),
-    remove a booking (`DELETE /bundles/{id}/bookings/{booking_id}`),
-    add an existing booking, rename (`PATCH /bundles/{id}`), delete.
-  - Swap candidates must be filtered by **subcategory** (a DJ slot never lists dhol).
+- [x] **A2. Edit a bundle**
+  - Swap a service, remove a booking, rename, delete — all on `/bundle?id=`.
+  - There is no swap endpoint: a swap is "book the replacement into the same
+    slot, then remove the original". Candidates are narrowed by **subcategory**
+    so a DJ slot never lists dhol.
+  - The quantity (`guest_count`, `date_end`) is carried across, or the
+    replacement lands unpayable. Needed a backend change to expose those on the
+    bundle summary — the iOS swap drops them and has this bug.
+  - `POST /bookings` is idempotent, so re-booking the slot returns the *same*
+    booking; removing the "old" one would then delete it. Guarded by comparing
+    the returned `booking_id`.
+  - Editing is hidden once money has moved (`payment_confirmed`, or paid /
+    released / refunded / disputed), mirroring the iOS rule.
 
 - [ ] **A3. Events**
   - `GET /events`, `POST /events`, event detail with its bundles/bookings.

@@ -8,10 +8,14 @@ import { ApiError } from "@/lib/api";
 import {
   confirmBookingEvent,
   createCheckoutSession,
+  deleteBundle,
   disputeBooking,
   getBundle,
   refundBooking,
+  removeBookingFromBundle,
+  renameBundle,
 } from "@/lib/jorna";
+import { ServiceSwapPanel } from "@/components/ServiceSwapPanel";
 import {
   BOOKING_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
@@ -22,14 +26,24 @@ import {
   type BundleBooking,
   type BundleDetail,
 } from "@/lib/types";
-import { Button, Card, LinkButton } from "@/components/ui";
+import { Button, Card, Field, LinkButton } from "@/components/ui";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
 }
 
-type PanelKind = "refund" | "dispute";
+type PanelKind = "refund" | "dispute" | "remove";
 type Panel = { bookingId: string; kind: PanelKind } | null;
+
+/**
+ * Once money has moved, the composition is fixed — swapping or removing a
+ * booking would strand a payment. Mirrors the iOS rule.
+ */
+function isBeyondActionable(b: BundleBooking): boolean {
+  if (b.status === "payment_confirmed") return true;
+  const ps = (b.payment_status ?? "unpaid").toLowerCase();
+  return ["paid", "released", "refunded", "disputed"].includes(ps);
+}
 
 /** Escrow-aware status line for one booking. */
 function statusLine(b: BundleBooking): { text: string; tone: string } {
@@ -59,6 +73,8 @@ function BookingRow({
   onClosePanel,
   onRefund,
   onDispute,
+  onSwap,
+  onRemove,
 }: {
   booking: BundleBooking;
   busyId: string | null;
@@ -69,6 +85,8 @@ function BookingRow({
   onClosePanel: () => void;
   onRefund: (b: BundleBooking) => void;
   onDispute: (b: BundleBooking, reason: string) => void;
+  onSwap: (b: BundleBooking) => void;
+  onRemove: (b: BundleBooking) => void;
 }) {
   const [reason, setReason] = useState("");
   const pay = booking.payment_status ?? "unpaid";
@@ -120,6 +138,41 @@ function BookingRow({
             {busy ? "Opening checkout…" : `Pay ${money(booking.price)}`}
           </Button>
         </div>
+      ) : null}
+
+      {/* Composition — only while no money has moved */}
+      {!isBeyondActionable(booking) ? (
+        openPanel === "remove" ? (
+          <div className="mt-3 rounded-lg bg-panel p-3">
+            <p className="text-xs text-ink-soft">
+              Remove {booking.service_name || "this service"} from the bundle? The
+              rest of your bundle is unaffected.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <Button size="md" disabled={busy} onClick={() => onRemove(booking)}>
+                {busy ? "Removing…" : "Remove"}
+              </Button>
+              <Button variant="ghost" size="md" onClick={onClosePanel}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
+            {booking.service_category ? (
+              <Button variant="ghost" size="md" onClick={() => onSwap(booking)}>
+                Swap service
+              </Button>
+            ) : null}
+            <Button
+              variant="quiet"
+              size="md"
+              onClick={() => onOpenPanel(booking.booking_id, "remove")}
+            >
+              Remove
+            </Button>
+          </div>
+        )
       ) : null}
 
       {/* Escrow release */}
@@ -224,6 +277,11 @@ function BundleInner() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [swapping, setSwapping] = useState<BundleBooking | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [bundleBusy, setBundleBusy] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -267,6 +325,32 @@ function BundleInner() {
     }
   }
 
+  async function saveName() {
+    if (!bundleId || !newName.trim()) return;
+    setBundleBusy(true);
+    try {
+      await renameBundle(bundleId, newName.trim());
+      setRenaming(false);
+      await load();
+    } catch (err) {
+      setNotice(err instanceof ApiError ? err.message : "Couldn't rename this bundle.");
+    } finally {
+      setBundleBusy(false);
+    }
+  }
+
+  async function removeBundle() {
+    if (!bundleId) return;
+    setBundleBusy(true);
+    try {
+      await deleteBundle(bundleId);
+      router.push("/bundles");
+    } catch (err) {
+      setNotice(err instanceof ApiError ? err.message : "Couldn't delete this bundle.");
+      setBundleBusy(false);
+    }
+  }
+
   async function pay(booking: BundleBooking) {
     setBusyId(booking.booking_id);
     setNotice(null);
@@ -304,9 +388,70 @@ function BundleInner() {
       </Link>
 
       <header className="mt-5">
-        <h1 className="serif text-4xl text-maroon dark:text-gold">
-          {bundle.event_name || bundle.name}
-        </h1>
+        {renaming ? (
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[220px] flex-1">
+              <Field
+                label="Bundle name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
+            </div>
+            <Button size="md" disabled={bundleBusy} onClick={saveName}>
+              {bundleBusy ? "Saving…" : "Save"}
+            </Button>
+            <Button variant="ghost" size="md" onClick={() => setRenaming(false)}>
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <h1 className="serif text-4xl text-maroon dark:text-gold">
+              {bundle.event_name || bundle.name}
+            </h1>
+            <div className="flex shrink-0 gap-2">
+              <Button
+                variant="ghost"
+                size="md"
+                onClick={() => {
+                  setNewName(bundle.event_name || bundle.name || "");
+                  setRenaming(true);
+                }}
+              >
+                Rename
+              </Button>
+              <Button
+                variant="quiet"
+                size="md"
+                onClick={() => setConfirmDelete(true)}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {confirmDelete ? (
+          <div className="mt-3 rounded-xl bg-panel p-3">
+            <p className="text-sm text-ink-soft">
+              Delete this bundle and all of its booking requests? This can&apos;t be
+              undone.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <Button size="md" disabled={bundleBusy} onClick={removeBundle}>
+                {bundleBusy ? "Deleting…" : "Delete bundle"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="md"
+                onClick={() => setConfirmDelete(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
         <p className="mt-2 text-ink-soft">
           {bundle.booking_count} {bundle.booking_count === 1 ? "vendor" : "vendors"}
           {bundle.event?.date_iso ? ` · ${bundle.event.date_iso}` : ""}
@@ -360,9 +505,35 @@ function BundleInner() {
                 "Couldn't submit the report. Please try again.",
               )
             }
+            onSwap={(bk) => {
+              setNotice(null);
+              setSwapping(bk);
+            }}
+            onRemove={(bk) =>
+              run(
+                bk,
+                () => removeBookingFromBundle(bundleId!, bk.booking_id),
+                "Removed from your bundle.",
+                "Couldn't remove that booking. Please try again.",
+              )
+            }
           />
         ))}
       </section>
+
+      {swapping ? (
+        <ServiceSwapPanel
+          booking={swapping}
+          bundleId={bundleId!}
+          eventName={bundle.event_name || bundle.name || "My Event"}
+          onClose={() => setSwapping(null)}
+          onSwapped={async () => {
+            setSwapping(null);
+            setNotice("Service swapped — your date, time, and guest count carried over.");
+            await load();
+          }}
+        />
+      ) : null}
 
       <p className="mt-8 rounded-2xl border border-card-edge bg-panel p-5 text-center text-sm text-ink-soft">
         Each vendor is paid separately. Your money is held in escrow and only

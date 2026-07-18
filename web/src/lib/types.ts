@@ -223,6 +223,10 @@ export interface BundleBooking {
   price_unit?: string | null;
   /** True when the total still needs a quantity (guests/dates) before paying. */
   price_pending_quantity?: boolean;
+  // Quantity a rate-priced service multiplies by — carried across on a swap so
+  // the replacement booking stays payable.
+  date_end?: string | null;
+  guest_count?: number | null;
   // Escrow lifecycle (ISO timestamps, null until they happen).
   /** When Stripe payment succeeded. The 24h refund window runs from here. */
   paid_at?: string | null;
