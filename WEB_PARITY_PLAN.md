@@ -71,11 +71,18 @@ take money; B5–B6 complete their side.
     400s the user can't act on. Changing category clears the speciality rather
     than sending a stale pair.
 
-- [ ] **B2. Services CRUD**
-  - `POST/PATCH/DELETE /services`, `GET /services?vendor_id=`.
-  - Rate + unit (hour/day/event/person), `negotiable` toggle.
-  - Venue services require location + map coords.
-  - Image upload is **multipart** — the API client is JSON-only today and needs extending.
+- [x] **B2. Services CRUD** — `/my-services`
+  - List, create, edit, delete; photos added and removed inline.
+  - Rate + unit (flat/person/hour/day) with a note that anything but flat needs a
+    quantity from the client before it can be paid. `negotiable` per service.
+  - Venue services require an address **and** map coordinates (the check-in
+    anchor) — enforced before submitting, with a "use my current location"
+    helper for a vendor filling it in on site.
+  - Category/speciality come from `/vendors/categories`, defaulting to the
+    vendor's own so most services need no fiddling.
+  - Gated behind having a vendor profile, since services hang off one.
+  - Image upload needed `apiUpload` in the API client: multipart must **not**
+    set Content-Type by hand, or the boundary is missing and the body won't parse.
 
 - [ ] **B3. Booking requests (approve / decline)**
   - `GET /bookings/vendor/{vendor_id}`, `PUT /bookings/{id}/status`.

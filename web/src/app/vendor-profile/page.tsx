@@ -254,6 +254,7 @@ export default function VendorProfilePage() {
             you until you have at least one service.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
+            <LinkButton href="/my-services">Manage services</LinkButton>
             <LinkButton href={`/vendor?id=${vendor.vendor_id}`} variant="ghost">
               View public profile
             </LinkButton>

@@ -1,6 +1,6 @@
 // High-level Jorna API calls used by the UI.
 
-import { ApiError, apiFetch } from "./api";
+import { ApiError, apiFetch, apiUpload } from "./api";
 import type {
   BundleDetail,
   BundleRequest,
@@ -186,6 +186,62 @@ export function createVendor(input: VendorCreateInput): Promise<VendorDetail> {
 
 export function updateMyVendor(updates: VendorUpdateInput): Promise<VendorDetail> {
   return apiFetch<VendorDetail>("/vendors/me", { method: "PATCH", body: updates });
+}
+
+// ── Vendor services ──────────────────────────────────────────────────
+
+export interface ServiceInput {
+  name: string;
+  price: number;
+  experience: string;
+  /** hour | day | event | person — the quantity the rate multiplies by. */
+  price_unit?: string | null;
+  category?: string | null;
+  subcategory?: string | null;
+  description?: string | null;
+  negotiable?: boolean;
+  /** Required for venue-category services, along with the coordinates. */
+  location?: string | null;
+  venue_latitude?: number | null;
+  venue_longitude?: number | null;
+}
+
+export function createService(input: ServiceInput): Promise<ServiceItem> {
+  return apiFetch<ServiceItem>("/services", { method: "POST", body: input });
+}
+
+export function updateService(
+  serviceId: string,
+  updates: Partial<ServiceInput>,
+): Promise<ServiceItem> {
+  return apiFetch<ServiceItem>(`/services/${serviceId}`, {
+    method: "PATCH",
+    body: updates,
+  });
+}
+
+export function deleteService(serviceId: string): Promise<void> {
+  return apiFetch<void>(`/services/${serviceId}`, { method: "DELETE" });
+}
+
+/** Upload one or more photos for a service. Multipart; field name is `files`. */
+export function uploadServiceImages(
+  serviceId: string,
+  files: File[],
+): Promise<ServiceItem> {
+  const form = new FormData();
+  for (const file of files) form.append("files", file);
+  return apiUpload<ServiceItem>(`/services/${serviceId}/images`, form);
+}
+
+export function deleteServiceImage(
+  serviceId: string,
+  imageUrl: string,
+): Promise<unknown> {
+  return apiFetch(
+    `/services/${serviceId}/images?image_url=${encodeURIComponent(imageUrl)}`,
+    { method: "DELETE" },
+  );
 }
 
 // ── Events ───────────────────────────────────────────────────────────
