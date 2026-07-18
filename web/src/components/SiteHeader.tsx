@@ -10,9 +10,19 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-20 border-b border-line-soft bg-ground/85 backdrop-blur">
       <div className="mx-auto flex w-[min(1080px,100%-2rem)] items-center justify-between py-3">
-        <Link href="/" className="serif text-2xl text-maroon dark:text-gold">
-          Jorna
-        </Link>
+        <div className="flex items-baseline gap-3">
+          <Link href="/" className="serif text-2xl text-maroon dark:text-gold">
+            Jorna
+          </Link>
+          {/* Plain anchor: next/link would prefix the "/app" basePath and keep
+              you inside the app instead of returning to the marketing page. */}
+          <a
+            href="/"
+            className="hidden text-xs text-ink-faint transition hover:text-ink sm:inline"
+          >
+            ← main site
+          </a>
+        </div>
         <nav className="flex items-center gap-2">
           <Link
             href="/browse"
