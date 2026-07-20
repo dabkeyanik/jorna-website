@@ -7,7 +7,8 @@
     "install:app": "npm --prefix web install",
     "build": "npm --prefix web run build",
     "preview": "npm run build && wrangler dev",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "node scripts/deploy.mjs",
+    "deploy:once": "npm run build && wrangler deploy"
   },
   "devDependencies": {
     "wrangler": "^4.112.0"

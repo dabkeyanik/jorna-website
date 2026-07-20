@@ -148,15 +148,18 @@ These can't be a straight port; decide per item rather than assuming parity.
 - Never show a rate as if it were a total; carry `price_unit` through.
 - Verify against the real backend before ticking a box; `npm run deploy` publishes
   the marketing page and the app together.
-- **`wrangler deploy` fails intermittently, and a failed deploy leaves `/` serving
-  while `/app` 404s.** Confirmed: a run errored with a Cloudflare API failure on
-  `assets-upload-session` (`code: 10013`), printed no "Deployed" line, and
-  production then served the marketing page but 404'd every app route. Re-running
-  uploaded `/app/index.html` and friends as **new** files and fixed it.
+- **`npm run deploy` is self-verifying — use it, not `wrangler deploy` directly.**
+  `wrangler`'s incremental asset upload has intermittently dropped files while
+  still printing `Deployed … triggers` + a Version ID — so a success line is NOT
+  proof the app shipped. It's happened 3+ times: `/` (a plain static file) keeps
+  serving while every `/app` route 404s. One run failed hard
+  (`assets-upload-session`, `code: 10013`); another reported success yet shipped
+  nothing.
 
-  So: **read the deploy output.** Success ends with `Deployed … triggers` and a
-  Version ID; a failure ends with a log-file path. If `/app` 404s, re-run the
-  deploy — don't assume propagation. Then check the routes:
+  `scripts/deploy.mjs` handles this: build once, deploy, then fetch every route
+  in the built export (cache-busted) and re-deploy until they all return 200,
+  exiting non-zero if it can't. `npm run deploy:once` is the raw single-shot if
+  you ever need it. Manual spot-check is still cheap:
 
   ```bash
   for p in / /app/ /app/browse/ /app/book/ /app/plan/ /app/bundles/; do
