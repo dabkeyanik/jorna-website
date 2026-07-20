@@ -17,6 +17,7 @@ import {
 } from "@/lib/jorna";
 import { ServiceSwapPanel } from "@/components/ServiceSwapPanel";
 import { NegotiationPanel } from "@/components/NegotiationPanel";
+import { ReviewPanel } from "@/components/ReviewPanel";
 import {
   BOOKING_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
@@ -283,6 +284,13 @@ function BookingRow({
             </div>
           )}
         </div>
+      ) : null}
+
+      {/* Review — once the client has paid (or funds released) they can rate it */}
+      {booking.status === "payment_confirmed" ||
+      booking.payment_status === "paid" ||
+      booking.payment_status === "released" ? (
+        <ReviewPanel bookingId={booking.booking_id} />
       ) : null}
     </Card>
   );

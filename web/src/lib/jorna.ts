@@ -73,6 +73,28 @@ export function getVendorReviews(vendorId: string): Promise<Paginated<Review>> {
   return apiFetch<Paginated<Review>>(`/reviews/vendor/${vendorId}`, { auth: false });
 }
 
+/** The review for a booking, or null if the client hasn't left one yet. */
+export async function getBookingReview(bookingId: string): Promise<Review | null> {
+  try {
+    return await apiFetch<Review>(`/reviews/booking/${bookingId}`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+/** Leave a review (client only, after the booking is approved/paid; one per booking). */
+export function createReview(
+  bookingId: string,
+  rating: number,
+  comment?: string,
+): Promise<Review> {
+  return apiFetch<Review>("/reviews", {
+    method: "POST",
+    body: { booking_id: bookingId, rating, comment: comment || null },
+  });
+}
+
 export function getService(serviceId: string): Promise<ServiceItem> {
   return apiFetch<ServiceItem>(`/services/${serviceId}`, { auth: false });
 }

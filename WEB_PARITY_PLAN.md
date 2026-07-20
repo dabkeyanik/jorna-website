@@ -153,7 +153,10 @@ take money; B5–B6 complete their side.
     offer; only the *other* party may counter or accept, and no one accepts their
     own offer. Accepting sets the booking price and approves it, so both pages
     refresh. Start / counter / accept / decline.
-- [ ] **C3. Leave a review** — `POST /reviews` after a completed booking.
+- [x] **C3. Leave a review** — a `ReviewPanel` on the client's paid bookings in
+  `/bundle`. Loads any existing review (one per booking) and otherwise offers a
+  star + comment form. `POST /reviews`; client-only, matching the backend guard.
+  Reviews already render on the public vendor profile (Phase 2).
 - [ ] **C4. Report & block** — `Moderation` endpoints; hide blocked users.
 
 ## Phase D — account completeness
