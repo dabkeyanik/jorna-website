@@ -22,6 +22,7 @@ import {
 } from "@/lib/types";
 import { Button, Card, LinkButton } from "@/components/ui";
 import { VendorNav } from "@/components/VendorNav";
+import { NegotiationPanel } from "@/components/NegotiationPanel";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -331,6 +332,21 @@ export default function MyBookingsPage() {
                       </Button>
                     </div>
                   )
+                ) : null}
+
+                {/* Negotiation — on a negotiable request the vendor can counter
+                    the client's offer or settle a price before accepting. */}
+                {decidable && b.negotiable ? (
+                  <div className="mt-3">
+                    <NegotiationPanel
+                      bookingId={b.booking_id}
+                      listedPrice={b.price}
+                      onSettled={() => {
+                        setNotice("Price agreed — the booking is approved at the new price.");
+                        void load(vendor.vendor_id);
+                      }}
+                    />
+                  </div>
                 ) : null}
 
                 {/* Escrow release — the vendor's half, once the money is held */}

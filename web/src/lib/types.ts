@@ -227,6 +227,8 @@ export interface BundleBooking {
   // the replacement booking stays payable.
   date_end?: string | null;
   guest_count?: number | null;
+  /** Whether this service is open to price negotiation (service.negotiable). */
+  open_to_price_negotiation?: boolean;
   // Escrow lifecycle (ISO timestamps, null until they happen).
   /** When Stripe payment succeeded. The 24h refund window runs from here. */
   paid_at?: string | null;
@@ -315,6 +317,32 @@ export interface VendorUpdateInput {
   open_to_price_negotiation?: boolean;
   open_to_location_negotiation?: boolean;
   instagram_username?: string | null;
+}
+
+// ── Negotiation ──────────────────────────────────────────────────────
+
+export interface NegotiationOffer {
+  offer_id?: string;
+  amount_cents: number;
+  proposed_by: string;
+  proposed_by_name?: string | null;
+  message?: string | null;
+  created_at?: string | null;
+}
+
+export interface Negotiation {
+  negotiation_id: string;
+  booking_id: string;
+  /** open | accepted | rejected */
+  status: string;
+  current_offer_cents: number;
+  current_offer_dollars?: number;
+  /** Whoever made the current offer — the *other* party responds. */
+  proposed_by: string;
+  proposed_by_name?: string | null;
+  offers?: NegotiationOffer[];
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 // ── Conversations (group chat) ───────────────────────────────────────

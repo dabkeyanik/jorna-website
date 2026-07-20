@@ -146,7 +146,13 @@ take money; B5–B6 complete their side.
     fallback all converge without duplicating (mirrors iOS ChatSocket). Capped
     reconnect backoff; a live/offline indicator.
   - Static export is fine here — the socket is a plain browser client, no SSR.
-- [ ] **C2. Negotiation** — open/counter/accept; only on `negotiable` services.
+- [x] **C2. Negotiation** — a shared `NegotiationPanel` on both sides
+  - Client sees it on a negotiable, unpaid booking in `/bundle`; the vendor on a
+    still-decidable negotiable request in `/my-bookings`.
+  - Turn-based, mirroring the backend: `proposed_by` is whoever made the current
+    offer; only the *other* party may counter or accept, and no one accepts their
+    own offer. Accepting sets the booking price and approves it, so both pages
+    refresh. Start / counter / accept / decline.
 - [ ] **C3. Leave a review** — `POST /reviews` after a completed booking.
 - [ ] **C4. Report & block** — `Moderation` endpoints; hide blocked users.
 

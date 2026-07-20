@@ -16,6 +16,7 @@ import {
   renameBundle,
 } from "@/lib/jorna";
 import { ServiceSwapPanel } from "@/components/ServiceSwapPanel";
+import { NegotiationPanel } from "@/components/NegotiationPanel";
 import {
   BOOKING_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
@@ -75,6 +76,7 @@ function BookingRow({
   onDispute,
   onSwap,
   onRemove,
+  onNegotiated,
 }: {
   booking: BundleBooking;
   busyId: string | null;
@@ -87,8 +89,10 @@ function BookingRow({
   onDispute: (b: BundleBooking, reason: string) => void;
   onSwap: (b: BundleBooking) => void;
   onRemove: (b: BundleBooking) => void;
+  onNegotiated: () => void;
 }) {
   const [reason, setReason] = useState("");
+  const [showNeg, setShowNeg] = useState(false);
   const pay = booking.payment_status ?? "unpaid";
   const unit = priceUnitLabel(booking.price_unit);
   const status = statusLine(booking);
@@ -138,6 +142,25 @@ function BookingRow({
             {busy ? "Opening checkout…" : `Pay ${money(booking.price)}`}
           </Button>
         </div>
+      ) : null}
+
+      {/* Negotiation — only on a negotiable service, before any money moves */}
+      {booking.open_to_price_negotiation && !isBeyondActionable(booking) ? (
+        showNeg ? (
+          <div className="mt-3">
+            <NegotiationPanel
+              bookingId={booking.booking_id}
+              listedPrice={booking.price}
+              onSettled={onNegotiated}
+            />
+          </div>
+        ) : (
+          <div className="mt-3 flex justify-end">
+            <Button variant="ghost" size="md" onClick={() => setShowNeg(true)}>
+              Negotiate price
+            </Button>
+          </div>
+        )
       ) : null}
 
       {/* Composition — only while no money has moved */}
@@ -517,6 +540,10 @@ function BundleInner() {
                 "Couldn't remove that booking. Please try again.",
               )
             }
+            onNegotiated={() => {
+              setNotice("Price agreed — the booking is approved at the new price.");
+              void load();
+            }}
           />
         ))}
       </section>

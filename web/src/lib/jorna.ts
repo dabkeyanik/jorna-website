@@ -10,6 +10,7 @@ import type {
   EventCreateInput,
   EventItem,
   GroupMessage,
+  Negotiation,
   StripeStatus,
   TaxonomyCategory,
   VendorBooking,
@@ -272,6 +273,51 @@ export function getStripeStatus(vendorId: string): Promise<StripeStatus> {
 
 export function getEarnings(vendorId: string): Promise<Earnings> {
   return apiFetch<Earnings>(`/payments/vendors/${vendorId}/earnings`);
+}
+
+// ── Negotiation ──────────────────────────────────────────────────────
+
+/** The booking's negotiation, or null if none has been started. */
+export async function getNegotiation(bookingId: string): Promise<Negotiation | null> {
+  try {
+    return await apiFetch<Negotiation>(`/negotiations/booking/${bookingId}`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+export function startNegotiation(
+  bookingId: string,
+  amountCents: number,
+  message?: string,
+): Promise<Negotiation> {
+  return apiFetch<Negotiation>("/negotiations", {
+    method: "POST",
+    body: { booking_id: bookingId, amount_cents: amountCents, message: message || null },
+  });
+}
+
+export function counterOffer(
+  negotiationId: string,
+  amountCents: number,
+  message?: string,
+): Promise<Negotiation> {
+  return apiFetch<Negotiation>(`/negotiations/${negotiationId}/offer`, {
+    method: "POST",
+    body: { amount_cents: amountCents, message: message || null },
+  });
+}
+
+export function acceptOffer(negotiationId: string): Promise<Negotiation> {
+  return apiFetch<Negotiation>(`/negotiations/${negotiationId}/accept`, { method: "POST" });
+}
+
+export function rejectOffer(negotiationId: string, message?: string): Promise<Negotiation> {
+  return apiFetch<Negotiation>(`/negotiations/${negotiationId}/reject`, {
+    method: "POST",
+    body: { message: message || null },
+  });
 }
 
 // ── Conversations (group chat) ───────────────────────────────────────
