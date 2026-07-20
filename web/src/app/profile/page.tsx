@@ -75,6 +75,7 @@ export default function ProfilePage() {
           <Row href="/events" title="Events" sub="Your celebrations and what's booked for each" />
           <Row href="/bundles" title="Bundles" sub="Vendor teams you've built" />
           <Row href="/browse" title="Browse vendors" sub="Find and book more" />
+          <Row href="/blocked" title="Blocked" sub="People you've blocked" />
         </div>
       </section>
 

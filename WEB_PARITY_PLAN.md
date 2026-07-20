@@ -157,7 +157,12 @@ take money; B5–B6 complete their side.
   `/bundle`. Loads any existing review (one per booking) and otherwise offers a
   star + comment form. `POST /reviews`; client-only, matching the backend guard.
   Reviews already render on the public vendor profile (Phase 2).
-- [ ] **C4. Report & block** — `Moderation` endpoints; hide blocked users.
+- [x] **C4. Report & block** — a `ModerationMenu` on the vendor profile (report
+  with a reason + details, or block the vendor's user), and a `/blocked` page to
+  unblock, linked from the Profile hub. The backend hides blocked users from
+  search and hides their reviews/messages, so no client-side filtering is needed.
+  Note: the moderation router has **no prefix** — the paths are `/reports` and
+  `/blocks`, not `/moderation/*` (verified against the live schema).
 
 ## Phase D — account completeness
 

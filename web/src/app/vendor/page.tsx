@@ -13,6 +13,7 @@ import {
   type VendorDetail,
 } from "@/lib/types";
 import { Card, LinkButton } from "@/components/ui";
+import { ModerationMenu } from "@/components/ModerationMenu";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -208,6 +209,15 @@ function VendorInner() {
         <LinkButton href="/plan" className="mt-4">
           Build my bundle
         </LinkButton>
+      </div>
+
+      <div className="mt-6">
+        <ModerationMenu
+          targetType="vendor"
+          targetId={vendor.vendor_id}
+          blockUserId={vendor.user_id}
+          label={name || "this vendor"}
+        />
       </div>
     </div>
   );

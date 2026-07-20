@@ -319,6 +319,24 @@ export interface VendorUpdateInput {
   instagram_username?: string | null;
 }
 
+// ── Moderation ───────────────────────────────────────────────────────
+
+export const REPORT_REASONS = [
+  { value: "inappropriate", label: "Inappropriate content" },
+  { value: "spam", label: "Spam" },
+  { value: "harassment", label: "Harassment" },
+  { value: "scam", label: "Scam or fraud" },
+  { value: "other", label: "Something else" },
+];
+
+export type ReportTargetType = "user" | "vendor" | "review" | "message" | "conversation";
+
+export interface BlockedUser {
+  blocked_user_id: string;
+  blocked_name: string;
+  blocked_vendor_id?: string | null;
+}
+
 // ── Negotiation ──────────────────────────────────────────────────────
 
 export interface NegotiationOffer {

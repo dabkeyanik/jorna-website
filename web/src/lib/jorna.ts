@@ -5,12 +5,14 @@ import type {
   BundleDetail,
   BundleRequest,
   AvailabilitySlot,
+  BlockedUser,
   ConversationSummary,
   Earnings,
   EventCreateInput,
   EventItem,
   GroupMessage,
   Negotiation,
+  ReportTargetType,
   StripeStatus,
   TaxonomyCategory,
   VendorBooking,
@@ -295,6 +297,34 @@ export function getStripeStatus(vendorId: string): Promise<StripeStatus> {
 
 export function getEarnings(vendorId: string): Promise<Earnings> {
   return apiFetch<Earnings>(`/payments/vendors/${vendorId}/earnings`);
+}
+
+// ── Moderation (report & block) ──────────────────────────────────────
+
+// The moderation router is mounted with no prefix, so these are top-level paths
+// (/reports, /blocks), not /moderation/*.
+export function reportContent(input: {
+  target_type: ReportTargetType;
+  target_id: string;
+  reason: string;
+  details?: string;
+}): Promise<unknown> {
+  return apiFetch("/reports", {
+    method: "POST",
+    body: { ...input, details: input.details || null },
+  });
+}
+
+export function listBlockedUsers(): Promise<BlockedUser[]> {
+  return apiFetch<BlockedUser[]>("/blocks");
+}
+
+export function blockUser(userId: string): Promise<unknown> {
+  return apiFetch(`/blocks/${userId}`, { method: "POST" });
+}
+
+export function unblockUser(userId: string): Promise<unknown> {
+  return apiFetch(`/blocks/${userId}`, { method: "DELETE" });
 }
 
 // ── Negotiation ──────────────────────────────────────────────────────
