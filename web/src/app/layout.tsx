@@ -3,6 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { AppTabBar } from "@/components/AppTabBar";
 
 export const metadata: Metadata = {
   title: "Jorna — Plan your celebration",
@@ -20,6 +21,8 @@ export default function RootLayout({
           <SiteHeader />
           <main className="flex-1">{children}</main>
           <SiteFooter />
+          {/* Bottom tab bar (mirrors iOS) — sticky, shown only when signed in. */}
+          <AppTabBar />
         </AuthProvider>
       </body>
     </html>

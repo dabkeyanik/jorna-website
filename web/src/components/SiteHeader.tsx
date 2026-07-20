@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { Button, LinkButton } from "./ui";
 
+// Slim top bar. Primary navigation lives in the bottom tab bar (AppTabBar,
+// mirroring iOS); the header just carries the wordmark, the escape back to the
+// marketing site, and the auth affordance.
 export function SiteHeader() {
   const { user, loading, logout } = useAuth();
 
@@ -14,8 +17,8 @@ export function SiteHeader() {
           <Link href="/" className="serif text-2xl text-maroon dark:text-gold">
             Jorna
           </Link>
-          {/* Plain anchor: next/link would prefix the "/app" basePath and keep
-              you inside the app instead of returning to the marketing page. */}
+          {/* Plain anchor: next/link would keep the "/app" basePath and stay
+              inside the app instead of returning to the marketing page. */}
           <a
             href="/"
             className="hidden text-xs text-ink-faint transition hover:text-ink sm:inline"
@@ -24,39 +27,10 @@ export function SiteHeader() {
           </a>
         </div>
         <nav className="flex items-center gap-2">
-          <Link
-            href="/browse"
-            className="px-2 text-sm font-semibold text-ink-soft transition hover:text-ink"
-          >
-            Browse
-          </Link>
           {loading ? null : user ? (
-            <>
-              <Link
-                href="/events"
-                className="hidden px-2 text-sm font-semibold text-ink-soft transition hover:text-ink sm:inline"
-              >
-                Events
-              </Link>
-              <Link
-                href="/bundles"
-                className="px-2 text-sm font-semibold text-ink-soft transition hover:text-ink"
-              >
-                Bundles
-              </Link>
-              <Link
-                href="/my-bookings"
-                className="hidden px-2 text-sm font-semibold text-ink-soft transition hover:text-ink sm:inline"
-              >
-                Selling
-              </Link>
-              <LinkButton href="/plan" size="md">
-                Plan
-              </LinkButton>
-              <Button variant="ghost" onClick={logout}>
-                Sign out
-              </Button>
-            </>
+            <Button variant="ghost" onClick={logout}>
+              Sign out
+            </Button>
           ) : (
             <>
               <LinkButton href="/login" variant="ghost">

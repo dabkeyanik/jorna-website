@@ -11,6 +11,16 @@ each one should leave the app in a working state.
 
 ## Done
 
+- [x] **Navigation mirrors the iOS tab bar.** A role-aware bottom tab bar
+  (`AppTabBar`), shown only when signed in:
+  - Client: Home (browse) · Build · Bundles · Messages · Profile
+  - Vendor: Home (browse) · Bookings · Messages · Profile
+  - Role = has a vendor profile (`getMyVendor != null`), same signal as iOS.
+  - Header slimmed to wordmark + escape + auth; `/profile` is the account hub
+    (planning links for all; selling links for vendors, "start selling" for
+    clients). `/messages` is a placeholder until Phase C.
+
+
 - [x] Design system, auth (email/password), typed API client with token refresh
 - [x] AI bundle builder (`/plan`) — one-shot form → 3 comparison bundles
 - [x] Browse + filters (`/browse`), vendor profiles (`/vendor?id=`)
