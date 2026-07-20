@@ -4,6 +4,7 @@ import { ApiError, apiFetch, apiUpload } from "./api";
 import type {
   BundleDetail,
   BundleRequest,
+  AvailabilitySlot,
   Earnings,
   EventCreateInput,
   EventItem,
@@ -269,6 +270,22 @@ export function getStripeStatus(vendorId: string): Promise<StripeStatus> {
 
 export function getEarnings(vendorId: string): Promise<Earnings> {
   return apiFetch<Earnings>(`/payments/vendors/${vendorId}/earnings`);
+}
+
+// ── Vendor availability ──────────────────────────────────────────────
+
+export function getMyAvailability(): Promise<AvailabilitySlot[]> {
+  return apiFetch<AvailabilitySlot[]>("/vendors/me/availability");
+}
+
+/** Replace all weekly availability slots. Send [] to clear. */
+export function setMyAvailability(slots: AvailabilitySlot[]): Promise<unknown> {
+  const clean = slots.map((s) => ({
+    day_of_week: s.day_of_week,
+    start_time: s.start_time,
+    end_time: s.end_time,
+  }));
+  return apiFetch("/vendors/me/availability", { method: "PUT", body: { slots: clean } });
 }
 
 // ── Vendor-side bookings ─────────────────────────────────────────────

@@ -85,6 +85,7 @@ export default function ProfilePage() {
           <div className="grid gap-2">
             <Row href="/my-bookings" title="Requests" sub="Accept or decline booking requests" />
             <Row href="/my-services" title="Services" sub="What clients can book, and your prices" />
+            <Row href="/my-availability" title="Hours" sub="Your weekly availability" />
             <Row href="/my-earnings" title="Earnings" sub="Payouts, escrow, and payment setup" />
             <Row href="/vendor-profile" title="Vendor profile" sub="How clients see you" />
           </div>

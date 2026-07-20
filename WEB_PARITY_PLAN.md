@@ -127,9 +127,14 @@ take money; B5–B6 complete their side.
   - After confirming it says whether it's waiting on the client or already
     released. The venue is detected from the booking's mirrored coords.
 
-- [ ] **B6. Calendar & availability**
-  - `GET/PUT /vendors/me/availability`, `GET /vendors/{id}/availability`,
-    Google Calendar connect.
+- [x] **B6. Weekly availability** — `/my-availability`
+  - A per-weekday editor (0=Mon … 6=Sun) with multiple time windows per day,
+    saved via `PUT /vendors/me/availability`. Validates end-after-start client-side.
+  - **Google Calendar sync deferred** (noted in-page): it's a backend-owned OAuth
+    redirect (`/vendors/{id}/google-auth-url` → Google → the backend callback at
+    `GOOGLE_OAUTH_REDIRECT_URI`), so it returns to the API, not the web app —
+    the same return-URL problem as checkout/onboarding, and it also depends on
+    that env config. Wire it with a web return like the others when prioritised.
 
 ## Phase C — communication & trust
 

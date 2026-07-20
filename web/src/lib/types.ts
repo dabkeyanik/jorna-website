@@ -317,6 +317,26 @@ export interface VendorUpdateInput {
   instagram_username?: string | null;
 }
 
+// ── Vendor availability ──────────────────────────────────────────────
+
+/** A weekly availability window. day_of_week: 0=Monday … 6=Sunday. */
+export interface AvailabilitySlot {
+  availability_id?: string;
+  day_of_week: number;
+  start_time: string; // "HH:MM"
+  end_time: string;
+}
+
+export const WEEKDAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+
 // ── Vendor-side bookings ─────────────────────────────────────────────
 
 /** A booking as the vendor sees it (the fuller `_booking_dict` payload). */

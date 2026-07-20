@@ -59,7 +59,7 @@ const VENDOR_TABS: Tab[] = [
   { href: "/browse", label: "Home", icon: icon(I.home), match: ["/browse", "/vendor"] },
   { href: "/my-bookings", label: "Bookings", icon: icon(I.calendar), match: ["/my-bookings"] },
   { href: "/messages", label: "Messages", icon: icon(I.messages), match: ["/messages"] },
-  { href: "/profile", label: "Profile", icon: icon(I.profile), match: ["/profile", "/my-services", "/my-earnings", "/vendor-profile"] },
+  { href: "/profile", label: "Profile", icon: icon(I.profile), match: ["/profile", "/my-services", "/my-availability", "/my-earnings", "/vendor-profile"] },
 ];
 
 export function AppTabBar() {
