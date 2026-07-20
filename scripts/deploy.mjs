@@ -18,7 +18,13 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const appDir = join(root, "public", "app");
 const DOMAIN = process.env.DEPLOY_DOMAIN ?? "https://jornaevents.com";
 const MAX_ATTEMPTS = 4;
-const SETTLE_MS = 6000;
+// A deploy can pass one check, then 404 for a while as the new version
+// propagates across edge PoPs (or an old version is briefly still served). So
+// don't trust a single green check — require several consecutive clean passes,
+// and poll long enough for propagation to settle before giving up on a deploy.
+const CONFIRM_PASSES = 3; // consecutive all-green sweeps required
+const POLL_INTERVAL_MS = 8000;
+const VERIFY_TIMEOUT_MS = 120000; // per deploy attempt
 
 const log = (m) => console.log(`\x1b[36m[deploy]\x1b[0m ${m}`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -72,17 +78,32 @@ for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     continue;
   }
 
-  await sleep(SETTLE_MS);
-  const failures = await findFailures(urls);
-  if (failures.length === 0) {
-    log(`\x1b[32m✓ all ${urls.length} routes serving 200 — deploy verified\x1b[0m`);
-    process.exit(0);
+  // Poll until the routes are stably green (CONFIRM_PASSES in a row) or we run
+  // out of time for this attempt. A brief 404 is propagation; a persistent one
+  // is a bad upload → re-deploy.
+  const deadline = Date.now() + VERIFY_TIMEOUT_MS;
+  let streak = 0;
+  let lastFailures = [];
+  while (Date.now() < deadline) {
+    await sleep(POLL_INTERVAL_MS);
+    lastFailures = await findFailures(urls);
+    if (lastFailures.length === 0) {
+      streak += 1;
+      log(`clean sweep ${streak}/${CONFIRM_PASSES}`);
+      if (streak >= CONFIRM_PASSES) {
+        log(`\x1b[32m✓ all ${urls.length} routes stably serving 200 — verified\x1b[0m`);
+        process.exit(0);
+      }
+    } else {
+      if (streak > 0) log("regressed — restarting the stability count");
+      streak = 0;
+    }
   }
 
-  log(`\x1b[33m✗ ${failures.length}/${urls.length} route(s) not serving:\x1b[0m`);
-  for (const f of failures) log(`    ${f}`);
+  log(`\x1b[33m✗ not stable after ${VERIFY_TIMEOUT_MS / 1000}s; last sweep had ${lastFailures.length} failure(s):\x1b[0m`);
+  for (const f of lastFailures) log(`    ${f}`);
   if (attempt < MAX_ATTEMPTS) {
-    log("re-deploying to re-upload the missing assets…");
+    log("re-deploying…");
     await sleep(2000);
   }
 }
