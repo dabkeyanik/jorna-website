@@ -4,7 +4,7 @@
   // The name must stay "misty-water-0dbb" — that's the Worker the dashboard
   // created, and changing it here would deploy a second, separate Worker
   // rather than update the live one.
-  "name": "misty-water-0dbb",
+  "name": "jorna-website",
   "compatibility_date": "2026-07-17",
   "assets": {
     "directory": "./public"
