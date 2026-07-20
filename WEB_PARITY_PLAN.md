@@ -138,8 +138,14 @@ take money; B5–B6 complete their side.
 
 ## Phase C — communication & trust
 
-- [ ] **C1. Group chat** — `GET /conversations`, messages (newest window first),
-      live updates over the `/conversations/ws/{id}` WebSocket.
+- [x] **C1. Group chat** — `/messages` (inbox) + `/conversation?id=` (thread)
+  - Real inbox replaces the placeholder; the thread loads the newest window and
+    streams new messages over the `/conversations/ws/{id}` WebSocket.
+  - Browsers can't set WS headers, so it auths via `?token=`. Messages upsert by
+    `message_id`, so the sender's echo, the POST response, and a 5s REST poll
+    fallback all converge without duplicating (mirrors iOS ChatSocket). Capped
+    reconnect backoff; a live/offline indicator.
+  - Static export is fine here — the socket is a plain browser client, no SSR.
 - [ ] **C2. Negotiation** — open/counter/accept; only on `negotiable` services.
 - [ ] **C3. Leave a review** — `POST /reviews` after a completed booking.
 - [ ] **C4. Report & block** — `Moderation` endpoints; hide blocked users.

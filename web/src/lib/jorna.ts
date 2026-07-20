@@ -5,9 +5,11 @@ import type {
   BundleDetail,
   BundleRequest,
   AvailabilitySlot,
+  ConversationSummary,
   Earnings,
   EventCreateInput,
   EventItem,
+  GroupMessage,
   StripeStatus,
   TaxonomyCategory,
   VendorBooking,
@@ -270,6 +272,37 @@ export function getStripeStatus(vendorId: string): Promise<StripeStatus> {
 
 export function getEarnings(vendorId: string): Promise<Earnings> {
   return apiFetch<Earnings>(`/payments/vendors/${vendorId}/earnings`);
+}
+
+// ── Conversations (group chat) ───────────────────────────────────────
+
+export function listConversations(): Promise<ConversationSummary[]> {
+  return apiFetch<ConversationSummary[]>("/conversations");
+}
+
+export function getUnreadCount(): Promise<{ unread_count: number }> {
+  return apiFetch<{ unread_count: number }>("/conversations/unread-count");
+}
+
+/** Newest window first (offset 0 = most recent), returned oldest→newest. */
+export function getConversationMessages(
+  conversationId: string,
+  params: { limit?: number; offset?: number } = {},
+): Promise<{ messages: GroupMessage[]; total: number }> {
+  return apiFetch<{ messages: GroupMessage[]; total: number }>(
+    `/conversations/${conversationId}/messages${query({ ...params })}`,
+  );
+}
+
+/** Send a message. The backend also broadcasts it over the socket. */
+export function sendConversationMessage(
+  conversationId: string,
+  content: string,
+): Promise<GroupMessage> {
+  return apiFetch<GroupMessage>(`/conversations/${conversationId}/messages`, {
+    method: "POST",
+    body: { content },
+  });
 }
 
 // ── Vendor availability ──────────────────────────────────────────────

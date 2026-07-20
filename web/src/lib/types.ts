@@ -317,6 +317,37 @@ export interface VendorUpdateInput {
   instagram_username?: string | null;
 }
 
+// ── Conversations (group chat) ───────────────────────────────────────
+
+export interface GroupMessage {
+  message_id: string;
+  conversation_id: string;
+  sender_id: string;
+  sender_name?: string | null;
+  sender_pfp?: string | null;
+  content: string;
+  created_at: string;
+  read_by?: string[];
+}
+
+export interface ConversationSummary {
+  conversation_id: string;
+  bundle_id?: string | null;
+  name?: string | null;
+  /** all_parties | vendors_only */
+  type?: string | null;
+  member_count?: number;
+  members?: Array<{ user_id: string; name?: string | null; pfp_url?: string | null }>;
+  last_message?: {
+    message_id?: string;
+    content?: string | null;
+    sender_id?: string | null;
+    sender_name?: string | null;
+    created_at?: string | null;
+  } | null;
+  created_at?: string | null;
+}
+
 // ── Vendor availability ──────────────────────────────────────────────
 
 /** A weekly availability window. day_of_week: 0=Monday … 6=Sunday. */

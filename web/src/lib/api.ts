@@ -38,6 +38,11 @@ export function configureTokens(access: TokenAccess) {
   tokens = access;
 }
 
+/** The current bearer token, for the WebSocket (which auths via ?token=). */
+export function currentAccessToken(): string | null {
+  return tokens.getAccess();
+}
+
 async function parseError(res: Response): Promise<string> {
   try {
     const data = await res.json();
