@@ -4,11 +4,18 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
-import { getMyVendor, listVendorBookings, setBookingStatus } from "@/lib/jorna";
+import {
+  checkInBooking,
+  confirmBookingEvent,
+  getMyVendor,
+  listVendorBookings,
+  setBookingStatus,
+} from "@/lib/jorna";
 import {
   BOOKING_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
   categoryLabel,
+  eventHasPassed,
   priceUnitLabel,
   type VendorBooking,
   type VendorDetail,
@@ -33,6 +40,11 @@ function matches(filter: Filter, b: VendorBooking): boolean {
   if (filter === "pending")
     return b.status === "pending" || b.status === "negotiation_ongoing";
   return b.status === "approved" || b.status === "payment_confirmed";
+}
+
+/** A booking is venue-anchored when it carries the event's mirrored coords. */
+function hasVenue(b: VendorBooking): boolean {
+  return b.venue_latitude != null && b.venue_longitude != null;
 }
 
 export default function MyBookingsPage() {
@@ -101,6 +113,57 @@ export default function MyBookingsPage() {
     } finally {
       setBusyId(null);
     }
+  }
+
+  /** Run a release action, then refetch so the new state is authoritative. */
+  async function release(
+    b: VendorBooking,
+    action: () => Promise<unknown>,
+    fallback: string,
+  ) {
+    if (!vendor) return;
+    setBusyId(b.booking_id);
+    setError(null);
+    setNotice(null);
+    try {
+      await action();
+      await load(vendor.vendor_id);
+      setNotice("Confirmed. The payment releases once the client confirms too.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : fallback);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function checkIn(b: VendorBooking) {
+    if (!navigator.geolocation) {
+      setError("This browser can't share a location, so it can't verify you're at the venue.");
+      return;
+    }
+    setBusyId(b.booking_id);
+    setError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) =>
+        void release(
+          b,
+          () => checkInBooking(b.booking_id, pos.coords.latitude, pos.coords.longitude),
+          "Couldn't check you in — make sure you're at the venue.",
+        ),
+      () => {
+        setBusyId(null);
+        setError("Couldn't read your location. You need to allow it to check in at the venue.");
+      },
+      { enableHighAccuracy: true, timeout: 15000 },
+    );
+  }
+
+  function vendorConfirm(b: VendorBooking) {
+    void release(
+      b,
+      () => confirmBookingEvent(b.booking_id),
+      "Couldn't confirm — please try again.",
+    );
   }
 
   if (authLoading || !user || loading) {
@@ -268,6 +331,50 @@ export default function MyBookingsPage() {
                       </Button>
                     </div>
                   )
+                ) : null}
+
+                {/* Escrow release — the vendor's half, once the money is held */}
+                {b.payment_status === "paid" ? (
+                  <div className="mt-3 border-t border-line-soft pt-3">
+                    {b.vendor_confirmed_at ? (
+                      <p className="text-xs text-ink-soft">
+                        {b.customer_confirmed_at
+                          ? "Confirmed by both — your payout is on its way."
+                          : "You've confirmed. Waiting on the client to confirm before the payment releases."}
+                      </p>
+                    ) : hasVenue(b) ? (
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-ink-faint">
+                          Check in at the venue to confirm you delivered.
+                        </p>
+                        <Button
+                          size="md"
+                          disabled={busyId === b.booking_id}
+                          onClick={() => checkIn(b)}
+                        >
+                          {busyId === b.booking_id ? "Checking in…" : "Check in at venue"}
+                        </Button>
+                      </div>
+                    ) : eventHasPassed(b.date_end || b.date_iso) ? (
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-ink-faint">
+                          Confirm the event happened to release your payment.
+                        </p>
+                        <Button
+                          size="md"
+                          disabled={busyId === b.booking_id}
+                          onClick={() => vendorConfirm(b)}
+                        >
+                          {busyId === b.booking_id ? "Confirming…" : "Confirm"}
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-ink-soft">
+                        You can confirm after the event
+                        {b.date_iso && b.date_iso !== "TBD" ? ` (${b.date_iso})` : ""}.
+                      </p>
+                    )}
+                  </div>
                 ) : null}
               </Card>
             );

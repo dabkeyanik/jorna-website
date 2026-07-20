@@ -335,6 +335,23 @@ export function confirmBookingEvent(bookingId: string): Promise<unknown> {
   return apiFetch(`/payments/bookings/${bookingId}/confirm`, { method: "POST" });
 }
 
+/**
+ * A vendor's GPS check-in at the venue — their half of releasing escrow. The
+ * backend requires the caller to be within ~0.2mi of the venue anchor, and
+ * records vendor_confirmed_at. Funds still can't release until the customer
+ * confirms too (which is date-gated), so a vendor may check in early.
+ */
+export function checkInBooking(
+  bookingId: string,
+  latitude: number,
+  longitude: number,
+): Promise<unknown> {
+  return apiFetch(`/bookings/${bookingId}/check-in`, {
+    method: "POST",
+    body: { latitude, longitude },
+  });
+}
+
 /** Full refund, available for 24 hours after payment. Customer only. */
 export function refundBooking(bookingId: string): Promise<unknown> {
   return apiFetch(`/payments/bookings/${bookingId}/refund`, { method: "POST" });

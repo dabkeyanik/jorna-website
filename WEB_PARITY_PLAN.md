@@ -107,9 +107,15 @@ take money; B5–B6 complete their side.
     routes at exactly those paths — without them a vendor 404s right after
     finishing setup. They just forward to Earnings, which re-checks live status.
 
-- [ ] **B5. Vendor confirm + check-in**
-  - `POST /payments/bookings/{id}/confirm`; GPS check-in via browser geolocation
-    where the event has venue coords, plain confirm where it doesn't.
+- [x] **B5. Vendor confirm + check-in** — on `/my-bookings`
+  - Once a booking is paid, the vendor's half of releasing escrow appears:
+    - **Venue event** → "Check in at venue" using browser geolocation →
+      `POST /bookings/{id}/check-in`. The backend requires being within ~0.2mi,
+      and a vendor may check in early (release still waits on the client).
+    - **Venue-less event** → plain "Confirm" (`/confirm`), shown only once the
+      event date has passed, since that call is date-gated.
+  - After confirming it says whether it's waiting on the client or already
+    released. The venue is detected from the booking's mirrored coords.
 
 - [ ] **B6. Calendar & availability**
   - `GET/PUT /vendors/me/availability`, `GET /vendors/{id}/availability`,
