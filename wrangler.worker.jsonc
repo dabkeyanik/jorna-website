@@ -1,0 +1,16 @@
+{
+  // TEMPORARY — the old Workers Static Assets deploy for the apex.
+  //
+  // The site has moved to Cloudflare Pages (see wrangler.jsonc), but the apex
+  // jornaevents.com is still attached to this Worker until the dashboard cutover
+  // (DEPLOY.md). While it is, deploy the current build here too so the apex stays
+  // current with Pages:  wrangler deploy --config wrangler.worker.jsonc
+  //
+  // Delete this file and the Worker once jornaevents.com points at Pages.
+  "name": "misty-water-0dbb",
+  "compatibility_date": "2026-07-17",
+  "assets": {
+    "directory": "./public"
+  },
+  "routes": [{ "pattern": "jornaevents.com", "custom_domain": true }]
+}

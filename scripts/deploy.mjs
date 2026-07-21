@@ -17,11 +17,13 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const appDir = join(root, "public", "app");
 const PAGES_PROJECT = "jorna-events";
-// Verify against the domain the deploy actually updates. Pre-cutover the apex
-// (jornaevents.com) still points at the old Worker, so a Pages deploy is proved
-// on the pages.dev alias. After the apex is moved to Pages, set
-// DEPLOY_DOMAIN=https://jornaevents.com (and update the default here).
-const DOMAIN = process.env.DEPLOY_DOMAIN ?? "https://jorna-events.pages.dev";
+// TRANSITION: the apex (jornaevents.com) still points at the old Worker until
+// the dashboard cutover to Pages (DEPLOY.md). Until then we deploy to BOTH —
+// Pages (the future, reliable) and the Worker (so the live apex stays current) —
+// and verify the apex, since that's the URL people actually hit. Once the domain
+// is on Pages: set DEPLOY_TARGET=pages, drop the Worker step, and this simplifies.
+const DEPLOY_TARGET = process.env.DEPLOY_TARGET ?? "both"; // "both" | "pages"
+const DOMAIN = process.env.DEPLOY_DOMAIN ?? "https://jornaevents.com";
 const MAX_ATTEMPTS = 4;
 // A deploy can pass one check, then 404 for a while as it propagates across edge
 // PoPs. Don't trust a single green check — require several consecutive clean
@@ -73,14 +75,21 @@ const urls = routeUrls();
 log(`will verify ${urls.length} routes after deploy`);
 
 for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-  log(`deploy attempt ${attempt}/${MAX_ATTEMPTS}`);
+  log(`deploy attempt ${attempt}/${MAX_ATTEMPTS} (target: ${DEPLOY_TARGET})`);
   try {
     execSync(
       `npx --no-install wrangler pages deploy public --project-name ${PAGES_PROJECT} --branch main --commit-dirty=true`,
       { cwd: root, stdio: "inherit" },
     );
+    if (DEPLOY_TARGET === "both") {
+      // Keep the apex (still on the Worker) current until the domain moves.
+      execSync("npx --no-install wrangler deploy --config wrangler.worker.jsonc", {
+        cwd: root,
+        stdio: "inherit",
+      });
+    }
   } catch {
-    log("wrangler exited non-zero — retrying");
+    log("a deploy step exited non-zero — retrying");
     await sleep(4000);
     continue;
   }
