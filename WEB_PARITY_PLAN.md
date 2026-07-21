@@ -166,7 +166,13 @@ take money; B5–B6 complete their side.
 
 ## Phase D — account completeness
 
-- [ ] **D1. Profile management** — edit email/phone/username/password, avatar upload.
+- [x] **D1. Account settings** — `/account` (linked from the Profile hub)
+  - Edit name/email/phone/location (`PATCH /me`), avatar upload (`PUT /me/avatar`,
+    multipart field `file`), and change password (`POST /auth/change-password`).
+  - Password change bumps `token_version` server-side, invalidating the session,
+    so on success we sign the user out and send them to sign in again.
+  - `AuthProvider` gained `setUser` so edits reflect immediately in the tab
+    bar / profile. (Username isn't in `PATCH /me`, so it isn't editable here.)
 - [ ] **D2. Password reset** — request + confirm.
 - [ ] **D3. Google OAuth** — Supabase sign-in → `POST /auth/google/lookup` exchange.
 

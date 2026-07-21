@@ -62,10 +62,16 @@ export default function ProfilePage() {
             {name.charAt(0).toUpperCase()}
           </div>
         )}
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h1 className="serif text-3xl text-maroon dark:text-gold">{name}</h1>
           <p className="text-sm text-ink-soft">{user.email}</p>
         </div>
+        <Link
+          href="/account"
+          className="shrink-0 text-sm font-semibold text-gold hover:underline"
+        >
+          Settings
+        </Link>
       </header>
 
       {/* Planning side — everyone has this */}

@@ -14,6 +14,7 @@ import type {
   Negotiation,
   ReportTargetType,
   StripeStatus,
+  User,
   TaxonomyCategory,
   VendorBooking,
   VendorCreateInput,
@@ -185,6 +186,42 @@ export function createCheckoutSession(
  */
 export function syncBookingPayment(bookingId: string): Promise<unknown> {
   return apiFetch(`/payments/bookings/${bookingId}/sync-payment`, { method: "POST" });
+}
+
+// ── Account (current user) ───────────────────────────────────────────
+
+export interface MeUpdate {
+  email?: string;
+  f_name?: string;
+  l_name?: string;
+  phone?: string | null;
+  location?: string;
+}
+
+/** Partial update of the signed-in user's profile. Returns the updated user. */
+export function updateMe(updates: MeUpdate): Promise<User> {
+  return apiFetch<User>("/me", { method: "PATCH", body: updates });
+}
+
+/** Upload a profile picture (multipart, field `file`). Returns the updated user. */
+export function uploadAvatar(file: File): Promise<User> {
+  const form = new FormData();
+  form.append("file", file);
+  return apiUpload<User>("/me/avatar", form, { method: "PUT" });
+}
+
+/**
+ * Change password. The backend bumps token_version, so this invalidates the
+ * current session — the caller should sign the user out afterwards.
+ */
+export function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ message?: string }> {
+  return apiFetch<{ message?: string }>("/auth/change-password", {
+    method: "POST",
+    body: { current_password: currentPassword, new_password: newPassword },
+  });
 }
 
 // ── Vendor profile ───────────────────────────────────────────────────
