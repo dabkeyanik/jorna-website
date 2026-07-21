@@ -1,16 +1,12 @@
 {
-  // Static-asset-only Worker: no server code, Cloudflare just serves ./public
-  // (the marketing page at / and the exported web app at /app).
-  // The name must stay "misty-water-0dbb" — that's the Worker the dashboard
-  // created, and changing it here would deploy a second, separate Worker
-  // rather than update the live one.
-  "name": "misty-water-0dbb",
-  "compatibility_date": "2026-07-17",
-  "assets": {
-    "directory": "./public"
-  },
-  // Serve the real domain from this Worker. Without this the Worker is only
-  // reachable at its workers.dev URL and jornaevents.com keeps serving an
-  // older, separately-hosted copy of the site.
-  "routes": [{ "pattern": "jornaevents.com", "custom_domain": true }]
+  // Cloudflare Pages project serving ./public (the marketing page at / and the
+  // exported web app under /app). Migrated off Workers Static Assets, whose
+  // many-file asset serving intermittently dropped the /app routes.
+  //
+  // Deploy with `npm run deploy` (build + `wrangler pages deploy` + verify).
+  // The apex jornaevents.com is attached to this project in the Cloudflare
+  // dashboard (Pages → jorna-events → Custom domains). The previous Worker
+  // "misty-water-0dbb" is retired once the domain is moved.
+  "name": "jorna-events",
+  "pages_build_output_dir": "./public"
 }

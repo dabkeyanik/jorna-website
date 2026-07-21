@@ -2,13 +2,12 @@
   "name": "jornaevents-site",
   "version": "1.0.0",
   "private": true,
-  "description": "jornaevents.com — the marketing page plus the Jorna web app, served by one Cloudflare Worker.",
+  "description": "jornaevents.com — the marketing page plus the Jorna web app, served by Cloudflare Pages.",
   "scripts": {
     "install:app": "npm --prefix web install",
     "build": "npm --prefix web run build",
-    "preview": "npm run build && wrangler dev",
     "deploy": "node scripts/deploy.mjs",
-    "deploy:once": "npm run build && wrangler deploy"
+    "deploy:once": "npm run build && wrangler pages deploy public --project-name jorna-events --branch main --commit-dirty=true"
   },
   "devDependencies": {
     "wrangler": "^4.112.0"

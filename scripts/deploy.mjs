@@ -16,12 +16,16 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const appDir = join(root, "public", "app");
-const DOMAIN = process.env.DEPLOY_DOMAIN ?? "https://jornaevents.com";
+const PAGES_PROJECT = "jorna-events";
+// Verify against the domain the deploy actually updates. Pre-cutover the apex
+// (jornaevents.com) still points at the old Worker, so a Pages deploy is proved
+// on the pages.dev alias. After the apex is moved to Pages, set
+// DEPLOY_DOMAIN=https://jornaevents.com (and update the default here).
+const DOMAIN = process.env.DEPLOY_DOMAIN ?? "https://jorna-events.pages.dev";
 const MAX_ATTEMPTS = 4;
-// A deploy can pass one check, then 404 for a while as the new version
-// propagates across edge PoPs (or an old version is briefly still served). So
-// don't trust a single green check — require several consecutive clean passes,
-// and poll long enough for propagation to settle before giving up on a deploy.
+// A deploy can pass one check, then 404 for a while as it propagates across edge
+// PoPs. Don't trust a single green check — require several consecutive clean
+// passes, polling long enough for propagation to settle before failing a deploy.
 const CONFIRM_PASSES = 3; // consecutive all-green sweeps required
 const POLL_INTERVAL_MS = 8000;
 const VERIFY_TIMEOUT_MS = 120000; // per deploy attempt
@@ -71,7 +75,10 @@ log(`will verify ${urls.length} routes after deploy`);
 for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
   log(`deploy attempt ${attempt}/${MAX_ATTEMPTS}`);
   try {
-    execSync("npx --no-install wrangler deploy", { cwd: root, stdio: "inherit" });
+    execSync(
+      `npx --no-install wrangler pages deploy public --project-name ${PAGES_PROJECT} --branch main --commit-dirty=true`,
+      { cwd: root, stdio: "inherit" },
+    );
   } catch {
     log("wrangler exited non-zero — retrying");
     await sleep(4000);
