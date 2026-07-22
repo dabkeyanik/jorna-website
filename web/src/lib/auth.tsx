@@ -3,7 +3,8 @@
 // Auth state for the web app. Email/password authenticates directly against the
 // backend (/auth/login, /auth/register) which issues Jorna's own JWT + refresh
 // token; those are persisted in localStorage and attached to every API call via
-// the api client. Google OAuth (Supabase) is a later phase.
+// the api client. Google OAuth goes through Supabase, then exchanges its token
+// for a Jorna session via adoptSession (see /auth/callback and lib/supabase).
 
 import {
   createContext,
@@ -31,6 +32,10 @@ interface RegisterInput {
   gender: string;
   language: string;
   phone?: string;
+  // Set when completing a Google sign-up: links the new account to the Supabase
+  // identity. The backend proves ownership from the token (matching sub + email).
+  supabase_user_id?: string;
+  supabase_access_token?: string;
 }
 
 interface AuthContextValue {
@@ -38,6 +43,8 @@ interface AuthContextValue {
   loading: boolean;
   login: (identifier: string, password: string) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
+  /** Adopt a Jorna token pair obtained outside the password flow (Google). */
+  adoptSession: (pair: TokenPair) => Promise<void>;
   logout: () => void;
   /** Set the current user directly (e.g. after editing the profile). */
   setUser: (user: User) => void;
@@ -118,19 +125,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = useCallback(
     async (input: RegisterInput) => {
-      const pair = await apiFetch<TokenPair>("/auth/register", {
+      // /auth/register creates the account but returns only {user_id, email} —
+      // it doesn't issue tokens. Establish the session by logging in after, with
+      // the credentials just set (works for Google sign-ups too: the linked
+      // account still has this password).
+      await apiFetch<{ user_id: string; email: string }>("/auth/register", {
         method: "POST",
         auth: false,
         body: input,
+      });
+      const pair = await apiFetch<TokenPair>("/auth/login", {
+        method: "POST",
+        auth: false,
+        body: { identifier: input.email, password: input.password },
       });
       await afterTokens(pair);
     },
     [afterTokens],
   );
 
+  // Persist a token pair we already hold (e.g. from /auth/google/lookup) and
+  // load the profile — the Google equivalent of finishing login().
+  const adoptSession = useCallback(
+    async (pair: TokenPair) => {
+      await afterTokens(pair);
+    },
+    [afterTokens],
+  );
+
   const value = useMemo(
-    () => ({ user, loading, login, register, logout: clear, setUser }),
-    [user, loading, login, register, clear],
+    () => ({ user, loading, login, register, adoptSession, logout: clear, setUser }),
+    [user, loading, login, register, adoptSession, clear],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

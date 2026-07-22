@@ -209,6 +209,30 @@ export function resetPassword(token: string, newPassword: string): Promise<{ mes
   });
 }
 
+// ── Google OAuth ─────────────────────────────────────────────────────
+
+export interface GoogleLookupResponse {
+  // Present (with refresh_token) only when a Jorna account already exists or was
+  // linked by email. Null when is_new_user — the client must register.
+  access_token: string | null;
+  refresh_token?: string | null;
+  token_type: string;
+  user_id: string | null;
+  email: string | null;
+  is_new_user: boolean;
+}
+
+/** Exchange a verified Supabase Google token for a Jorna session. No Jorna
+ *  account is created here — a new identity comes back as is_new_user=true with
+ *  its email, to be completed via /auth/register. */
+export function googleLookup(supabaseAccessToken: string): Promise<GoogleLookupResponse> {
+  return apiFetch<GoogleLookupResponse>("/auth/google/lookup", {
+    method: "POST",
+    auth: false,
+    body: { access_token: supabaseAccessToken },
+  });
+}
+
 // ── Account (current user) ───────────────────────────────────────────
 
 export interface MeUpdate {
