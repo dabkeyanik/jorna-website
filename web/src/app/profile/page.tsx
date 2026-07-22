@@ -78,6 +78,7 @@ export default function ProfilePage() {
       <section className="mt-8">
         <p className="eyebrow mb-3">Your celebrations</p>
         <div className="grid gap-2">
+          <Row href="/activity" title="Needs you" sub="Everything waiting on you, in one place" />
           <Row href="/events" title="Events" sub="Your celebrations and what's booked for each" />
           <Row href="/bundles" title="Bundles" sub="Vendor teams you've built" />
           <Row href="/browse" title="Browse vendors" sub="Find and book more" />

@@ -242,9 +242,36 @@ These can't be a straight port; decide per item rather than assuming parity.
   - Fidelity caveat stands: browser geolocation is permission-gated and coarser
     than native, and the backend's ~0.2mi radius is unforgiving — a denied or
     low-accuracy fix reads as "you're not at the venue".
-- [ ] **E2. Push notifications** — iOS uses FCM native push. The web equivalent
-      (service worker + VAPID) is **new backend work**, not a port. Likely an
-      in-app notification list first; true web push is a separate decision.
+- [x] **E2a. "Needs you"** — `/activity`, linked from the Profile hub
+  - **The plan assumed an in-app notification list was the cheap first step. It
+    isn't.** There is no notifications table and no endpoint: `notify_*` sends an
+    FCM push + an email and **persists nothing**. So a feed of past events would
+    need a table, a write at every notify site, a read endpoint, read-tracking —
+    and a migration against the production DB. Same order of work as real push.
+  - So this is **derived, not stored**: one screen computing what's waiting on
+    you from data the app already fetches — no backend change, no migration.
+    - *Vendor:* Stripe onboarding unfinished (clients literally can't pay you),
+      requests to answer, and paid bookings where your check-in/confirm is the
+      only thing holding up your own payout.
+    - *Client:* bookings to pay, a total still pending a quantity (so the Pay
+      button's absence is explained rather than mysterious), and events that are
+      over and waiting on your confirm to release the vendor.
+    - *Both:* unread group-chat messages.
+  - Every row mirrors a backend guard, so it never points at an action the server
+    must reject — confirms use the booking's **last** day, like
+    `event_confirmable_date`, and a quantity-pending booking is never shown as
+    payable.
+  - Cost: 2 calls for a client, 4 for a vendor, all already-existing endpoints.
+  - The page says plainly that nothing can reach you with the tab closed.
+
+- [ ] **E2b. True web push** — service worker + VAPID. Still **new backend work**,
+      not a port, and a deliberate decision rather than a default:
+      `User.fcm_token` is a single column for one native device token, while a
+      web subscription is a different shape (endpoint + p256dh + auth) and a user
+      has a phone *and* a browser — so it needs a new table + an Alembic
+      migration that runs on the production DB, plus dispatch wired into every
+      `notify_*` call site. Worth doing when it's worth that; `/activity` covers
+      the "what needs me?" question in the meantime.
 
 ---
 
