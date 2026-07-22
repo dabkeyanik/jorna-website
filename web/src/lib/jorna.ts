@@ -566,10 +566,16 @@ export function confirmBookingEvent(bookingId: string): Promise<unknown> {
 }
 
 /**
- * A vendor's GPS check-in at the venue — their half of releasing escrow. The
- * backend requires the caller to be within ~0.2mi of the venue anchor, and
- * records vendor_confirmed_at. Funds still can't release until the customer
- * confirms too (which is date-gated), so a vendor may check in early.
+ * GPS check-in at the venue. One endpoint, two meanings — the backend derives
+ * your role and never trusts a client-supplied flag:
+ *  • vendor — this is their half of releasing escrow (records
+ *    vendor_confirmed_at). Funds still can't release until the customer
+ *    confirms too (date-gated), so a vendor may check in early.
+ *  • client — pure presence (records client_checked_in_at) and notifies the
+ *    vendor they've arrived. It does NOT confirm the event or release funds;
+ *    that stays the date-gated confirmBookingEvent.
+ * Either way the caller must be within ~0.2mi of the venue anchor, and the
+ * anchor comes from the bundle's live venue booking — no venue, no check-in.
  */
 export function checkInBooking(
   bookingId: string,

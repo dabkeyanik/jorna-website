@@ -18,6 +18,7 @@ import {
 import { ServiceSwapPanel } from "@/components/ServiceSwapPanel";
 import { NegotiationPanel } from "@/components/NegotiationPanel";
 import { ReviewPanel } from "@/components/ReviewPanel";
+import { VenueCheckIn } from "@/components/VenueCheckIn";
 import {
   BOOKING_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
@@ -498,6 +499,8 @@ function BundleInner() {
           {notice}
         </p>
       ) : null}
+
+      <VenueCheckIn bookings={bundle.bookings} onCheckedIn={load} />
 
       <section className="mt-8 grid gap-3">
         {bundle.bookings.map((b) => (

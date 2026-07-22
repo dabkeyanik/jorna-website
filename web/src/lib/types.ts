@@ -235,6 +235,10 @@ export interface BundleBooking {
   customer_confirmed_at?: string | null;
   vendor_confirmed_at?: string | null;
   funds_released_at?: string | null;
+  // GPS venue check-ins — presence, not escrow. Neither releases funds; that's
+  // customer_confirmed_at / vendor_confirmed_at.
+  vendor_checked_in_at?: string | null;
+  client_checked_in_at?: string | null;
 }
 
 /** How long after paying a full refund is still available. */
@@ -268,6 +272,21 @@ export function withinRefundWindow(paidAt?: string | null): boolean {
  * event_confirmable_date: funds never release before the event's last day, and
  * a TBD date isn't confirmable at all.
  */
+/** A check-in timestamp as a short local date + time. Check-ins are stored as
+ *  ISO strings; an unparseable one degrades to a vague word rather than "NaN". */
+export function formatCheckInTime(iso?: string | null): string {
+  if (!iso) return "already";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? "already"
+    : d.toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+}
+
 export function eventHasPassed(dateIso?: string | null): boolean {
   if (!dateIso || dateIso === "TBD") return false;
   const day = Date.parse(`${dateIso}T23:59:59Z`);

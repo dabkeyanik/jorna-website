@@ -16,6 +16,7 @@ import {
   PAYMENT_STATUS_LABELS,
   categoryLabel,
   eventHasPassed,
+  formatCheckInTime,
   priceUnitLabel,
   type VendorBooking,
   type VendorDetail,
@@ -347,6 +348,15 @@ export default function MyBookingsPage() {
                       }}
                     />
                   </div>
+                ) : null}
+
+                {/* The client's GPS arrival. Presence only — it is not their
+                    escrow confirmation, so it never moves the payout along. */}
+                {b.client_checked_in_at ? (
+                  <p className="mt-3 text-xs text-green">
+                    {b.client_name || "Your client"} checked in at the venue on{" "}
+                    {formatCheckInTime(b.client_checked_in_at)}.
+                  </p>
                 ) : null}
 
                 {/* Escrow release — the vendor's half, once the money is held */}

@@ -217,8 +217,31 @@ take money; B5–B6 complete their side.
 
 These can't be a straight port; decide per item rather than assuming parity.
 
-- [ ] **E1. Client GPS check-in** — browser geolocation is permission-gated and
-      less accurate than native. Ship it, but expect different fidelity.
+- [x] **E1. Client GPS check-in** — "At the venue?" on `/bundle`
+  - **This turned out not to be a port.** iOS has *no* client check-in: only the
+    vendor side calls `check-in`. But the backend has always supported it — the
+    same `POST /bookings/{id}/check-in` derives the caller's role server-side and
+    takes a client down a different branch. So web is the first client to use it.
+  - **It is not an escrow action, and the UI says so.** The vendor's check-in
+    sets `vendor_confirmed_at` (their half of the release); the client's sets
+    only `client_checked_in_at` and notifies the vendor they've arrived. Sitting
+    next to "Confirm & release" that would otherwise read as the thing that pays
+    the vendor, so the copy states plainly that it releases nothing.
+  - Offered only when the bundle has a **live venue** — mirroring the backend's
+    `_live_venue_booking` (a rejected/cancelled/refunded venue stops anchoring,
+    a disputed one still anchors) — since without an anchor check-in 400s.
+    No backend change needed: the bundle summary already returns the check-in
+    timestamps, and the venue is derived from the bookings themselves.
+  - Check-in is per booking server-side, but a client arrives at *the event*, so
+    one action fans out across the live bookings and every vendor is told once.
+    If all calls fail, the backend's own wording is shown (it's the one that
+    knows you're 3 miles away), not a generic error.
+  - Closed the loop on the vendor side: `/my-bookings` now shows "… checked in at
+    the venue on …". It was already in the payload and the type, but nothing
+    rendered it, so the client's arrival would have been write-only.
+  - Fidelity caveat stands: browser geolocation is permission-gated and coarser
+    than native, and the backend's ~0.2mi radius is unforgiving — a denied or
+    low-accuracy fix reads as "you're not at the venue".
 - [ ] **E2. Push notifications** — iOS uses FCM native push. The web equivalent
       (service worker + VAPID) is **new backend work**, not a port. Likely an
       in-app notification list first; true web push is a separate decision.
