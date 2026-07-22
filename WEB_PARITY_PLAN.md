@@ -173,7 +173,20 @@ take money; B5–B6 complete their side.
     so on success we sign the user out and send them to sign in again.
   - `AuthProvider` gained `setUser` so edits reflect immediately in the tab
     bar / profile. (Username isn't in `PATCH /me`, so it isn't editable here.)
-- [ ] **D2. Password reset** — request + confirm.
+- [x] **D2. Password reset** — request (`/forgot-password`) + confirm (`/reset-password`)
+  - `POST /auth/forgot-password` with `client: "web"`, reached from a "Forgot
+    password?" link on the sign-in form. Always shows the same generic
+    confirmation (the backend never reveals whether the email exists).
+  - `client: "web"` is what makes the emailed link land in the web app: the
+    backend builds it as `{WEB_APP_URL}/reset-password?token=…` (`= https://
+    jornaevents.com/app/reset-password`) for `web` and the `jorna://` deep link
+    otherwise — the same return-path split as checkout/onboarding. Verified in
+    `auth_service._send_password_reset_email`.
+  - `/reset-password` reads the token from the query, `POST /auth/reset-password`
+    with the new password, then routes to sign in — a successful reset bumps
+    `token_version`, killing all sessions, so a fresh login is required anyway.
+    The hint states the real rule (8+ chars incl. upper, lower, digit), not just
+    length, so the user isn't bounced by a 422 the form didn't warn about.
 - [ ] **D3. Google OAuth** — Supabase sign-in → `POST /auth/google/lookup` exchange.
 
 ## Phase E — platform differences

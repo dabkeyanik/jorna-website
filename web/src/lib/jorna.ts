@@ -188,6 +188,27 @@ export function syncBookingPayment(bookingId: string): Promise<unknown> {
   return apiFetch(`/payments/bookings/${bookingId}/sync-payment`, { method: "POST" });
 }
 
+// ── Password reset ───────────────────────────────────────────────────
+
+/** Email a reset link. `client=web` makes the link open the web app's reset page.
+ *  Always resolves the same generic message (no user enumeration). */
+export function requestPasswordReset(email: string): Promise<{ message?: string }> {
+  return apiFetch<{ message?: string }>("/auth/forgot-password", {
+    method: "POST",
+    auth: false,
+    body: { email, client: "web" },
+  });
+}
+
+/** Complete a reset with the emailed token. */
+export function resetPassword(token: string, newPassword: string): Promise<{ message?: string }> {
+  return apiFetch<{ message?: string }>("/auth/reset-password", {
+    method: "POST",
+    auth: false,
+    body: { token, new_password: newPassword },
+  });
+}
+
 // ── Account (current user) ───────────────────────────────────────────
 
 export interface MeUpdate {

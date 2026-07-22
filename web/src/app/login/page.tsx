@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
@@ -136,6 +137,17 @@ function LoginInner() {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
+
+          {mode === "login" ? (
+            <div className="-mt-2 text-right">
+              <Link
+                href="/forgot-password"
+                className="text-sm font-semibold text-gold underline-offset-2 hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
+          ) : null}
 
           {error ? (
             <p className="rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
