@@ -85,7 +85,7 @@ export default function PlanPage() {
   const [guests, setGuests] = useState("");
   const [budget, setBudget] = useState("mid-range");
   const [styles, setStyles] = useState<string[]>([]);
-  const [needed, setNeeded] = useState<string[]>(ALL_CATEGORIES);
+  const [needed, setNeeded] = useState<string[]>([]);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
