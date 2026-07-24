@@ -1,0 +1,52 @@
+/* ────────────────────────────────────────────────────────────────────────────
+ *  FIREBASE MESSAGING SERVICE WORKER
+ *  Served at /app/firebase-messaging-sw.js (scope /app/). Handles push while the
+ *  tab is closed/backgrounded and shows the notification.
+ *
+ *  ┌──────────────────────────────────────────────────────────────────────────┐
+ *  │  PLACE YOUR VALUES HERE  (slot 2 of 2)                                    │
+ *  │  A service worker is a static file — it can't read the app's env vars, so │
+ *  │  the SAME five config values from web/src/lib/firebaseConfig.ts must be   │
+ *  │  hard-coded again below. Keep them in sync. (No VAPID key needed here.)   │
+ *  └──────────────────────────────────────────────────────────────────────────┘
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js");
+
+firebase.initializeApp({
+  apiKey:            "PASTE_apiKey_HERE",
+  authDomain:        "PASTE_authDomain_HERE",
+  projectId:         "PASTE_projectId_HERE",
+  messagingSenderId: "PASTE_messagingSenderId_HERE",
+  appId:             "PASTE_appId_HERE",
+});
+
+const messaging = firebase.messaging();
+
+// Fired when a push arrives and no tab is focused. Show the notification and
+// stash a link so a click opens the right place in the app.
+messaging.onBackgroundMessage((payload) => {
+  const title = (payload.notification && payload.notification.title) || "Jorna";
+  const body = (payload.notification && payload.notification.body) || "";
+  const data = payload.data || {};
+  self.registration.showNotification(title, {
+    body,
+    icon: "/app/favicon.ico",
+    data,
+  });
+});
+
+// Focus an existing tab (or open one) when the notification is clicked.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = "/app/activity/";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const c of clients) {
+        if (c.url.includes("/app/") && "focus" in c) return c.focus();
+      }
+      return self.clients.openWindow(url);
+    }),
+  );
+});
