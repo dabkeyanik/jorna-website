@@ -187,9 +187,8 @@ take money; B5–B6 complete their side.
     `token_version`, killing all sessions, so a fresh login is required anyway.
     The hint states the real rule (8+ chars incl. upper, lower, digit), not just
     length, so the user isn't bounced by a 422 the form didn't warn about.
-- [~] **D3. Google OAuth** — Supabase sign-in → `POST /auth/google/lookup` exchange.
-  *(Built & deployed; box left unticked pending the Supabase config below +
-  a manual Google round-trip, which can't be verified from Windows/CI.)*
+- [x] **D3. Google OAuth** — Supabase sign-in → `POST /auth/google/lookup` exchange.
+  *(Verified live: a real Google sign-in round-trips into the web app.)*
   - "Continue with Google" on `/login` (both modes) → `supabase.auth.signInWithOAuth`
     (PKCE) → Google → `/auth/callback`, which exchanges the code for a Supabase
     session and calls `POST /auth/google/lookup` (`lib/supabase.ts`, the new
@@ -205,13 +204,14 @@ take money; B5–B6 complete their side.
     `TokenPair` and never established a session (the account was created but the
     user wasn't signed in). Now it logs in right after registering, fixing both
     the email/password and Google sign-ups.
-  - **Blocked on one dashboard change (Supabase, not code):** add
-    `https://jornaevents.com/app/auth/callback/` (and, for dev,
-    `http://localhost:3000/app/auth/callback/`) to **Supabase → Authentication →
-    URL Configuration → Redirect URLs**. Without it Supabase refuses the web
-    redirect and bounces to the iOS deep link. Google is already enabled on this
-    project (iOS uses it), so no Google-console work. Tick this box after that
-    entry is added and one real Google sign-in round-trips on the live site.
+  - **Required Supabase config (done):** in **Authentication → URL
+    Configuration**, Redirect URLs include `https://jornaevents.com/app/**` (and
+    `http://localhost:3000/app/**` for dev), and the Site URL is
+    `https://jornaevents.com/app`. The app sends `redirect_to=…/app/auth/callback/`
+    (trailing slash, matching the static export); if the allow-list doesn't match
+    it *exactly*, GoTrue silently falls back to the Site URL — which is why the
+    wildcard is used rather than a bare path. Google is already enabled on this
+    project (iOS uses it), so no Google-console work was needed.
 
 ## Phase E — platform differences
 
