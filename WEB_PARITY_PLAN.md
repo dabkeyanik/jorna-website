@@ -264,14 +264,32 @@ These can't be a straight port; decide per item rather than assuming parity.
   - Cost: 2 calls for a client, 4 for a vendor, all already-existing endpoints.
   - The page says plainly that nothing can reach you with the tab closed.
 
-- [ ] **E2b. True web push** — service worker + VAPID. Still **new backend work**,
-      not a port, and a deliberate decision rather than a default:
-      `User.fcm_token` is a single column for one native device token, while a
-      web subscription is a different shape (endpoint + p256dh + auth) and a user
-      has a phone *and* a browser — so it needs a new table + an Alembic
-      migration that runs on the production DB, plus dispatch wired into every
-      `notify_*` call site. Worth doing when it's worth that; `/activity` covers
-      the "what needs me?" question in the meantime.
+- [~] **E2b. True web push** — FCM for Web (service worker + VAPID)
+  *(Built & deployed; box left unticked pending a real browser granting
+  permission and an actual push arriving — can't be verified from Windows/CI.)*
+  - **Backend shipped first** (separate repo, deployed): push tokens moved off the
+    single `users.fcm_token` column to a `push_tokens` table (one user → many
+    devices), a `send_push_to_user` helper that fans out and prunes dead tokens,
+    and `register-token` gaining a `platform`. Migration 0031 backfilled then
+    dropped the column. **The key realisation:** FCM registration tokens are the
+    same string shape for native and web, so a browser is just another device on
+    the existing Firebase Admin send path — no separate VAPID/pywebpush stack.
+  - **Web client:** `lib/push.ts` registers `/app/firebase-messaging-sw.js`
+    (explicit scope — FCM would otherwise look for it at the origin root and 404
+    under `/app`), requests permission, `getToken({ vapidKey })`, and registers
+    it with `platform:"web"`. The firebase SDK is imported lazily so it never
+    loads for users who don't opt in. "Turn on notifications" lives on `/activity`;
+    a foreground listener shows messages FCM suppresses while the tab is focused;
+    sign-out removes this browser's token (needs the session still valid, so it
+    runs before the session clears).
+  - **Config:** `firebaseConfig.ts` (env-overridable) + the same five values
+    hard-coded in the service worker (a static file can't read env). The **web**
+    app's `apiKey`/`appId` — not the iOS ones. The values are public by design
+    (they ship in the browser), so they're committed, not secret. A guard hides
+    the opt-in until every value is real.
+  - Verify by opening `/app/activity` on the live site, clicking **Turn on
+    notifications**, granting permission, and confirming a real push arrives
+    (e.g. have someone message you). Tick then.
 
 ---
 

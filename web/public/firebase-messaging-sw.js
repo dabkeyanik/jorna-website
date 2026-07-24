@@ -15,11 +15,11 @@ importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js
 importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js");
 
 firebase.initializeApp({
-  apiKey:            "PASTE_apiKey_HERE",
-  authDomain:        "PASTE_authDomain_HERE",
-  projectId:         "PASTE_projectId_HERE",
-  messagingSenderId: "PASTE_messagingSenderId_HERE",
-  appId:             "PASTE_appId_HERE",
+  apiKey:            "AIzaSyDy11WfdRcuOoGtBXEjCuPQTMcnNuaUE_Q",
+  authDomain:        "jorna-15768.firebaseapp.com",
+  projectId:         "jorna-15768",
+  messagingSenderId: "876290852341",
+  appId:             "1:876290852341:web:1356351e32243ccd748cbc",
 });
 
 const messaging = firebase.messaging();

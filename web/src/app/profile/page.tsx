@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { getMyVendor } from "@/lib/jorna";
+import { disableWebPushForThisDevice } from "@/lib/push";
 import type { VendorDetail } from "@/lib/types";
 import { Button, Card, LinkButton } from "@/components/ui";
 
@@ -111,7 +112,15 @@ export default function ProfilePage() {
       </section>
 
       <div className="mt-10">
-        <Button variant="ghost" onClick={logout}>
+        <Button
+          variant="ghost"
+          onClick={async () => {
+            // Unregister this browser's push token first — needs the session
+            // still valid — so a shared computer stops pinging after sign-out.
+            await disableWebPushForThisDevice(user.user_id);
+            logout();
+          }}
+        >
           Sign out
         </Button>
       </div>

@@ -25,17 +25,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const firebaseConfig = {
-  apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY             ?? "PASTE_apiKey_HERE",
-  authDomain:        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN         ?? "PASTE_authDomain_HERE",         // e.g. your-project.firebaseapp.com
-  projectId:         process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID          ?? "PASTE_projectId_HERE",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "PASTE_messagingSenderId_HERE",
-  appId:             process.env.NEXT_PUBLIC_FIREBASE_APP_ID              ?? "PASTE_appId_HERE",
+  apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY             ?? "AIzaSyDy11WfdRcuOoGtBXEjCuPQTMcnNuaUE_Q",
+  authDomain:        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN         ?? "jorna-15768.firebaseapp.com",
+  projectId:         process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID          ?? "jorna-15768",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "876290852341",
+  appId:             process.env.NEXT_PUBLIC_FIREBASE_APP_ID              ?? "1:876290852341:web:1356351e32243ccd748cbc",
 };
 
 /** The Web Push certificate public key ("Key pair") from Cloud Messaging.
  *  Used client-side by getToken({ vapidKey }); the backend never needs it. */
 export const VAPID_PUBLIC_KEY =
-  process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY ?? "PASTE_VAPID_PUBLIC_KEY_HERE";
+  process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY ??
+  "BEFNZxH80y6hzzZ8kacx3spJ0_ka2RTaLoDEZBykbiQnDRBxsFwy-5Q9prbLnECzunV5zV0Ogw9I7d7Gz66YfTM";
 
 /** True once every slot above has a real value — the push UI stays hidden until
  *  then, so a half-configured build simply doesn't offer notifications. */

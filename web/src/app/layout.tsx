@@ -4,6 +4,7 @@ import { AuthProvider } from "@/lib/auth";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { AppTabBar } from "@/components/AppTabBar";
+import { PushRuntime } from "@/components/PushRuntime";
 
 export const metadata: Metadata = {
   title: "Jorna — Plan your celebration",
@@ -23,6 +24,8 @@ export default function RootLayout({
           <SiteFooter />
           {/* Bottom tab bar (mirrors iOS) — sticky, shown only when signed in. */}
           <AppTabBar />
+          {/* Foreground web-push listener; no-op unless signed in + permitted. */}
+          <PushRuntime />
         </AuthProvider>
       </body>
     </html>

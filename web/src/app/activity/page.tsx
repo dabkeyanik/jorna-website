@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { loadAttention, type AttentionItem } from "@/lib/attention";
+import { PushOptIn } from "@/components/PushOptIn";
 import { Card, LinkButton } from "@/components/ui";
 
 export default function ActivityPage() {
@@ -41,7 +42,9 @@ export default function ActivityPage() {
   return (
     <div className="mx-auto w-[min(680px,100%-2rem)] py-10">
       <h1 className="serif text-4xl text-maroon dark:text-gold">Needs you</h1>
-      <p className="mt-2 text-ink-soft">Everything waiting on you, in one place.</p>
+      <p className="mt-2 mb-6 text-ink-soft">Everything waiting on you, in one place.</p>
+
+      <PushOptIn />
 
       {items.length === 0 ? (
         <Card className="mt-8 p-6 text-center">
