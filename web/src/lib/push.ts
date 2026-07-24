@@ -17,18 +17,55 @@ const LOCAL_TOKEN_KEY = "jorna_push_token";
 
 export type PermissionState = NotificationPermission | "unsupported";
 
+// Why push isn't available — so the UI can explain instead of vanishing.
+//   unconfigured    — Firebase values not filled in (dev only; not user-facing)
+//   insecure        — not an https / secure context
+//   ios-add-to-home — iOS, but not launched from a Home Screen install (16.4+)
+//   unsupported     — browser lacks the APIs / FCM isn't supported here
+export type PushAvailability =
+  | { ok: true }
+  | { ok: false; reason: "unconfigured" | "insecure" | "ios-add-to-home" | "unsupported" };
+
+function isIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  // iPhone/iPod report plainly; iPadOS 13+ masquerades as a Mac with touch.
+  return (
+    /iP(hone|ad|od)/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+function isStandalone(): boolean {
+  if (typeof window === "undefined") return false;
+  const iosStandalone = (navigator as unknown as { standalone?: boolean }).standalone === true;
+  return window.matchMedia?.("(display-mode: standalone)").matches || iosStandalone;
+}
+
+/** Whether this browser can do web push right now, and if not, why. */
+export async function pushAvailability(): Promise<PushAvailability> {
+  if (!firebasePushConfigured) return { ok: false, reason: "unconfigured" };
+  if (typeof window === "undefined") return { ok: false, reason: "unsupported" };
+  if (!window.isSecureContext) return { ok: false, reason: "insecure" };
+
+  const hasApis =
+    "serviceWorker" in navigator && "Notification" in window && "PushManager" in window;
+  if (hasApis) {
+    try {
+      const { isSupported } = await import("firebase/messaging");
+      if (await isSupported()) return { ok: true };
+    } catch {
+      /* fall through to the reasons below */
+    }
+  }
+  // On iOS the push APIs are absent unless the site was installed to the Home
+  // Screen and opened from there — the most common "nothing showed up" cause.
+  if (isIOS() && !isStandalone()) return { ok: false, reason: "ios-add-to-home" };
+  return { ok: false, reason: "unsupported" };
+}
+
 /** Can this browser do web push at all, and is Firebase configured? */
 export async function pushSupported(): Promise<boolean> {
-  if (!firebasePushConfigured || typeof window === "undefined") return false;
-  if (!("serviceWorker" in navigator) || !("Notification" in window) || !("PushManager" in window)) {
-    return false;
-  }
-  try {
-    const { isSupported } = await import("firebase/messaging");
-    return await isSupported();
-  } catch {
-    return false;
-  }
+  return (await pushAvailability()).ok;
 }
 
 export function permissionState(): PermissionState {
