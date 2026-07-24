@@ -264,9 +264,9 @@ These can't be a straight port; decide per item rather than assuming parity.
   - Cost: 2 calls for a client, 4 for a vendor, all already-existing endpoints.
   - The page says plainly that nothing can reach you with the tab closed.
 
-- [~] **E2b. True web push** — FCM for Web (service worker + VAPID)
-  *(Built & deployed; box left unticked pending a real browser granting
-  permission and an actual push arriving — can't be verified from Windows/CI.)*
+- [x] **E2b. True web push** — FCM for Web (service worker + VAPID)
+  *(Verified: opt-in on a real browser, and an actual push arrived — with some
+  first-delivery latency, which is normal for web push, see note at the end.)*
   - **Backend shipped first** (separate repo, deployed): push tokens moved off the
     single `users.fcm_token` column to a `push_tokens` table (one user → many
     devices), a `send_push_to_user` helper that fans out and prunes dead tokens,
@@ -287,9 +287,14 @@ These can't be a straight port; decide per item rather than assuming parity.
     app's `apiKey`/`appId` — not the iOS ones. The values are public by design
     (they ship in the browser), so they're committed, not secret. A guard hides
     the opt-in until every value is real.
-  - Verify by opening `/app/activity` on the live site, clicking **Turn on
-    notifications**, granting permission, and confirming a real push arrives
-    (e.g. have someone message you). Tick then.
+  - **Verified live** — opt-in, permission grant, and a real push delivered.
+  - **Latency note:** web push isn't as instant as native. The first push after
+    enabling is the slowest (token propagation), and the browser/OS wakes the
+    service worker to deliver, which adds a beat — especially when idle or the
+    tab is closed. It's normal. If it needs to be snappier for time-sensitive
+    messages, the backend can mark web pushes high-urgency
+    (`WebpushConfig` headers `Urgency: high`) in `_build_message` — a small,
+    optional backend change + deploy.
 
 ---
 
