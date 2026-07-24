@@ -6,17 +6,70 @@ import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { generateBundles, selectBundle } from "@/lib/jorna";
 import { CATEGORY_LABELS, categoryLabel, type BundleOption } from "@/lib/types";
-import { Button, Card, Chip, Field } from "@/components/ui";
+import { Button, Card, Chip, Field, Rule } from "@/components/ui";
 import { BundleResults } from "@/components/BundleResults";
 
 const BUDGETS = [
-  { value: "budget-friendly", label: "Budget-friendly" },
-  { value: "mid-range", label: "Balanced" },
-  { value: "premium", label: "Premium" },
+  { value: "budget-friendly", label: "Budget-friendly", hint: "Smart value" },
+  { value: "mid-range", label: "Balanced", hint: "Best mix" },
+  { value: "premium", label: "Premium", hint: "Top tier" },
 ];
 
 const STYLES = ["elegant", "traditional", "modern", "luxury", "fun", "minimal"];
 const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS);
+
+// Inline icons (stroke = currentColor) — nothing fetched over the network.
+const svg = "size-[18px] shrink-0";
+const IconPin = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className={svg}>
+    <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z" />
+    <circle cx="12" cy="10" r="2.5" />
+  </svg>
+);
+const IconCalendar = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className={svg}>
+    <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+    <path d="M3.5 9.5h17M8 3v4M16 3v4" />
+  </svg>
+);
+const IconUsers = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className={svg}>
+    <circle cx="9" cy="8" r="3.2" />
+    <path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 6.2a3 3 0 0 1 0 5.6M20.5 19a5.5 5.5 0 0 0-3.2-5" />
+  </svg>
+);
+
+function SkeletonBundles() {
+  return (
+    <section className="mt-12">
+      <h2 className="serif text-center text-3xl text-ink">Assembling three vendor teams…</h2>
+      <p className="mt-2 text-center text-sm text-ink-soft">
+        Matching services to your date, budget, and vibe.
+      </p>
+      <div className="mt-6 grid gap-4 pt-4 md:grid-cols-3">
+        {[0, 1, 2].map((i) => (
+          <Card key={i} className="p-5">
+            <div className="mx-auto h-6 w-28 animate-pulse rounded bg-line-soft" />
+            <div className="mx-auto mt-4 h-9 w-32 animate-pulse rounded bg-line-soft" />
+            <div className="my-4 h-px bg-line-soft" />
+            <div className="space-y-3">
+              {[0, 1, 2, 3].map((j) => (
+                <div key={j} className="flex items-center gap-3">
+                  <div className="size-9 animate-pulse rounded-full bg-line-soft" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3 w-3/4 animate-pulse rounded bg-line-soft" />
+                    <div className="h-2.5 w-1/2 animate-pulse rounded bg-line-soft" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 h-11 w-full animate-pulse rounded-full bg-line-soft" />
+          </Card>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 export default function PlanPage() {
   const { user, loading } = useAuth();
@@ -93,6 +146,8 @@ export default function PlanPage() {
     return <div className="py-20 text-center text-ink-soft">Loading…</div>;
   }
 
+  const allSelected = needed.length === ALL_CATEGORIES.length;
+
   return (
     <div className="mx-auto w-[min(1080px,100%-2rem)] py-10">
       <header className="text-center">
@@ -102,21 +157,26 @@ export default function PlanPage() {
         </h1>
         <p className="mx-auto mt-3 max-w-[52ch] text-ink-soft">
           Tell us about your event and we&apos;ll assemble three complete vendor teams —
-          Budget, Balanced, and Top Rated — you can compare and book.
+          Budget, Balanced, and Top Rated — to compare and book.
         </p>
+        <div className="mt-7">
+          <Rule />
+        </div>
       </header>
 
-      <Card className="mx-auto mt-8 max-w-3xl p-6">
+      <Card className="mx-auto mt-8 max-w-3xl p-6 sm:p-7">
         <div className="grid gap-4 sm:grid-cols-3">
           <Field
             label="City & state"
             placeholder="Jersey City, NJ"
+            icon={IconPin}
             value={location}
             onChange={(e) => setLocation(e.target.value)}
           />
           <Field
             label="Event date"
             type="date"
+            icon={IconCalendar}
             value={eventDate}
             onChange={(e) => setEventDate(e.target.value)}
           />
@@ -125,24 +185,45 @@ export default function PlanPage() {
             type="number"
             min={1}
             placeholder="200"
+            icon={IconUsers}
             value={guests}
             onChange={(e) => setGuests(e.target.value)}
           />
         </div>
 
-        <div className="mt-6">
-          <p className="mb-2 text-sm font-medium text-ink-soft">Budget</p>
-          <div className="flex flex-wrap gap-2">
-            {BUDGETS.map((b) => (
-              <Chip key={b.value} active={budget === b.value} onClick={() => setBudget(b.value)}>
-                {b.label}
-              </Chip>
-            ))}
+        <div className="mt-7">
+          <p className="mb-2.5 text-sm font-medium text-ink-soft">Budget</p>
+          <div className="grid grid-cols-3 gap-2.5">
+            {BUDGETS.map((b) => {
+              const active = budget === b.value;
+              return (
+                <button
+                  key={b.value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setBudget(b.value)}
+                  className={`rounded-xl border px-3 py-3 text-center transition ${
+                    active
+                      ? "border-gold bg-gold/12 ring-1 ring-gold/40"
+                      : "border-card-edge bg-ground-2 hover:border-gold/50"
+                  }`}
+                >
+                  <span
+                    className={`block text-sm font-semibold ${active ? "text-maroon dark:text-gold" : "text-ink"}`}
+                  >
+                    {b.label}
+                  </span>
+                  <span className="mt-0.5 block text-[0.7rem] text-ink-faint">{b.hint}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div className="mt-6">
-          <p className="mb-2 text-sm font-medium text-ink-soft">Vibe (optional)</p>
+        <div className="mt-7">
+          <p className="mb-2.5 text-sm font-medium text-ink-soft">
+            Vibe <span className="text-ink-faint">(optional)</span>
+          </p>
           <div className="flex flex-wrap gap-2">
             {STYLES.map((s) => (
               <Chip key={s} active={styles.includes(s)} onClick={() => toggle(styles, setStyles, s)}>
@@ -152,17 +233,20 @@ export default function PlanPage() {
           </div>
         </div>
 
-        <div className="mt-6">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-medium text-ink-soft">What you need</p>
+        <div className="mt-7">
+          <div className="mb-2.5 flex items-center justify-between">
+            <p className="text-sm font-medium text-ink-soft">
+              What you need{" "}
+              <span className="text-ink-faint">
+                · {needed.length}/{ALL_CATEGORIES.length}
+              </span>
+            </p>
             <button
               type="button"
               className="text-xs font-semibold text-gold hover:underline"
-              onClick={() =>
-                setNeeded(needed.length === ALL_CATEGORIES.length ? [] : ALL_CATEGORIES)
-              }
+              onClick={() => setNeeded(allSelected ? [] : ALL_CATEGORIES)}
             >
-              {needed.length === ALL_CATEGORIES.length ? "Clear all" : "Select all"}
+              {allSelected ? "Clear all" : "Select all"}
             </button>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -180,25 +264,27 @@ export default function PlanPage() {
           </p>
         ) : null}
 
-        <Button size="lg" className="mt-6 w-full" disabled={busy} onClick={generate}>
+        <Button size="lg" className="mt-7 w-full" disabled={busy} onClick={generate}>
+          <span aria-hidden="true">✦</span>
           {busy ? "Building your bundles…" : "Build my bundles"}
         </Button>
       </Card>
 
-      {options ? (
+      {busy ? (
+        <SkeletonBundles />
+      ) : options ? (
         <section className="mt-12">
-          <h2 className="serif mb-5 text-center text-3xl text-ink">Your three teams</h2>
+          <h2 className="serif text-center text-3xl text-ink">Your three teams</h2>
+          <p className="mt-2 text-center text-sm text-ink-soft">
+            Compare, tweak, and choose — you can edit any bundle after picking it.
+          </p>
           {options.every((o) => o.bundle.items.length === 0) ? (
-            <p className="text-center text-ink-soft">
-              We couldn&apos;t find available vendors for those categories and date yet.
-              Try a different date or fewer categories.
+            <p className="mt-8 text-center text-ink-soft">
+              We couldn&apos;t find available vendors for those categories and date yet. Try a
+              different date or fewer categories.
             </p>
           ) : (
-            <BundleResults
-              options={options}
-              onChoose={choose}
-              choosingLabel={choosingLabel}
-            />
+            <BundleResults options={options} onChoose={choose} choosingLabel={choosingLabel} />
           )}
         </section>
       ) : null}

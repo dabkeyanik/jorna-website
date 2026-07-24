@@ -1,38 +1,87 @@
 "use client";
 
 import { categoryLabel, type BundleOption } from "@/lib/types";
-import { Button, Card } from "./ui";
+import { Avatar, Button, Card, Stars } from "./ui";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
 }
 
+/** The middle "Balanced" tier is the one we nudge people toward. */
+function isRecommended(option: BundleOption) {
+  return option.label.trim().toLowerCase() === "balanced";
+}
+
 function BundleCard({
   option,
+  recommended,
   onChoose,
   choosing,
 }: {
   option: BundleOption;
+  recommended: boolean;
   onChoose?: (option: BundleOption) => void;
   choosing?: boolean;
 }) {
   const { bundle } = option;
   const unfilled = bundle.unfilled_categories ?? [];
-  return (
-    <Card className="flex flex-col p-5">
-      <div className="flex items-baseline justify-between gap-2">
-        <h3 className="serif text-2xl text-maroon dark:text-gold">{option.label}</h3>
-        <span className="serif text-xl text-ink">{money(bundle.estimated_total_min)}</span>
-      </div>
-      <p className="mt-1 text-sm text-ink-soft">{option.description}</p>
+  const count = bundle.items.length;
+  const rated = bundle.items.filter((i) => i.rating > 0);
+  const avg = rated.length ? rated.reduce((s, i) => s + i.rating, 0) / rated.length : 0;
 
-      <div className="mt-4 flex-1 space-y-2.5">
+  return (
+    <Card
+      className={`relative flex flex-col p-5 transition ${
+        recommended
+          ? "ring-2 ring-gold shadow-[0_20px_55px_-26px_rgba(169,121,31,0.55)]"
+          : "hover:border-gold/40"
+      }`}
+    >
+      {recommended ? (
+        <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gold px-3 py-1 text-[0.66rem] font-bold uppercase tracking-[0.16em] text-maroon-deep shadow-[var(--shadow-card)]">
+          Recommended
+        </span>
+      ) : null}
+
+      {/* Tier + pitch */}
+      <div className="text-center">
+        <h3 className="serif text-2xl text-maroon dark:text-gold">{option.label}</h3>
+        <p className="mx-auto mt-1 max-w-[26ch] text-xs leading-relaxed text-ink-soft">
+          {option.description}
+        </p>
+      </div>
+
+      {/* Headline total */}
+      <div className="mt-4 text-center">
+        <p className="text-[0.68rem] uppercase tracking-[0.18em] text-ink-faint">Estimated total</p>
+        <p className="serif mt-0.5 text-[2rem] leading-none text-ink">
+          {money(bundle.estimated_total_min)}
+        </p>
+        <p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-ink-faint">
+          <span>
+            {count} {count === 1 ? "vendor" : "vendors"}
+          </span>
+          {avg > 0 ? (
+            <>
+              <span aria-hidden="true">·</span>
+              <Stars rating={avg} className="text-xs" />
+              <span>avg</span>
+            </>
+          ) : null}
+        </p>
+      </div>
+
+      <div className="my-4 h-px bg-line-soft" />
+
+      {/* Line-up */}
+      <ul className="flex-1 space-y-3">
         {bundle.items.map((item) => (
-          <div
+          <li
             key={`${item.category}-${item.vendor_id ?? item.vendor_name}`}
-            className="flex items-center justify-between gap-3 rounded-xl border border-line-soft bg-panel px-3 py-2.5"
+            className="flex items-center gap-3"
           >
-            <div className="min-w-0">
+            <Avatar src={item.pfp_url} name={item.vendor_name} size={38} />
+            <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-ink">
                 {item.service_name || categoryLabel(item.category)}
               </p>
@@ -42,24 +91,23 @@ function BundleCard({
             </div>
             <div className="shrink-0 text-right">
               <p className="text-sm font-semibold text-ink">{money(item.price_min)}</p>
-              {item.rating > 0 ? (
-                <p className="text-xs text-gold">★ {item.rating.toFixed(1)}</p>
-              ) : null}
+              <Stars rating={item.rating} className="text-[0.7rem]" />
             </div>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
 
       {unfilled.length > 0 ? (
-        <p className="mt-3 rounded-lg bg-gold/10 px-3 py-2 text-xs text-ink-soft">
-          No available {unfilled.map(categoryLabel).join(", ")} for your date — you can
-          add {unfilled.length === 1 ? "it" : "one"} later if a vendor opens up.
+        <p className="mt-4 rounded-lg bg-gold/10 px-3 py-2 text-xs leading-relaxed text-ink-soft">
+          No available {unfilled.map(categoryLabel).join(", ")} for your date — you can add{" "}
+          {unfilled.length === 1 ? "it" : "one"} later if a vendor opens up.
         </p>
       ) : null}
 
       {onChoose ? (
         <Button
-          className="mt-4 w-full"
+          className="mt-5 w-full"
+          variant={recommended ? "primary" : "ghost"}
           disabled={choosing || !option.bundle_id}
           onClick={() => onChoose(option)}
         >
@@ -81,11 +129,13 @@ export function BundleResults({
   choosingLabel?: string | null;
 }) {
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    // pt-4 leaves room for the "Recommended" ribbon to sit above its card.
+    <div className="grid items-start gap-4 pt-4 md:grid-cols-3">
       {options.map((o) => (
         <BundleCard
           key={o.label}
           option={o}
+          recommended={isRecommended(o)}
           onChoose={onChoose}
           choosing={choosingLabel === o.label}
         />

@@ -68,17 +68,71 @@ export function Card({ className = "", children }: { className?: string; childre
 export function Field({
   label,
   hint,
+  icon,
   ...rest
-}: { label: string; hint?: string } & InputHTMLAttributes<HTMLInputElement>) {
+}: { label: string; hint?: string; icon?: ReactNode } & InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-sm font-medium text-ink-soft">{label}</span>
-      <input
-        className="w-full rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5 text-ink outline-none transition focus:border-gold focus:ring-2 focus:ring-gold/30"
-        {...rest}
-      />
+      <span className="relative block">
+        {icon ? (
+          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-ink-faint">
+            {icon}
+          </span>
+        ) : null}
+        <input
+          className={`w-full rounded-xl border border-card-edge bg-ground-2 py-2.5 text-ink outline-none transition focus:border-gold focus:ring-2 focus:ring-gold/30 ${
+            icon ? "pl-10 pr-3.5" : "px-3.5"
+          }`}
+          {...rest}
+        />
+      </span>
       {hint ? <span className="mt-1 block text-xs text-ink-faint">{hint}</span> : null}
     </label>
+  );
+}
+
+/** Compact star rating, e.g. ★ 4.9. Renders nothing for an unrated item. */
+export function Stars({ rating, className = "" }: { rating?: number | null; className?: string }) {
+  if (!rating || rating <= 0) return null;
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-gold ${className}`}>
+      <span aria-hidden="true">★</span>
+      <span className="font-semibold tabular-nums">{rating.toFixed(1)}</span>
+    </span>
+  );
+}
+
+/** A circular avatar: the photo when there is one, else a serif monogram. */
+export function Avatar({
+  src,
+  name,
+  size = 40,
+}: {
+  src?: string | null;
+  name?: string | null;
+  size?: number;
+}) {
+  const initial = (name?.trim()?.[0] ?? "·").toUpperCase();
+  const dim = { width: size, height: size };
+  if (src) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return (
+      <img
+        src={src}
+        alt=""
+        style={dim}
+        className="shrink-0 rounded-full object-cover ring-1 ring-card-edge"
+      />
+    );
+  }
+  return (
+    <span
+      style={dim}
+      className="grid shrink-0 place-items-center rounded-full bg-panel serif text-gold ring-1 ring-card-edge"
+    >
+      {initial}
+    </span>
   );
 }
 
