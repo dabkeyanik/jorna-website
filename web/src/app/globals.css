@@ -108,6 +108,29 @@ h3,
   font-weight: 600;
 }
 
+/* Native controls (date pickers, scrollbars) follow the app's chosen theme,
+   not just the OS — otherwise a light OS with the app toggled dark renders a
+   harsh white date popup and a stark black picker button. */
+[data-theme="light"] {
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* Date/time fields carry their own calendar icon (see Field), so drop the stark
+   native picker button; the field opens the picker on click instead. */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  cursor: pointer;
+}
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.001ms !important;

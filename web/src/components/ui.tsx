@@ -71,6 +71,16 @@ export function Field({
   icon,
   ...rest
 }: { label: string; hint?: string; icon?: ReactNode } & InputHTMLAttributes<HTMLInputElement>) {
+  // The native calendar button is hidden (globals.css), so open the picker when
+  // the field is clicked. showPicker() needs the click's user gesture; typing
+  // still works if it's unsupported.
+  const dateLike =
+    rest.type === "date" ||
+    rest.type === "time" ||
+    rest.type === "datetime-local" ||
+    rest.type === "month" ||
+    rest.type === "week";
+
   return (
     <label className="block">
       <span className="mb-1.5 block text-sm font-medium text-ink-soft">{label}</span>
@@ -85,6 +95,17 @@ export function Field({
             icon ? "pl-10 pr-3.5" : "px-3.5"
           }`}
           {...rest}
+          onClick={(e) => {
+            if (dateLike) {
+              const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void };
+              try {
+                el.showPicker?.();
+              } catch {
+                /* not supported / not allowed — typing still works */
+              }
+            }
+            rest.onClick?.(e);
+          }}
         />
       </span>
       {hint ? <span className="mt-1 block text-xs text-ink-faint">{hint}</span> : null}
