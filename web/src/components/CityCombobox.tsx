@@ -18,6 +18,7 @@ export function CityCombobox({
   onChange,
   icon,
   placeholder,
+  required,
 }: {
   label: string;
   value: string;
@@ -25,6 +26,7 @@ export function CityCombobox({
   onChange: (value: string, coords: Coords | null) => void;
   icon?: ReactNode;
   placeholder?: string;
+  required?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -76,6 +78,7 @@ export function CityCombobox({
             }`}
             placeholder={placeholder}
             value={value}
+            required={required}
             role="combobox"
             aria-expanded={showList}
             aria-autocomplete="list"

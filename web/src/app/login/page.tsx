@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { supabase, startGoogleSignIn } from "@/lib/supabase";
 import { Button, Card, Field } from "@/components/ui";
+import { CityCombobox } from "@/components/CityCombobox";
 
 function GoogleMark() {
   // Google "G", inline so nothing is fetched over the network (the site's ethos).
@@ -203,11 +204,11 @@ function LoginInner() {
                   required
                 />
               </div>
-              <Field
+              <CityCombobox
                 label="City & state"
-                placeholder="Jersey City, NJ"
+                placeholder="Start typing a city…"
                 value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                onChange={(v) => setLocation(v)}
                 required
               />
             </>

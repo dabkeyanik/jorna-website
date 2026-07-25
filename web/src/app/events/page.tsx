@@ -8,6 +8,7 @@ import { ApiError } from "@/lib/api";
 import { createEvent, listEvents } from "@/lib/jorna";
 import type { EventItem } from "@/lib/types";
 import { Button, Card, Field } from "@/components/ui";
+import { CityCombobox } from "@/components/CityCombobox";
 
 function money(n?: number | null) {
   return n == null ? null : `$${Math.round(n).toLocaleString()}`;
@@ -111,12 +112,12 @@ export default function EventsPage() {
                 value={dateIso}
                 onChange={(e) => setDateIso(e.target.value)}
               />
-              <Field
+              <CityCombobox
                 label="Location"
-                placeholder="Jersey City, NJ"
+                placeholder="Start typing a city…"
                 required
                 value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                onChange={(v) => setLocation(v)}
               />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">

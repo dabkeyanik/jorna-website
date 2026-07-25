@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { changePassword, updateMe, uploadAvatar } from "@/lib/jorna";
 import { Button, Card, Field } from "@/components/ui";
+import { CityCombobox } from "@/components/CityCombobox";
 
 export default function AccountPage() {
   const { user, loading: authLoading, setUser, logout } = useAuth();
@@ -141,7 +142,12 @@ export default function AccountPage() {
           <Field label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-            <Field label="City & state" value={location} onChange={(e) => setLocation(e.target.value)} />
+            <CityCombobox
+              label="City & state"
+              placeholder="Start typing a city…"
+              value={location}
+              onChange={(v) => setLocation(v)}
+            />
           </div>
           {profileErr ? (
             <p className="rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
