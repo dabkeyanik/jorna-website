@@ -14,11 +14,13 @@ import {
   refundBooking,
   removeBookingFromBundle,
   renameBundle,
+  updateEvent,
 } from "@/lib/jorna";
 import { ServiceSwapPanel } from "@/components/ServiceSwapPanel";
 import { NegotiationPanel } from "@/components/NegotiationPanel";
 import { ReviewPanel } from "@/components/ReviewPanel";
 import { VenueCheckIn } from "@/components/VenueCheckIn";
+import { CityCombobox } from "@/components/CityCombobox";
 import {
   BOOKING_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
@@ -28,6 +30,8 @@ import {
   withinRefundWindow,
   type BundleBooking,
   type BundleDetail,
+  type BundleEventInfo,
+  type EventCreateInput,
 } from "@/lib/types";
 import { Avatar, Button, Card, Field, LinkButton } from "@/components/ui";
 
@@ -305,6 +309,110 @@ function BookingRow({
   );
 }
 
+function Detail({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+  return (
+    <div>
+      <p className="text-[0.64rem] uppercase tracking-[0.14em] text-ink-faint">{label}</p>
+      <p className={muted ? "text-ink-faint" : "text-ink"}>{value}</p>
+    </div>
+  );
+}
+
+/**
+ * Edit the event's general details — date, location, guest count. These are
+ * event-level metadata (the Event, back-filled for every bundle); per-vendor
+ * dates/quantities that drive pricing stay on each booking. Only non-empty
+ * fields are sent (PATCH is exclude_unset), so saving never blanks a value.
+ */
+function EventDetailsEditor({
+  event,
+  onSaved,
+}: {
+  event: BundleEventInfo;
+  onSaved: () => void | Promise<void>;
+}) {
+  const hasDate = Boolean(event.date_iso && event.date_iso !== "TBD");
+  const [editing, setEditing] = useState(false);
+  const [date, setDate] = useState(hasDate ? (event.date_iso as string) : "");
+  const [location, setLocation] = useState(event.location ?? "");
+  const [guests, setGuests] = useState(event.guest_count != null ? String(event.guest_count) : "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    const updates: Partial<EventCreateInput> = {};
+    if (date) updates.date_iso = date;
+    if (location.trim()) updates.location = location.trim();
+    if (guests) updates.guest_count = Number(guests);
+    try {
+      if (Object.keys(updates).length > 0) await updateEvent(event.event_id, updates);
+      setEditing(false);
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't save your changes. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-card-edge bg-card p-4">
+        <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+          <Detail label="Date" value={hasDate ? (event.date_iso as string) : "Not set"} muted={!hasDate} />
+          <Detail label="Location" value={event.location || "Not set"} muted={!event.location} />
+          <Detail
+            label="Guests"
+            value={event.guest_count != null ? String(event.guest_count) : "Not set"}
+            muted={event.guest_count == null}
+          />
+        </div>
+        <Button variant="ghost" size="md" onClick={() => setEditing(true)}>
+          Edit details
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 rounded-2xl border border-card-edge bg-card p-4">
+      <p className="mb-3 text-sm font-medium text-ink-soft">Event details</p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field label="Event date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <CityCombobox
+          label="Location"
+          placeholder="Start typing a city…"
+          value={location}
+          onChange={(v) => setLocation(v)}
+        />
+        <Field
+          label="Guests"
+          type="number"
+          min={1}
+          placeholder="200"
+          value={guests}
+          onChange={(e) => setGuests(e.target.value)}
+        />
+      </div>
+      {error ? (
+        <p className="mt-3 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
+          {error}
+        </p>
+      ) : null}
+      <div className="mt-3 flex gap-2">
+        <Button size="md" disabled={busy} onClick={save}>
+          {busy ? "Saving…" : "Save details"}
+        </Button>
+        <Button variant="ghost" size="md" onClick={() => setEditing(false)}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function BundleInner() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -494,8 +602,6 @@ function BundleInner() {
 
         <p className="mt-2 text-ink-soft">
           {bundle.booking_count} {bundle.booking_count === 1 ? "vendor" : "vendors"}
-          {bundle.event?.date_iso ? ` · ${bundle.event.date_iso}` : ""}
-          {bundle.event?.location ? ` · ${bundle.event.location}` : ""}
         </p>
 
         {/* Total + a paid-progress bar across the bundle's bookings. */}
@@ -528,6 +634,8 @@ function BundleInner() {
             : null}
         </div>
       </header>
+
+      {bundle.event ? <EventDetailsEditor event={bundle.event} onSaved={load} /> : null}
 
       {notice ? (
         <p className="mt-6 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
