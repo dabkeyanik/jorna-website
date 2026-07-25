@@ -8,6 +8,7 @@ import { generateBundles, selectBundle } from "@/lib/jorna";
 import { CATEGORY_LABELS, categoryLabel, type BundleOption } from "@/lib/types";
 import { Button, Card, Chip, Field, Rule } from "@/components/ui";
 import { BundleResults } from "@/components/BundleResults";
+import { CityCombobox, type Coords } from "@/components/CityCombobox";
 
 const BUDGETS = [
   { value: "budget-friendly", label: "Budget-friendly", hint: "Smart value" },
@@ -81,6 +82,9 @@ export default function PlanPage() {
   }, [loading, user, router]);
 
   const [location, setLocation] = useState("");
+  // Set when a suggested city is picked, so we can send coordinates for
+  // distance-based matching; null when the location was free-typed.
+  const [coords, setCoords] = useState<Coords | null>(null);
   const [eventDate, setEventDate] = useState("");
   const [guests, setGuests] = useState("");
   const [budget, setBudget] = useState("mid-range");
@@ -129,6 +133,8 @@ export default function PlanPage() {
         needed_categories: needed,
         booked_categories: [],
         location: location.trim() || null,
+        latitude: coords?.lat ?? null,
+        longitude: coords?.lng ?? null,
         event_date: eventDate || null,
         guest_count: guests ? Number(guests) : null,
         budget_tier: budget,
@@ -166,12 +172,15 @@ export default function PlanPage() {
 
       <Card className="mx-auto mt-8 max-w-3xl p-6 sm:p-7">
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field
+          <CityCombobox
             label="City & state"
-            placeholder="Jersey City, NJ"
+            placeholder="Start typing a city…"
             icon={IconPin}
             value={location}
-            onChange={(e) => setLocation(e.target.value)}
+            onChange={(v, c) => {
+              setLocation(v);
+              setCoords(c);
+            }}
           />
           <Field
             label="Event date"
