@@ -29,7 +29,7 @@ import {
   type BundleBooking,
   type BundleDetail,
 } from "@/lib/types";
-import { Button, Card, Field, LinkButton } from "@/components/ui";
+import { Avatar, Button, Card, Field, LinkButton } from "@/components/ui";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -116,15 +116,23 @@ function BookingRow({
   return (
     <Card className="p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="serif text-lg text-ink">{booking.service_name || "Service"}</h3>
-          <p className="mt-0.5 text-sm text-ink-soft">
-            {booking.vendor_name}
-            {booking.service_category
-              ? ` · ${categoryLabel(booking.service_subcategory || booking.service_category)}`
-              : ""}
-          </p>
-          <p className={`mt-1.5 text-sm font-medium ${status.tone}`}>{status.text}</p>
+        <div className="flex min-w-0 gap-3">
+          <Avatar name={booking.vendor_name} size={40} />
+          <div className="min-w-0">
+            <h3 className="serif text-lg text-ink">{booking.service_name || "Service"}</h3>
+            <p className="mt-0.5 text-sm text-ink-soft">
+              {booking.vendor_name}
+              {booking.service_category
+                ? ` · ${categoryLabel(booking.service_subcategory || booking.service_category)}`
+                : ""}
+            </p>
+            <span
+              className={`mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-ground-2 px-2.5 py-0.5 text-xs font-medium ${status.tone}`}
+            >
+              <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
+              {status.text}
+            </span>
+          </div>
         </div>
         <div className="text-right">
           <p className="serif text-lg text-ink">{money(booking.price)}</p>
@@ -489,9 +497,36 @@ function BundleInner() {
           {bundle.event?.date_iso ? ` · ${bundle.event.date_iso}` : ""}
           {bundle.event?.location ? ` · ${bundle.event.location}` : ""}
         </p>
-        <p className="serif mt-3 text-2xl text-ink">
-          {money(bundle.total_estimated_cost)}
-        </p>
+
+        {/* Total + a paid-progress bar across the bundle's bookings. */}
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-card-edge bg-panel p-4">
+          <div>
+            <p className="text-[0.68rem] uppercase tracking-[0.16em] text-ink-faint">
+              Estimated total
+            </p>
+            <p className="serif text-3xl text-ink">{money(bundle.total_estimated_cost)}</p>
+          </div>
+          {bundle.booking_count > 0
+            ? (() => {
+                const paid = bundle.bookings.filter((b) =>
+                  ["paid", "released"].includes(b.payment_status ?? ""),
+                ).length;
+                return (
+                  <div className="min-w-[180px] flex-1">
+                    <p className="text-xs text-ink-soft">
+                      {paid} of {bundle.booking_count} paid
+                    </p>
+                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-line-soft">
+                      <div
+                        className="h-full rounded-full bg-gold transition-[width]"
+                        style={{ width: `${(paid / bundle.booking_count) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()
+            : null}
+        </div>
       </header>
 
       {notice ? (
