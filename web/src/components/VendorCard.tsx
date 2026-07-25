@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { categoryLabel, type VendorSearchItem } from "@/lib/types";
+import { Card, Stars } from "./ui";
 
 function money(n?: number | null) {
   if (n == null) return null;
@@ -16,11 +17,14 @@ function money(n?: number | null) {
 export function VendorCard({ item }: { item: VendorSearchItem }) {
   const name = `${item.first_name ?? ""} ${item.last_name ?? ""}`.trim();
   const price = money(item.service_price);
+  const monogram = (name || item.service_name || "·").charAt(0).toUpperCase();
+  const distance =
+    item.distance_miles != null ? `${Math.round(item.distance_miles)} mi away` : null;
 
   return (
     <Link
       href={`/vendor?id=${item.vendor_id}`}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-card-edge bg-card shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:border-gold/50"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-card-edge bg-card shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:border-gold/50 hover:shadow-[0_20px_44px_-22px_rgba(74,11,26,0.4)]"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-panel">
         {item.pfp_url ? (
@@ -29,22 +33,26 @@ export function VendorCard({ item }: { item: VendorSearchItem }) {
             src={item.pfp_url}
             alt={item.service_name || name}
             loading="lazy"
-            className="size-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            className="size-full object-cover transition duration-300 group-hover:scale-[1.04]"
           />
         ) : (
-          <div className="flex size-full items-center justify-center text-ink-faint">
-            {categoryLabel(item.category)}
+          // No photo → an elegant serif monogram on a soft gradient.
+          <div className="flex size-full items-center justify-center bg-gradient-to-br from-panel to-ground-2">
+            <span className="serif text-5xl text-gold/70">{monogram}</span>
           </div>
         )}
         <span className="absolute left-3 top-3 rounded-full bg-ground/90 px-2.5 py-1 text-xs font-semibold text-maroon backdrop-blur dark:text-gold">
           {categoryLabel(item.category)}
         </span>
+        {item.rating ? (
+          <span className="absolute right-3 top-3 rounded-full bg-ground/90 px-2 py-1 text-xs backdrop-blur">
+            <Stars rating={item.rating} />
+          </span>
+        ) : null}
       </div>
 
       <div className="flex flex-1 flex-col p-4">
-        <h3 className="serif text-lg leading-snug text-ink">
-          {item.service_name || name}
-        </h3>
+        <h3 className="serif text-lg leading-snug text-ink">{item.service_name || name}</h3>
         <p className="mt-0.5 text-sm text-ink-soft">{name}</p>
 
         <div className="mt-auto flex items-end justify-between gap-2 pt-3">
@@ -52,9 +60,7 @@ export function VendorCard({ item }: { item: VendorSearchItem }) {
             {item.location ? (
               <p className="truncate text-xs text-ink-faint">{item.location}</p>
             ) : null}
-            {item.rating ? (
-              <p className="text-sm text-gold">★ {item.rating.toFixed(1)}</p>
-            ) : null}
+            {distance ? <p className="text-xs text-ink-faint">{distance}</p> : null}
           </div>
           {price ? (
             // /vendors/search returns the service's rate but not its price_unit,
@@ -70,5 +76,22 @@ export function VendorCard({ item }: { item: VendorSearchItem }) {
         </div>
       </div>
     </Link>
+  );
+}
+
+/** Placeholder card shown while the first page of results loads. */
+export function VendorCardSkeleton() {
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="aspect-[4/3] animate-pulse bg-line-soft" />
+      <div className="space-y-2 p-4">
+        <div className="h-4 w-3/4 animate-pulse rounded bg-line-soft" />
+        <div className="h-3 w-1/2 animate-pulse rounded bg-line-soft" />
+        <div className="mt-3 flex justify-between">
+          <div className="h-3 w-16 animate-pulse rounded bg-line-soft" />
+          <div className="h-5 w-12 animate-pulse rounded bg-line-soft" />
+        </div>
+      </div>
+    </Card>
   );
 }

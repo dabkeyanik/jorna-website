@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { searchVendors } from "@/lib/jorna";
 import { CATEGORY_LABELS, categoryLabel, type VendorSearchItem } from "@/lib/types";
-import { Button, Chip, Field } from "@/components/ui";
-import { VendorCard } from "@/components/VendorCard";
+import { Button, Chip, Field, Rule } from "@/components/ui";
+import { VendorCard, VendorCardSkeleton } from "@/components/VendorCard";
 
 const PAGE_SIZE = 12;
 const CATEGORIES = Object.keys(CATEGORY_LABELS);
@@ -79,10 +79,13 @@ export default function BrowsePage() {
           Every venue, caterer, DJ, dhol player, mehndi artist and more on Jorna —
           filter by what you need.
         </p>
+        <div className="mt-7">
+          <Rule />
+        </div>
       </header>
 
       {/* Filters */}
-      <div className="mt-8 rounded-2xl border border-card-edge bg-panel p-4">
+      <div className="mt-8 rounded-2xl border border-card-edge bg-panel p-4 sm:p-5">
         <div className="flex flex-wrap gap-2">
           <Chip active={category === ""} onClick={() => setCategory("")}>
             All
@@ -94,21 +97,28 @@ export default function BrowsePage() {
           ))}
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-ink-soft">Rating</span>
-            <select
-              value={minRating}
-              onChange={(e) => setMinRating(Number(e.target.value))}
-              className="w-full rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5 text-ink outline-none focus:border-gold"
-            >
+        <div className="mt-5 grid gap-4 sm:grid-cols-3">
+          <div>
+            <span className="mb-2 block text-sm font-medium text-ink-soft">Minimum rating</span>
+            <div className="flex flex-wrap gap-2">
               {RATINGS.map((r) => (
-                <option key={r.value} value={r.value}>
+                <Chip key={r.value} active={minRating === r.value} onClick={() => setMinRating(r.value)}>
                   {r.label}
-                </option>
+                </Chip>
               ))}
-            </select>
-          </label>
+            </div>
+          </div>
+
+          <div>
+            <span className="mb-2 block text-sm font-medium text-ink-soft">Sort by</span>
+            <div className="flex flex-wrap gap-2">
+              {SORTS.map((s) => (
+                <Chip key={s.value} active={sortBy === s.value} onClick={() => setSortBy(s.value)}>
+                  {s.label}
+                </Chip>
+              ))}
+            </div>
+          </div>
 
           <Field
             label="Max price"
@@ -118,21 +128,6 @@ export default function BrowsePage() {
             value={maxPrice}
             onChange={(e) => setMaxPrice(e.target.value)}
           />
-
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-ink-soft">Sort by</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="w-full rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5 text-ink outline-none focus:border-gold"
-            >
-              {SORTS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
       </div>
 
@@ -141,6 +136,15 @@ export default function BrowsePage() {
         <p className="mt-8 rounded-lg bg-maroon/10 px-3 py-2 text-center text-sm text-maroon dark:text-gold">
           {error}
         </p>
+      ) : null}
+
+      {/* First load → skeleton grid (nicer than a bare "Loading…"). */}
+      {loading && items.length === 0 && !error ? (
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <VendorCardSkeleton key={i} />
+          ))}
+        </div>
       ) : null}
 
       {!error && !loading && items.length === 0 ? (
@@ -165,9 +169,10 @@ export default function BrowsePage() {
         </>
       ) : null}
 
-      {loading ? (
+      {/* Pagination (only once we already have results). */}
+      {items.length > 0 && loading ? (
         <p className="mt-8 text-center text-ink-soft">Loading…</p>
-      ) : hasMore ? (
+      ) : items.length > 0 && hasMore ? (
         <div className="mt-8 text-center">
           <Button variant="ghost" onClick={() => load(offset + PAGE_SIZE, false)}>
             Show more
