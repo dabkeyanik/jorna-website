@@ -342,7 +342,10 @@
     <h1 class="wordmark">Jorna</h1>
     <p class="lede">Your whole celebration in one place — a matched team of vendors, booked and paid for safely, from the first idea to the last dance.</p>
     <div class="cta-row">
-      <a class="btn btn-primary" href="/app/">Try it now — build a bundle</a>
+      <!-- People reach this page from the "?" on Home, so the button is a way
+           back rather than an invitation to start. Straight to /app/browse/, the
+           page they came from; /app/ would only redirect there. -->
+      <a class="btn btn-primary" href="/app/browse/">← Back to the app</a>
     </div>
     <div class="rule"><i></i></div>
     <p class="hero-note">Or read the short guide for whichever side of the aisle you're on.</p>
