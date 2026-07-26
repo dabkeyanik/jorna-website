@@ -10,7 +10,7 @@
 // rather than leave production half-broken.
 
 import { execSync } from "node:child_process";
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -39,8 +39,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** Every route in the built export, as verifiable URLs (dynamic — no drift). */
 function routeUrls() {
   // "/" redirects into the app; "/welcome/" is the marketing page it used to be,
-  // still linked from the App Store listing and the app's own footer.
-  const urls = new Set(["/", "/welcome/", "/app/"]);
+  // still linked from the App Store listing and the app's own footer. The legal
+  // pages are required by App Store Connect and by guideline 1.2, so a deploy
+  // that quietly stopped serving them should fail.
+  const urls = new Set(["/", "/welcome/", "/privacy/", "/terms/", "/support/", "/app/"]);
   const walk = (dir) => {
     for (const name of readdirSync(dir)) {
       if (name === "_next") continue; // hashed assets, not routes
@@ -70,6 +72,36 @@ async function findFailures(urls) {
   }
   return failures;
 }
+
+/** Refuse to publish documents that still have blanks in them.
+ *
+ *  The legal pages were drafted with the details only the owner can supply —
+ *  entity name, support address, jurisdiction — marked "FILL:". A privacy policy
+ *  is a published promise and App Store Connect links straight to it, so shipping
+ *  one mid-sentence is worse than not having it up yet. This makes that a
+ *  structural impossibility rather than something to remember. */
+function assertNoPlaceholders() {
+  const offenders = [];
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      if (name === "app" && dir === join(root, "public")) continue; // generated
+      const p = join(dir, name);
+      if (statSync(p).isDirectory()) walk(p);
+      else if (name.endsWith(".html") && readFileSync(p, "utf8").includes("FILL:")) {
+        offenders.push(relative(root, p));
+      }
+    }
+  };
+  walk(join(root, "public"));
+  if (offenders.length) {
+    log(`\x1b[31mRefusing to deploy — unfilled placeholders ("FILL:") in:\x1b[0m`);
+    for (const f of offenders) log(`    ${f}`);
+    log("Fill them in, or move the file out of public/, then deploy again.");
+    process.exit(1);
+  }
+}
+
+assertNoPlaceholders();
 
 log("building…");
 execSync("npm run build", { cwd: root, stdio: "inherit" });

@@ -1,0 +1,100 @@
+/* Shared by /privacy/, /terms/ and /support/. Same palette as the marketing
+   page; kept in one file rather than inlined three times so a restyle is one
+   edit. Same-origin, so nothing is fetched off-site. */
+
+:root {
+  --ground:      #F6EEE1;
+  --ground-2:    #FCF7EE;
+  --ink:         #35101B;
+  --ink-soft:    #6B4A45;
+  --ink-faint:   #8A6B62;
+  --maroon:      #6B1226;
+  --gold:        #A9791F;
+  --line:        rgba(107, 18, 38, 0.16);
+  --line-soft:   rgba(107, 18, 38, 0.09);
+  --card:        #FFFFFF;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground:    #1C0610;
+    --ground-2:  #250A16;
+    --ink:       #F3E6D6;
+    --ink-soft:  #D8B79C;
+    --ink-faint: #B08E7E;
+    --maroon:    #8A1B34;
+    --gold:      #E0B457;
+    --line:      rgba(224, 180, 87, 0.22);
+    --line-soft: rgba(224, 180, 87, 0.12);
+    --card:      #2A0C19;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 400 17px/1.65 ui-rounded, "SF Pro Rounded", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { width: min(760px, 100% - 2.5rem); margin: 0 auto; padding: 3rem 0 5rem; }
+
+header.doc { border-bottom: 1px solid var(--line); padding-bottom: 1.75rem; margin-bottom: 2.5rem; }
+
+.eyebrow {
+  font-size: .72rem; letter-spacing: .24em; text-transform: uppercase;
+  color: var(--gold); font-weight: 600;
+}
+
+h1 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2rem, 5vw, 2.75rem); line-height: 1.1; font-weight: 500;
+  color: var(--maroon); margin: .6rem 0 .5rem;
+}
+
+h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.4rem; font-weight: 500; color: var(--maroon);
+  margin: 2.5rem 0 .75rem;
+}
+
+h3 { font-size: 1.02rem; font-weight: 700; margin: 1.5rem 0 .4rem; }
+
+p, li { color: var(--ink-soft); }
+li { margin: .35rem 0; }
+strong { color: var(--ink); }
+
+a { color: var(--gold); text-underline-offset: 2px; }
+a:hover { color: var(--maroon); }
+
+.updated { color: var(--ink-faint); font-size: .9rem; margin: 0; }
+
+table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .95rem; }
+th, td { text-align: left; padding: .6rem .7rem; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+th { color: var(--ink); font-weight: 700; }
+td { color: var(--ink-soft); }
+
+.card {
+  background: var(--card); border: 1px solid var(--line-soft);
+  border-radius: 14px; padding: 1.1rem 1.25rem; margin: 1.25rem 0;
+}
+
+/* Unfilled details. Deliberately loud: these must not reach production
+   unnoticed. Search the pages for "FILL:" before publishing. */
+.fill {
+  background: #FFE9A8; color: #5A3C00; font-weight: 700;
+  padding: .05em .35em; border-radius: 4px; white-space: nowrap;
+}
+@media (prefers-color-scheme: dark) { .fill { background: #6B5210; color: #FFE9A8; } }
+
+nav.doc-nav {
+  display: flex; flex-wrap: wrap; gap: 1rem; align-items: center;
+  border-top: 1px solid var(--line); margin-top: 3.5rem; padding-top: 1.5rem;
+  font-size: .92rem;
+}
+nav.doc-nav a { color: var(--ink-soft); text-decoration: none; }
+nav.doc-nav a:hover { color: var(--gold); text-decoration: underline; }
