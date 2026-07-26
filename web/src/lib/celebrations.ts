@@ -1,6 +1,9 @@
-// Trending celebrations — the iOS home's trending tiles (Wedding, Sangeet,
-// Mehndi, Birthday, Graduation). Picking one opens the bundle builder with the
-// categories that celebration usually needs already ticked.
+// Trending celebrations — started as the iOS home's trending tiles (Wedding,
+// Sangeet, Mehndi, Birthday, Graduation) and has since grown past them: web
+// also offers Pooja, Bachelor Party, and Bachelorette Party. Picking one opens
+// the bundle builder with the categories that celebration usually needs already
+// ticked. If iOS adds tiles, the two lists are maintained separately — there is
+// no shared source, and the key only has to match this file.
 //
 // Two things to know about this mapping:
 //
@@ -37,6 +40,23 @@ export const CELEBRATIONS: Celebration[] = [
     key: "mehndi",
     label: "Mehndi",
     categories: ["venue", "catering", "mehndi", "photography", "floral_decor"],
+  },
+  {
+    key: "pooja",
+    label: "Pooja",
+    // The pandit is the one booking a pooja can't do without, and he comes from
+    // cultural_services — the slot no other tile here uses.
+    categories: ["venue", "catering", "cultural_services", "floral_decor"],
+  },
+  {
+    key: "bachelor",
+    label: "Bachelor Party",
+    categories: ["venue", "catering", "dj", "photography"],
+  },
+  {
+    key: "bachelorette",
+    label: "Bachelorette Party",
+    categories: ["venue", "catering", "dj", "photography", "makeup"],
   },
   {
     key: "birthday",
