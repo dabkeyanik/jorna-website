@@ -42,6 +42,10 @@ export function googleRedirectTo(): string {
 // Where to land after a successful Google sign-in — stashed before the redirect
 // (the callback page can't receive our own query params alongside Supabase's).
 const OAUTH_NEXT_KEY = "jorna_oauth_next";
+// Host or Vendor, when the redirect began from the sign-up form. A one-tap Google
+// sign-up has no form to carry it, so it rides across the round trip here and
+// decides where the new account lands. Absent for a plain sign-in.
+const OAUTH_ROLE_KEY = "jorna_oauth_role";
 
 export function rememberOAuthNext(next: string) {
   try {
@@ -61,9 +65,27 @@ export function takeOAuthNext(): string {
   }
 }
 
-/** Begin the Google OAuth redirect. Rejects if Supabase won't start the flow. */
-export async function startGoogleSignIn(next: string): Promise<void> {
+export function takeOAuthRole(): string | null {
+  try {
+    const v = localStorage.getItem(OAUTH_ROLE_KEY);
+    localStorage.removeItem(OAUTH_ROLE_KEY);
+    return v;
+  } catch {
+    return null;
+  }
+}
+
+/** Begin the Google OAuth redirect. Rejects if Supabase won't start the flow.
+ *  `role` is set when starting from the sign-up form, so a brand-new account
+ *  knows whether it belongs to a host or a vendor. */
+export async function startGoogleSignIn(next: string, role?: string | null): Promise<void> {
   rememberOAuthNext(next);
+  try {
+    if (role) localStorage.setItem(OAUTH_ROLE_KEY, role);
+    else localStorage.removeItem(OAUTH_ROLE_KEY);
+  } catch {
+    /* storage disabled — a new vendor just lands on the default destination */
+  }
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo: googleRedirectTo() },

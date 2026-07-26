@@ -1,18 +1,17 @@
 "use client";
 
 // Where Google returns after OAuth (Supabase → this page with ?code=…).
-// Completes the PKCE handshake, exchanges the Supabase token for a Jorna
-// session, and routes on:
-//   • existing / linkable account → adopt the Jorna tokens, go to `next`
-//   • brand-new Google identity   → hold the Supabase session and send to the
-//     signup completion form (/login?google=1)
+// Completes the PKCE handshake, then trades the Supabase token for a Jorna
+// session — creating the account if the identity is new, so "Continue with
+// Google" is the entire sign-up. A new vendor goes on to build their storefront;
+// everyone else lands where they were headed.
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase, takeOAuthNext } from "@/lib/supabase";
+import { supabase, takeOAuthNext, takeOAuthRole } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { googleLookup } from "@/lib/jorna";
+import { googleLookup, googleRegister, type GoogleLookupResponse } from "@/lib/jorna";
 import { ApiError } from "@/lib/api";
 
 export default function AuthCallbackPage() {
@@ -46,25 +45,41 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        // Exchange the Supabase token for a Jorna session.
-        const lookup = await googleLookup(session.access_token);
+        // Exchange the Supabase token for a Jorna session, creating the account
+        // if this Google identity is new. One tap is the whole sign-up: the token
+        // carries the email, name and avatar, the username is derived, and the
+        // rest of the profile is nullable and filled in later.
         const next = takeOAuthNext();
+        const role = takeOAuthRole();
 
-        if (!lookup.is_new_user && lookup.access_token && lookup.refresh_token) {
+        // TRANSITIONAL: this site deploys independently of the API, so the new
+        // endpoint may not be live yet. A 404 falls back to the old two-step —
+        // look up, then finish on the form — rather than breaking Google sign-in
+        // outright. Delete once /auth/google/register is deployed.
+        let session_: GoogleLookupResponse;
+        try {
+          session_ = await googleRegister(session.access_token);
+        } catch (e) {
+          if (!(e instanceof ApiError) || e.status !== 404) throw e;
+          session_ = await googleLookup(session.access_token);
+        }
+
+        if (session_.access_token && session_.refresh_token) {
           await adoptSession({
-            access_token: lookup.access_token,
-            refresh_token: lookup.refresh_token,
-            token_type: lookup.token_type || "bearer",
+            access_token: session_.access_token,
+            refresh_token: session_.refresh_token,
+            token_type: session_.token_type || "bearer",
           });
           // Jorna's JWT is the session now — the Supabase one isn't needed.
           await supabase.auth.signOut();
-          router.replace(next);
+          // A brand-new vendor still needs a storefront before they can sell;
+          // everyone else goes where they were headed.
+          const landing = session_.is_new_user && role === "vendor" ? "/vendor-profile" : next;
+          router.replace(landing);
           return;
         }
 
-        // New Google identity: keep the Supabase session (the signup form needs
-        // it to prove ownership) and go finish creating the account, preserving
-        // where they were headed.
+        // No session came back, which shouldn't happen — fall back to the form.
         router.replace(`/login?google=1&next=${encodeURIComponent(next)}`);
       } catch (e) {
         setError(e instanceof ApiError ? e.message : "Google sign-in failed. Please try again.");

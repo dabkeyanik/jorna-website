@@ -233,6 +233,21 @@ export function googleLookup(supabaseAccessToken: string): Promise<GoogleLookupR
   });
 }
 
+/** Sign in with Google, creating the account on first use — the whole sign-up in
+ *  one tap. Always returns a session, so `is_new_user` here only says whether the
+ *  account was just made (useful for where to send them, not whether to ask for
+ *  more). Idempotent, so retrying a dropped response is safe.
+ *
+ *  Distinct from googleLookup, which creates nothing: iOS still shows a
+ *  registration form after looking up, so that endpoint has to stay pure. */
+export function googleRegister(supabaseAccessToken: string): Promise<GoogleLookupResponse> {
+  return apiFetch<GoogleLookupResponse>("/auth/google/register", {
+    method: "POST",
+    auth: false,
+    body: { access_token: supabaseAccessToken },
+  });
+}
+
 // ── Account (current user) ───────────────────────────────────────────
 
 export interface MeUpdate {

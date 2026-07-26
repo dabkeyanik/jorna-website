@@ -121,7 +121,9 @@ function LoginInner() {
     setError(null);
     setGoogleBusy(true);
     try {
-      await startGoogleSignIn(next); // navigates to Google on success
+      // The role only means something for a sign-up; a returning user's account
+      // already knows what it is.
+      await startGoogleSignIn(next, mode === "register" ? role : null);
     } catch {
       setGoogleBusy(false);
       setError("Couldn't start Google sign-in. Please try again.");
@@ -164,6 +166,41 @@ function LoginInner() {
       <p className="mt-2 text-center text-ink-soft">{subheading}</p>
 
       <Card className="mt-8 p-6">
+        {/* The role fork sits above Google, not inside the form: with one-tap
+            sign-up, that button *is* the whole registration, so the choice has to
+            be made before it's pressed. It rides across the OAuth round trip in
+            localStorage (see lib/supabase) since there's no form to carry it. */}
+        {mode === "register" ? (
+          <div className="mb-5">
+            <p className="mb-2.5 text-sm font-medium text-ink-soft">I&apos;m joining as</p>
+            <div className="grid grid-cols-2 gap-2.5">
+              {ROLES.map((r) => {
+                const active = role === r.value;
+                return (
+                  <button
+                    key={r.value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setRole(r.value)}
+                    className={`rounded-xl border px-3 py-3 text-left transition ${
+                      active
+                        ? "border-gold bg-gold/12 ring-1 ring-gold/40"
+                        : "border-card-edge bg-ground-2 hover:border-gold/50"
+                    }`}
+                  >
+                    <span
+                      className={`block text-sm font-semibold ${active ? "text-maroon dark:text-gold" : "text-ink"}`}
+                    >
+                      {r.label}
+                    </span>
+                    <span className="mt-0.5 block text-[0.7rem] text-ink-faint">{r.hint}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
         {/* Google — offered on the normal login/register screens, not mid-completion. */}
         {!isGoogleSignup ? (
           <>
@@ -171,13 +208,20 @@ function LoginInner() {
               type="button"
               variant="ghost"
               size="lg"
-              disabled={googleBusy}
+              disabled={googleBusy || (mode === "register" && role === null)}
               onClick={google}
               className="w-full"
             >
               <GoogleMark />
               {googleBusy ? "Connecting…" : "Continue with Google"}
             </Button>
+            {mode === "register" ? (
+              <p className="mt-2 text-center text-xs text-ink-faint">
+                {role === null
+                  ? "Choose one above to continue."
+                  : "That's the whole sign-up — no form to fill in."}
+              </p>
+            ) : null}
             <div className="my-5 flex items-center gap-3 text-xs text-ink-faint">
               <span className="h-px flex-1 bg-card-edge" />
               or
@@ -197,34 +241,6 @@ function LoginInner() {
             />
           ) : (
             <>
-              <div>
-                <p className="mb-2.5 text-sm font-medium text-ink-soft">I&apos;m joining as</p>
-                <div className="grid grid-cols-2 gap-2.5">
-                  {ROLES.map((r) => {
-                    const active = role === r.value;
-                    return (
-                      <button
-                        key={r.value}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => setRole(r.value)}
-                        className={`rounded-xl border px-3 py-3 text-left transition ${
-                          active
-                            ? "border-gold bg-gold/12 ring-1 ring-gold/40"
-                            : "border-card-edge bg-ground-2 hover:border-gold/50"
-                        }`}
-                      >
-                        <span
-                          className={`block text-sm font-semibold ${active ? "text-maroon dark:text-gold" : "text-ink"}`}
-                        >
-                          {r.label}
-                        </span>
-                        <span className="mt-0.5 block text-[0.7rem] text-ink-faint">{r.hint}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
               <Field
                 label="Email"
                 type="email"
