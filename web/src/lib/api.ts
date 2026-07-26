@@ -43,19 +43,36 @@ export function currentAccessToken(): string | null {
   return tokens.getAccess();
 }
 
+/** What to say when the body carries no message we recognize. A 429 comes from
+ *  slowapi, whose body is {"error": "Rate limit exceeded: 3 per 1 minute"} —
+ *  neither shape parseError knows, and developer-facing besides. The auth routes
+ *  are the tight ones (register 3/min, login 5/min), so a person fumbling a
+ *  sign-up is the likeliest way to see this. */
+function fallbackMessage(status: number): string {
+  if (status === 429) return "Too many attempts. Please wait a minute and try again.";
+  return `Request failed (${status})`;
+}
+
 async function parseError(res: Response): Promise<string> {
+  if (res.status === 429) return fallbackMessage(429);
   try {
     const data = await res.json();
     if (typeof data?.detail === "string") return data.detail;
     if (Array.isArray(data?.detail)) {
-      return data.detail
-        .map((d: { msg?: string; loc?: string[] }) => d.msg ?? "")
-        .filter(Boolean)
-        .join(", ");
+      // FastAPI validation errors. Pydantic v2 prefixes messages raised by a
+      // field validator with "Value error, " — internal noise to a reader.
+      return (
+        data.detail
+          .map((d: { msg?: string; loc?: string[] }) =>
+            (d.msg ?? "").replace(/^Value error,\s*/, ""),
+          )
+          .filter(Boolean)
+          .join(", ") || fallbackMessage(res.status)
+      );
     }
-    return data?.message ?? `Request failed (${res.status})`;
+    return data?.message ?? fallbackMessage(res.status);
   } catch {
-    return `Request failed (${res.status})`;
+    return fallbackMessage(res.status);
   }
 }
 
