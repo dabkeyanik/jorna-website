@@ -39,10 +39,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** Every route in the built export, as verifiable URLs (dynamic — no drift). */
 function routeUrls() {
   // "/" redirects into the app; "/welcome/" is the marketing page it used to be,
-  // still linked from the App Store listing and the app's own footer. The legal
-  // pages are required by App Store Connect and by guideline 1.2, so a deploy
-  // that quietly stopped serving them should fail.
-  const urls = new Set(["/", "/welcome/", "/privacy/", "/terms/", "/support/", "/app/"]);
+  // still linked from the App Store listing and the app's own footer. Add
+  // "/privacy/", "/terms/" and "/support/" here when those move out of drafts/.
+  const urls = new Set(["/", "/welcome/", "/app/"]);
   const walk = (dir) => {
     for (const name of readdirSync(dir)) {
       if (name === "_next") continue; // hashed assets, not routes
@@ -75,11 +74,13 @@ async function findFailures(urls) {
 
 /** Refuse to publish documents that still have blanks in them.
  *
- *  The legal pages were drafted with the details only the owner can supply —
- *  entity name, support address, jurisdiction — marked "FILL:". A privacy policy
- *  is a published promise and App Store Connect links straight to it, so shipping
- *  one mid-sentence is worse than not having it up yet. This makes that a
- *  structural impossibility rather than something to remember. */
+ *  The legal pages are drafted with the details only the owner can supply —
+ *  entity name, support address, jurisdiction — marked "FILL:". They currently
+ *  live in drafts/, outside the publish path, so this passes; it earns its keep
+ *  the moment they move into public/. A privacy policy is a published promise
+ *  that App Store Connect links straight to, so shipping one mid-sentence is
+ *  worse than not having it up — better to make that impossible than to
+ *  remember it. */
 function assertNoPlaceholders() {
   const offenders = [];
   const walk = (dir) => {
