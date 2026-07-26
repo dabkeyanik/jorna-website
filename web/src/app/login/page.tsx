@@ -21,6 +21,18 @@ function GoogleMark() {
   );
 }
 
+// Which side of the marketplace someone is joining. Deliberately *not* a
+// backend concept: /auth/register takes no role and the account created is
+// identical either way — "is a vendor" is derived from having a vendor profile.
+// The choice decides where we land them afterwards, and it puts selling in
+// front of vendors at the same moment iOS asks the same question.
+type Role = "host" | "vendor";
+
+const ROLES: { value: Role; label: string; hint: string }[] = [
+  { value: "host", label: "Host", hint: "Plan a celebration and book a team." },
+  { value: "vendor", label: "Vendor", hint: "List your services and get booked." },
+];
+
 function LoginInner() {
   const { login, register } = useAuth();
   const router = useRouter();
@@ -31,6 +43,8 @@ function LoginInner() {
   const isGoogleSignup = params.get("google") === "1";
 
   const [mode, setMode] = useState<"login" | "register">(isGoogleSignup ? "register" : "login");
+  // No default: the choice is required, the way iOS's two signup cards are.
+  const [role, setRole] = useState<Role | null>(null);
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +106,10 @@ function LoginInner() {
         // The Jorna JWT is the session now; drop the Supabase one.
         if (isGoogleSignup) await supabase.auth.signOut();
       }
-      router.push(next);
+      // A new vendor goes straight to building their vendor profile — the web
+      // equivalent of iOS routing "I am a Vendor" into VendorInfoView, so the
+      // account and the storefront are one continuous flow.
+      router.push(mode === "register" && role === "vendor" ? "/vendor-profile" : next);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -117,16 +134,34 @@ function LoginInner() {
       ? "Welcome back"
       : "Create your account";
 
+  // Doubles as the prompt for the role choice: until one is picked the submit
+  // button is disabled, so the subheading says what's missing rather than
+  // leaving a dead button to puzzle over.
+  const subheading =
+    mode === "login"
+      ? "Sign in to build and book your celebration."
+      : role === null
+        ? "First — how will you use Jorna?"
+        : isGoogleSignup
+          ? "A few details and your Google account is all set."
+          : role === "vendor"
+            ? "A few details and you're ready to list."
+            : "A few details and you're planning.";
+
+  const submitLabel = busy
+    ? "One moment…"
+    : isGoogleSignup
+      ? "Complete sign-up"
+      : mode === "login"
+        ? "Sign in"
+        : role === "vendor"
+          ? "Create account & continue"
+          : "Create account";
+
   return (
     <div className="mx-auto w-[min(460px,100%-2rem)] py-14">
       <h1 className="serif text-center text-4xl text-maroon dark:text-gold">{heading}</h1>
-      <p className="mt-2 text-center text-ink-soft">
-        {isGoogleSignup
-          ? "A few details and your Google account is all set."
-          : mode === "login"
-            ? "Sign in to build and book your celebration."
-            : "A few details and you're planning."}
-      </p>
+      <p className="mt-2 text-center text-ink-soft">{subheading}</p>
 
       <Card className="mt-8 p-6">
         {/* Google — offered on the normal login/register screens, not mid-completion. */}
@@ -162,6 +197,34 @@ function LoginInner() {
             />
           ) : (
             <>
+              <div>
+                <p className="mb-2.5 text-sm font-medium text-ink-soft">I&apos;m joining as</p>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {ROLES.map((r) => {
+                    const active = role === r.value;
+                    return (
+                      <button
+                        key={r.value}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setRole(r.value)}
+                        className={`rounded-xl border px-3 py-3 text-left transition ${
+                          active
+                            ? "border-gold bg-gold/12 ring-1 ring-gold/40"
+                            : "border-card-edge bg-ground-2 hover:border-gold/50"
+                        }`}
+                      >
+                        <span
+                          className={`block text-sm font-semibold ${active ? "text-maroon dark:text-gold" : "text-ink"}`}
+                        >
+                          {r.label}
+                        </span>
+                        <span className="mt-0.5 block text-[0.7rem] text-ink-faint">{r.hint}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <Field
                 label="Email"
                 type="email"
@@ -190,6 +253,13 @@ function LoginInner() {
               <div className="grid grid-cols-2 gap-3">
                 <Field
                   label="Username"
+                  // Mirrors the backend's rule (3–30 of [A-Za-z0-9_]) so a space
+                  // or a dot is caught here instead of coming back as a 422.
+                  minLength={3}
+                  maxLength={30}
+                  pattern="[A-Za-z0-9_]{3,30}"
+                  title="3–30 characters: letters, digits, and underscores only."
+                  hint="Letters, digits, and underscores."
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
@@ -248,16 +318,12 @@ function LoginInner() {
           <Button
             type="submit"
             size="lg"
-            disabled={busy || (isGoogleSignup && !googleReady)}
+            disabled={
+              busy || (isGoogleSignup && !googleReady) || (mode === "register" && role === null)
+            }
             className="mt-1"
           >
-            {busy
-              ? "One moment…"
-              : isGoogleSignup
-                ? "Complete sign-up"
-                : mode === "login"
-                  ? "Sign in"
-                  : "Create account"}
+            {submitLabel}
           </Button>
         </form>
       </Card>
