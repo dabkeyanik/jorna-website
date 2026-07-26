@@ -36,7 +36,7 @@ or payment data) to a third-party language model.
 4. Add `/privacy/`, `/terms/` and `/support/` to the seed list in
    `scripts/deploy.mjs` so a deploy that stops serving them fails.
 5. Link them from the app footer (`web/src/components/SiteFooter.tsx`) and the
-   marketing page footer (`public/welcome/index.html`) — guideline 1.2 wants them
+   marketing page footer (`public/help/index.html`) — guideline 1.2 wants them
    reachable from inside the app, not only from the website.
 6. `npm run deploy`. It aborts while any page under `public/` still contains
    `FILL:`, so a half-finished policy can't reach production.

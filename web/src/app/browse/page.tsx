@@ -220,7 +220,7 @@ export default function BrowsePage() {
               app now, so this is how anyone still finds it. A plain anchor: it
               lives outside the app, and next/link would prefix "/app". */}
           <a
-            href="/welcome/"
+            href="/help/"
             aria-label="How Jorna works"
             title="How Jorna works"
             className="absolute right-0 top-0 grid size-9 place-items-center rounded-full border border-card-edge bg-ground-2 text-base font-bold text-ink-soft transition hover:border-gold/60 hover:text-gold"
