@@ -17,3 +17,6 @@ web/.env.local
 
 .wrangler/
 .DS_Store
+
+# Incremental typecheck cache from `tsc --noEmit`
+web/tsconfig.tsbuildinfo
