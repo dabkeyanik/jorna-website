@@ -214,7 +214,19 @@ export default function BrowsePage() {
   return (
     <div className="mx-auto w-[min(1080px,100%-2rem)] py-10">
       {!expanded ? (
-        <header className="text-center">
+        <header className="relative text-center">
+          {/* The walkthrough of how Jorna works — bundles, escrow, check-in —
+              used to be the site's front page. The root goes straight into the
+              app now, so this is how anyone still finds it. A plain anchor: it
+              lives outside the app, and next/link would prefix "/app". */}
+          <a
+            href="/welcome/"
+            aria-label="How Jorna works"
+            title="How Jorna works"
+            className="absolute right-0 top-0 grid size-9 place-items-center rounded-full border border-card-edge bg-ground-2 text-base font-bold text-ink-soft transition hover:border-gold/60 hover:text-gold"
+          >
+            ?
+          </a>
           <span className="eyebrow">Browse</span>
           <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold sm:text-5xl">
             Find your vendors
