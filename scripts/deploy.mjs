@@ -17,13 +17,21 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const appDir = join(root, "public", "app");
 const PAGES_PROJECT = "jorna-events";
-// TRANSITION: the apex (jornaevents.com) still points at the old Worker until
-// the dashboard cutover to Pages (DEPLOY.md). Until then we deploy to BOTH —
-// Pages (the future, reliable) and the Worker (so the live apex stays current) —
-// and verify the apex, since that's the URL people actually hit. Once the domain
-// is on Pages: set DEPLOY_TARGET=pages, drop the Worker step, and this simplifies.
-const DEPLOY_TARGET = process.env.DEPLOY_TARGET ?? "both"; // "both" | "pages"
-const DOMAIN = process.env.DEPLOY_DOMAIN ?? "https://jornaevents.com";
+// TRANSITION (DEPLOY.md). The apex jornaevents.com is attached to the Pages
+// project, but the retired Worker misty-water-0dbb still holds the live binding
+// for that hostname — so the Worker answers it and serves an older build. Two
+// claims on one hostname is also why `wrangler deploy --config
+// wrangler.worker.jsonc` now fails on domains/records: deploying to the Worker
+// can no longer succeed, so we stop trying and ship Pages only.
+//
+// Until the dashboard step (remove the apex from the Worker), verify against the
+// Pages URL — the thing a deploy can actually change — and warn when the apex is
+// serving something else, so a green deploy can't be mistaken for "live".
+// AFTER the cutover: set DOMAIN back to the apex, delete wrangler.worker.jsonc,
+// and drop the freshness check.
+const DEPLOY_TARGET = process.env.DEPLOY_TARGET ?? "pages"; // "pages" | "both"
+const DOMAIN = process.env.DEPLOY_DOMAIN ?? "https://jorna-events.pages.dev";
+const APEX = "https://jornaevents.com";
 const MAX_ATTEMPTS = 4;
 // A deploy can pass one check, then 404 for a while as it propagates across edge
 // PoPs. Don't trust a single green check — require several consecutive clean
@@ -68,11 +76,33 @@ async function findFailures(urls) {
   return failures;
 }
 
+/** Whether the apex serves the same build as DOMAIN. Compares a route whose
+ *  bytes change between builds: the marketing page alone can be byte-identical
+ *  across builds, which would report a stale apex as fresh. null = couldn't tell. */
+async function apexMatches() {
+  const probe = "/app/login/";
+  const bust = () => `?_deploycheck=${Date.now()}`;
+  try {
+    const [live, shipped] = await Promise.all([
+      fetch(APEX + probe + bust()).then((r) => r.text()),
+      fetch(DOMAIN + probe + bust()).then((r) => r.text()),
+    ]);
+    return live === shipped;
+  } catch {
+    return null;
+  }
+}
+
 log("building…");
 execSync("npm run build", { cwd: root, stdio: "inherit" });
 
 const urls = routeUrls();
 log(`will verify ${urls.length} routes after deploy`);
+
+// A deploy step that exits non-zero `continue`s without ever verifying. Tracking
+// that separately keeps the final message honest: "routes aren't serving" and
+// "we never got as far as looking" are different problems with different fixes.
+let everVerified = false;
 
 for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
   log(`deploy attempt ${attempt}/${MAX_ATTEMPTS} (target: ${DEPLOY_TARGET})`);
@@ -102,12 +132,25 @@ for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
   let lastFailures = [];
   while (Date.now() < deadline) {
     await sleep(POLL_INTERVAL_MS);
+    everVerified = true;
     lastFailures = await findFailures(urls);
     if (lastFailures.length === 0) {
       streak += 1;
       log(`clean sweep ${streak}/${CONFIRM_PASSES}`);
       if (streak >= CONFIRM_PASSES) {
-        log(`\x1b[32m✓ all ${urls.length} routes stably serving 200 — verified\x1b[0m`);
+        log(`\x1b[32m✓ all ${urls.length} routes stably serving 200 at ${DOMAIN} — verified\x1b[0m`);
+        if (DOMAIN !== APEX) {
+          const fresh = await apexMatches();
+          if (fresh === false) {
+            log(
+              `\x1b[33m! ${APEX} is serving a DIFFERENT build — the retired Worker still holds ` +
+                `that hostname, so this deploy is NOT live for users. Finish the cutover ` +
+                `(DEPLOY.md): remove the apex from the Worker so Pages can serve it.\x1b[0m`,
+            );
+          } else if (fresh === null) {
+            log(`\x1b[33m! couldn't reach ${APEX} to compare builds — check it by hand.\x1b[0m`);
+          }
+        }
         process.exit(0);
       }
     } else {
@@ -125,7 +168,11 @@ for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
 }
 
 log(
-  "\x1b[31mFAILED: routes still not serving after every attempt. " +
-    "Production may be partially deployed — investigate before walking away.\x1b[0m",
+  everVerified
+    ? "\x1b[31mFAILED: routes still not serving after every attempt. " +
+        "Production may be partially deployed — investigate before walking away.\x1b[0m"
+    : "\x1b[31mFAILED: every deploy attempt exited non-zero, so the routes were never " +
+        "checked. This is a deploy/config error (see the wrangler output above), not " +
+        "evidence that the site is broken — verify the live URL before assuming either.\x1b[0m",
 );
 process.exit(1);

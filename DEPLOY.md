@@ -14,32 +14,65 @@ in `public/`, hosted on **Cloudflare Pages** (project `jorna-events`).
 npm run deploy
 ```
 
-This builds the app into `public/app`, runs `wrangler pages deploy public`, then
+Builds the app into `public/app`, runs `wrangler pages deploy public`, then
 fetches every route and re-deploys until they all serve 200 (see
-`scripts/deploy.mjs`). It verifies against `jorna-events.pages.dev`; once the
-apex is on Pages you can verify the apex directly with
-`DEPLOY_DOMAIN=https://jornaevents.com npm run deploy`.
+`scripts/deploy.mjs`). `npm run deploy:once` is the raw single-shot.
 
-`npm run deploy:once` is the raw single-shot.
+It verifies against `jorna-events.pages.dev` and then warns if
+`jornaevents.com` is serving a different build — which it currently is, see
+below. **A green deploy does not mean the change is live for users** until the
+cutover is finished.
 
-## One-time: move the apex domain to Pages
+## ⚠️ Unfinished: the apex is still on the retired Worker
 
-Until this is done, `jornaevents.com` still serves from the old Worker
-(`misty-water-0dbb`). The Pages deployment is live and verifiable at
-`https://jorna-events.pages.dev`.
+`jornaevents.com` is **attached to the Pages project already**
+(`wrangler pages project list` lists it under Project Domains), but the retired
+Worker `misty-water-0dbb` still holds the live binding for that hostname. The
+Worker wins, so the apex serves **an older build** while Pages serves the
+current one.
 
-In the Cloudflare dashboard:
+That collision is also why `wrangler deploy --config wrangler.worker.jsonc`
+now fails with a `domains/records` API error: two things claim one hostname.
+Deploying to the Worker can no longer succeed, so `npm run deploy` ships to
+Pages only (`DEPLOY_TARGET=pages` is the default).
 
-1. **Workers & Pages → `misty-water-0dbb` → Settings → Domains & Routes** —
-   remove the `jornaevents.com` custom domain. (Frees the hostname.)
-2. **Workers & Pages → `jorna-events` (Pages) → Custom domains → Set up a custom
-   domain →** `jornaevents.com`. The zone is already on Cloudflare, so DNS + TLS
-   provision automatically.
-3. Once `https://jornaevents.com/app/` serves the app, set the deploy default:
-   change `DEPLOY_DOMAIN` in `scripts/deploy.mjs` to `https://jornaevents.com`.
-4. Retire the old Worker (`wrangler delete` or dashboard) so nothing else claims
-   the domain.
+**The one remaining action** — Cloudflare dashboard, **Workers & Pages →
+`misty-water-0dbb` → Settings → Domains & Routes → remove `jornaevents.com`.**
+Freeing the hostname lets the Pages custom domain activate, and the apex starts
+serving whatever was last deployed.
 
-Backend CORS already allows `https://jornaevents.com`, so no API change is
-needed. (The `*.pages.dev` origin is **not** allowed, so API calls only work
-once the app is on the real domain.)
+Then, in this order:
+
+1. Confirm `https://jornaevents.com/app/login/` matches
+   `https://jorna-events.pages.dev/app/login/` (compare the bytes, not just a
+   200 — that is exactly how the stale apex went unnoticed).
+2. In `scripts/deploy.mjs`: set `DOMAIN` back to `https://jornaevents.com` and
+   delete the `apexMatches()` check and its call — both exist only for this
+   transition.
+3. Delete `wrangler.worker.jsonc` and drop the `"both"` branch of
+   `DEPLOY_TARGET`.
+4. Retire the Worker itself (`wrangler delete --name misty-water-0dbb`, or the
+   dashboard) so nothing can reclaim the domain.
+
+## Why pages.dev is not a usable staging URL
+
+Backend CORS allows `https://jornaevents.com` and **rejects**
+`https://jorna-events.pages.dev` — verified by preflight:
+
+```
+$ curl -i -X OPTIONS -H "Origin: https://jornaevents.com" \
+    -H "Access-Control-Request-Method: POST" $API/auth/login
+HTTP/1.1 200 OK
+access-control-allow-origin: https://jornaevents.com
+
+$ curl -i -X OPTIONS -H "Origin: https://jorna-events.pages.dev" ... 
+HTTP/1.1 400 Bad Request
+```
+
+So the pages.dev deployment **renders but cannot talk to the API** — every
+sign-in, booking, and listing call fails CORS. It proves the build ships; it
+cannot prove the build works. Until the apex moves, the only place the app is
+genuinely exercisable is `jornaevents.com`, which is serving the old build.
+
+To use pages.dev as a real staging environment, add it to `ALLOWED_ORIGINS` on
+Railway (the backend reads that env var; it is not in the repo).
