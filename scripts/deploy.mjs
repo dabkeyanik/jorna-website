@@ -38,7 +38,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Every route in the built export, as verifiable URLs (dynamic — no drift). */
 function routeUrls() {
-  const urls = new Set(["/", "/app/"]);
+  // "/" redirects into the app; "/welcome/" is the marketing page it used to be,
+  // still linked from the App Store listing and the app's own footer.
+  const urls = new Set(["/", "/welcome/", "/app/"]);
   const walk = (dir) => {
     for (const name of readdirSync(dir)) {
       if (name === "_next") continue; // hashed assets, not routes

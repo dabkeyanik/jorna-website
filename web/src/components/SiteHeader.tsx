@@ -21,12 +21,11 @@ export function SiteHeader() {
             Jorna
           </Link>
           {/* Plain anchor: next/link would keep the "/app" basePath and stay
-              inside the app instead of returning to the marketing page. That is
-              the whole point here, so the no-html-link-for-pages rule — which
-              reads "/" as the app's own entry route — is wrong about this one. */}
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              inside the app instead of leaving it. Points at /welcome/, not "/",
+              because the root now redirects into the app — linking there would
+              bounce anyone trying to leave straight back in. */}
           <a
-            href="/"
+            href="/welcome/"
             className="hidden text-xs text-ink-faint transition hover:text-ink sm:inline"
           >
             ← main site
