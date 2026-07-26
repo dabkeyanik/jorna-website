@@ -300,17 +300,14 @@ export default function BrowsePage() {
             Start from an occasion and we&apos;ll preselect what it usually takes — then
             add your date, city, and guest count.
           </p>
-          <div className="mt-4 flex flex-wrap gap-3">
+          <div className="mt-4 flex flex-wrap justify-center gap-3">
             {CELEBRATIONS.map((c) => (
               <Link
                 key={c.key}
                 href={`/plan?event=${c.key}`}
-                className="group rounded-2xl border border-card-edge bg-ground-2 px-5 py-4 transition hover:border-gold/60 hover:bg-gold/[0.06]"
+                className="rounded-2xl border border-card-edge bg-ground-2 px-7 py-4 font-semibold text-ink transition hover:border-gold/60 hover:bg-gold/[0.06]"
               >
-                <span className="block font-semibold text-ink">{c.label}</span>
-                <span className="mt-0.5 block text-xs text-ink-faint">
-                  {c.categories.length} categories ready
-                </span>
+                {c.label}
               </Link>
             ))}
           </div>
