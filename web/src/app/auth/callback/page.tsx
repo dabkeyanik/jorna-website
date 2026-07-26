@@ -11,7 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase, takeOAuthNext, takeOAuthRole } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { googleLookup, googleRegister, type GoogleLookupResponse } from "@/lib/jorna";
+import { googleRegister } from "@/lib/jorna";
 import { ApiError } from "@/lib/api";
 
 export default function AuthCallbackPage() {
@@ -52,17 +52,7 @@ export default function AuthCallbackPage() {
         const next = takeOAuthNext();
         const role = takeOAuthRole();
 
-        // TRANSITIONAL: this site deploys independently of the API, so the new
-        // endpoint may not be live yet. A 404 falls back to the old two-step —
-        // look up, then finish on the form — rather than breaking Google sign-in
-        // outright. Delete once /auth/google/register is deployed.
-        let session_: GoogleLookupResponse;
-        try {
-          session_ = await googleRegister(session.access_token);
-        } catch (e) {
-          if (!(e instanceof ApiError) || e.status !== 404) throw e;
-          session_ = await googleLookup(session.access_token);
-        }
+        const session_ = await googleRegister(session.access_token);
 
         if (session_.access_token && session_.refresh_token) {
           await adoptSession({
