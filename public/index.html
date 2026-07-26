@@ -8,16 +8,17 @@
 <meta name="theme-color" content="#6B1226">
 <link rel="canonical" href="https://jornaevents.com/">
 
-<!-- The root goes straight into the app. /app/ is the auth-aware door: signed in
-     lands on Home, signed out on sign-in — so the decision lives in one place
-     instead of being duplicated here against localStorage.
+<!-- The root goes straight to Home. Not to sign-in: browsing needs no account, so
+     the product comes first and an account is asked for when someone tries to
+     book. Straight to /app/browse/ rather than via /app/, which would only
+     redirect here anyway — one navigation instead of two.
 
      The marketing page still exists at /welcome/ and is what the App Store's
      "Marketing URL" and any campaign link should point at. Redirecting the root
      means search engines index a redirect, so /welcome/ is the page with the
      content worth finding. -->
-<meta http-equiv="refresh" content="0;url=/app/">
-<script>location.replace("/app/");</script>
+<meta http-equiv="refresh" content="0;url=/app/browse/">
+<script>location.replace("/app/browse/");</script>
 
 <style>
   html { color-scheme: light dark; }
@@ -32,7 +33,7 @@
 </head>
 <body>
   <!-- Only seen if both the refresh and the script are blocked. -->
-  <p>Taking you to Jorna… <a href="/app/">Continue</a><br>
+  <p>Taking you to Jorna… <a href="/app/browse/">Continue</a><br>
     <a href="/welcome/">Read about Jorna instead</a></p>
 </body>
 </html>

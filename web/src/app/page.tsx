@@ -1,29 +1,27 @@
 "use client";
 
-// /app/ is not a page — it is the door the marketing site's "Try it now" button
-// opens. It used to repeat the marketing pitch (same headline, same lede, a
-// second "Try it now — build a bundle" button), so reaching anything actually
-// took two clicks through near-identical screens. Now it only routes:
+// /app/ is not a page — it's the door the site's root opens.
 //
-//   signed in  → /browse, the same Home the tab bar's Home tab goes to
-//   signed out → /login, which sends them to /plan afterwards — the bundle
-//                builder the button promised
+// It used to repeat the marketing pitch, then briefly routed by auth state
+// (signed in → Home, signed out → sign-in). Both are gone: everyone lands on
+// Home. Browsing needs no account, so showing the product first and asking for
+// one only when someone tries to book beats a sign-in wall on arrival.
 //
-// replace() rather than push() so Back from Home returns to the marketing page
-// instead of landing here and bouncing forward again.
+// That also means no waiting on the session to load before deciding — this
+// redirects immediately. The root shim points straight at /app/browse/, so this
+// only catches anyone arriving at /app/ directly.
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth";
 
 export default function AppEntry() {
   const router = useRouter();
-  const { user, loading } = useAuth();
 
   useEffect(() => {
-    if (loading) return; // still reading the stored session
-    router.replace(user ? "/browse" : "/login");
-  }, [loading, user, router]);
+    // replace() so Back returns where they came from rather than bouncing
+    // forward through here again.
+    router.replace("/browse");
+  }, [router]);
 
   return <p className="py-24 text-center text-ink-soft">Taking you in…</p>;
 }
