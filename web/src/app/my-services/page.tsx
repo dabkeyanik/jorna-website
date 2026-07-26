@@ -41,7 +41,12 @@ const blank: ServiceInput = {
   name: "",
   price: 0,
   experience: "",
-  price_unit: "event",
+  // Per hour, matching the iOS create screen — the same vendor should not get a
+  // different starting point depending on where they list. It is also the safer
+  // way round: a rate left hourly by mistake just blocks checkout until the
+  // client supplies hours, whereas an hourly rate left flat by mistake books a
+  // whole event at one hour's price, and amount_cents freezes at payment.
+  price_unit: "hour",
   description: "",
   negotiable: false,
 };
@@ -61,6 +66,11 @@ export default function MyServicesPage() {
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [uploadingFor, setUploadingFor] = useState<string | null>(null);
+  // Photos chosen while filling in a new service. They can only be sent once the
+  // service exists (the upload endpoint is per-service), so they wait here and
+  // go up right after create — iOS collects the image on its create screen the
+  // same way rather than making the vendor come back for it.
+  const [newPhotos, setNewPhotos] = useState<File[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -95,10 +105,12 @@ export default function MyServicesPage() {
   const subOptions =
     categories.find((c) => c.value === form.category)?.subcategories ?? [];
   const isVenue = form.category === "venue";
+  const isOther = form.category === "other";
 
   function startNew() {
     // Default to what this vendor does, so most services need no category fiddling.
     setForm({ ...blank, category: vendor?.category ?? "", subcategory: vendor?.subcategory ?? "" });
+    setNewPhotos([]);
     setEditing("new");
     setError(null);
   }
@@ -117,6 +129,7 @@ export default function MyServicesPage() {
       venue_latitude: s.venue_latitude ?? null,
       venue_longitude: s.venue_longitude ?? null,
     });
+    setNewPhotos([]);
     setEditing(s.service_id);
     setError(null);
   }
@@ -155,9 +168,22 @@ export default function MyServicesPage() {
         subcategory: form.subcategory || null,
         location: form.location || null,
       };
-      if (editing === "new") await createService(payload);
-      else if (editing) await updateService(editing, payload);
+      if (editing === "new") {
+        const created = await createService(payload);
+        if (newPhotos.length) {
+          try {
+            await uploadServiceImages(created.service_id, newPhotos);
+          } catch {
+            // The service itself is saved by this point — say that plainly
+            // instead of letting the outer catch claim it wasn't.
+            setError("Service saved, but the photos didn't upload. Add them from the list below.");
+          }
+        }
+      } else if (editing) {
+        await updateService(editing, payload);
+      }
       await refresh(vendor.vendor_id);
+      setNewPhotos([]);
       setEditing(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't save that service.");
@@ -318,7 +344,19 @@ export default function MyServicesPage() {
                   ))}
                 </select>
               </label>
-              {subOptions.length > 0 ? (
+              {isOther ? (
+                // "Other" has no subcategories in the taxonomy, so there is
+                // nothing to pick from — the vendor types what they do, as they
+                // do on iOS. The backend only validates a subcategory against
+                // the list when its category has one, so free text is accepted.
+                <Field
+                  label="Speciality"
+                  placeholder="Describe what you offer"
+                  required
+                  value={form.subcategory ?? ""}
+                  onChange={(e) => setForm({ ...form, subcategory: e.target.value })}
+                />
+              ) : subOptions.length > 0 ? (
                 <label className="block">
                   <span className="mb-1.5 block text-sm font-medium text-ink-soft">
                     Speciality
@@ -406,6 +444,27 @@ export default function MyServicesPage() {
                     Use my current location
                   </Button>
                 </div>
+              </div>
+            ) : null}
+
+            {editing === "new" ? (
+              <div>
+                <p className="mb-1.5 text-sm font-medium text-ink-soft">Photos</p>
+                <label className="inline-block cursor-pointer rounded-lg border border-dashed border-card-edge px-3 py-2 text-xs text-ink-soft hover:border-gold">
+                  {newPhotos.length
+                    ? `${newPhotos.length} selected — choose again to replace`
+                    : "+ Choose photos"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => setNewPhotos(Array.from(e.target.files ?? []))}
+                  />
+                </label>
+                <span className="mt-1 block text-xs text-ink-faint">
+                  Uploaded as soon as the service is created. You can add more later.
+                </span>
               </div>
             ) : null}
 
