@@ -9,7 +9,9 @@
 // never list dhol players.
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { ApiError } from "@/lib/api";
+import { CELEBRATIONS } from "@/lib/celebrations";
 import { searchVendors } from "@/lib/jorna";
 import { categoryLabel, type VendorSearchItem } from "@/lib/types";
 import { Button, Chip, Field, Rule } from "@/components/ui";
@@ -285,6 +287,32 @@ export default function BrowsePage() {
             <Button variant="ghost" onClick={() => setExpanded(true)}>
               Browse every vendor
             </Button>
+          </div>
+
+          {/* Trending celebrations — the other iOS home section. These skip the
+              category question: each one opens the builder with the categories
+              that celebration usually needs already ticked, leaving the date,
+              city, and guest count to fill in. */}
+          <h2 className="serif mt-12 text-2xl text-maroon dark:text-gold">
+            Trending celebrations
+          </h2>
+          <p className="mt-2 text-ink-soft">
+            Start from an occasion and we&apos;ll preselect what it usually takes — then
+            add your date, city, and guest count.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            {CELEBRATIONS.map((c) => (
+              <Link
+                key={c.key}
+                href={`/plan?event=${c.key}`}
+                className="group rounded-2xl border border-card-edge bg-ground-2 px-5 py-4 transition hover:border-gold/60 hover:bg-gold/[0.06]"
+              >
+                <span className="block font-semibold text-ink">{c.label}</span>
+                <span className="mt-0.5 block text-xs text-ink-faint">
+                  {c.categories.length} categories ready
+                </span>
+              </Link>
+            ))}
           </div>
         </>
       ) : (

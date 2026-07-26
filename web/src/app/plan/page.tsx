@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
+import { celebrationByKey } from "@/lib/celebrations";
 import { generateBundles, selectBundle } from "@/lib/jorna";
 import { CATEGORY_LABELS, categoryLabel, type BundleOption } from "@/lib/types";
 import { Button, Card, Chip, Field, Rule } from "@/components/ui";
@@ -72,14 +73,23 @@ function SkeletonBundles() {
   );
 }
 
-export default function PlanPage() {
+function PlanInner() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const params = useSearchParams();
 
-  // Gate: send guests to sign in, then back here.
+  // Arriving from a "Trending celebrations" tile on Home (/plan?event=wedding).
+  // Only the category selection is seeded from it — see lib/celebrations.
+  const celebration = celebrationByKey(params.get("event"));
+
+  // Gate: send guests to sign in, then back here — keeping ?event= so the
+  // preselection survives the round trip through sign-in.
   useEffect(() => {
-    if (!loading && !user) router.replace("/login?next=/plan");
-  }, [loading, user, router]);
+    if (!loading && !user) {
+      const next = celebration ? `/plan?event=${celebration.key}` : "/plan";
+      router.replace(`/login?next=${encodeURIComponent(next)}`);
+    }
+  }, [loading, user, router, celebration]);
 
   const [location, setLocation] = useState("");
   // Set when a suggested city is picked, so we can send coordinates for
@@ -89,7 +99,9 @@ export default function PlanPage() {
   const [guests, setGuests] = useState("");
   const [budget, setBudget] = useState("mid-range");
   const [styles, setStyles] = useState<string[]>([]);
-  const [needed, setNeeded] = useState<string[]>([]);
+  // Seeded in the initializer rather than an effect, so an arriving celebration's
+  // categories are ticked on the first paint instead of flicking on after it.
+  const [needed, setNeeded] = useState<string[]>(celebration?.categories ?? []);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -159,7 +171,7 @@ export default function PlanPage() {
       <header className="text-center">
         <span className="eyebrow">AI bundle builder</span>
         <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold sm:text-5xl">
-          Build your celebration
+          {celebration ? `Build your ${celebration.label.toLowerCase()}` : "Build your celebration"}
         </h1>
         <p className="mx-auto mt-3 max-w-[52ch] text-ink-soft">
           Tell us about your event and we&apos;ll assemble three complete vendor teams —
@@ -249,6 +261,11 @@ export default function PlanPage() {
               <span className="text-ink-faint">
                 · {needed.length}/{ALL_CATEGORIES.length}
               </span>
+              {celebration ? (
+                <span className="ml-1 text-ink-faint">
+                  · preselected for a {celebration.label.toLowerCase()}, change anything
+                </span>
+              ) : null}
             </p>
             <button
               type="button"
@@ -298,5 +315,14 @@ export default function PlanPage() {
         </section>
       ) : null}
     </div>
+  );
+}
+
+// useSearchParams needs a Suspense boundary to prerender in the static export.
+export default function PlanPage() {
+  return (
+    <Suspense fallback={null}>
+      <PlanInner />
+    </Suspense>
   );
 }
