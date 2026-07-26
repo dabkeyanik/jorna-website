@@ -41,8 +41,11 @@ function LoginInner() {
   // Set when we've come back from Google as a brand-new identity that needs to
   // finish creating a Jorna account (the callback routes here with ?google=1).
   const isGoogleSignup = params.get("google") === "1";
+  // ?mode=register opens straight on the sign-up form — what a "Get started"
+  // entry point promises. Completing a Google sign-up implies it too.
+  const startsOnRegister = isGoogleSignup || params.get("mode") === "register";
 
-  const [mode, setMode] = useState<"login" | "register">(isGoogleSignup ? "register" : "login");
+  const [mode, setMode] = useState<"login" | "register">(startsOnRegister ? "register" : "login");
   // No default: the choice is required, the way iOS's two signup cards are.
   const [role, setRole] = useState<Role | null>(null);
   const [busy, setBusy] = useState(false);

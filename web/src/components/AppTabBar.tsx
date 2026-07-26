@@ -113,7 +113,7 @@ export function AppTabBar() {
     };
   }, [user, pathname]);
 
-  // Signed-out visitors (marketing "Try it now", browsing, login) get no tabs.
+  // Signed-out visitors (browsing, "Get started", login) get no tabs.
   if (loading || !user) return null;
 
   const tabs = isVendor ? VENDOR_TABS : CLIENT_TABS;
