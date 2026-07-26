@@ -33,7 +33,12 @@ export function SiteHeader() {
               <LinkButton href="/login" variant="ghost">
                 Sign in
               </LinkButton>
-              <LinkButton href="/plan">Try it now</LinkButton>
+              {/* Paired with "Sign in", so it says what it does. It used to read
+                  "Try it now" and point at /plan — but /plan turns a guest away
+                  to sign in, so the invitation was answered by a login wall.
+                  ?mode=register opens the form it advertises; the post-auth
+                  landing is unchanged (login defaults `next` to /plan). */}
+              <LinkButton href="/login?mode=register">Get started</LinkButton>
             </>
           )}
         </nav>
