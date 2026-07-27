@@ -12,6 +12,7 @@
 
 import {
   eventHasPassed,
+  priceUnitKind,
   priceUnitLabel,
   type BundleBooking,
   type BundleDetail,
@@ -85,8 +86,18 @@ export function hasLiveVenue(bookings: BundleBooking[]): boolean {
   return bookings.some((b) => b.service_category === "venue" && !isDeadBooking(b));
 }
 
-/** Gaps in the event itself — the answers every vendor ends up needing. */
-function eventTasks(event: BundleEventInfo | null | undefined): PlanTask[] {
+/**
+ * Gaps in the event itself.
+ *
+ * The date and the place are wanted whatever is booked. A guest count is not:
+ * it only blocks a total when something is charged per person, and asking for
+ * one on a plan of flat-rate bookings is a task with nothing behind it — you
+ * can't clear it by acting, because nothing was waiting on it.
+ */
+function eventTasks(
+  event: BundleEventInfo | null | undefined,
+  bookings: BundleBooking[],
+): PlanTask[] {
   if (!event) return [];
   const missing: PlanTask[] = [];
   const add = (field: string, title: string, note: string) =>
@@ -105,11 +116,20 @@ function eventTasks(event: BundleEventInfo | null | undefined): PlanTask[] {
   if (!event.location) {
     add("location", "Add where it's happening", "Used to match vendors near you.");
   }
-  if (event.guest_count == null) {
+  // Only what's live: a declined per-person booking isn't waiting on anything.
+  const perPerson = bookings.filter(
+    (b) => !isDeadBooking(b) && priceUnitKind(b.price_unit) === "person",
+  );
+  if (event.guest_count == null && perPerson.length > 0) {
+    const names = perPerson
+      .map((b) => b.service_name)
+      .filter((n): n is string => Boolean(n));
     add(
       "guests",
       "Add your guest count",
-      "Anything priced per person needs it before it can be paid.",
+      names.length === 1
+        ? `${names[0]} is priced per person, so its total can't be worked out without one.`
+        : `${perPerson.length} of your bookings are priced per person, so their totals can't be worked out without one.`,
     );
   }
   return missing;
@@ -266,7 +286,7 @@ export function planForBundle(bundle: BundleDetail): BundlePlan {
 
   const days = daysUntil(bundle.event?.date_iso);
   const tasks = [
-    ...eventTasks(bundle.event),
+    ...eventTasks(bundle.event, bookings),
     ...bookings
       .filter((b) => !isDeadBooking(b))
       .map(bookingTask)
