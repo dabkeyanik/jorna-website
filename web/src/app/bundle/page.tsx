@@ -33,6 +33,7 @@ import {
   type BundleEventInfo,
   type EventCreateInput,
 } from "@/lib/types";
+import { planForBundle, taskDetail } from "@/lib/planning";
 import { Avatar, Button, Card, Field, LinkButton } from "@/components/ui";
 
 function money(n: number) {
@@ -523,16 +524,75 @@ function BundleInner() {
       <div className="py-20 text-center">
         <p className="text-ink-soft">{error ?? "Bundle not found."}</p>
         <LinkButton href="/bundles" variant="ghost" className="mt-5">
-          Back to your bundles
+          Back to planning
         </LinkButton>
       </div>
     );
   }
 
+  const plan = planForBundle(bundle);
+
+  // The same row wherever a booking appears — the sections below differ only in
+  // which bookings they hold, not in what a booking can do.
+  const renderRow = (b: BundleBooking) => (
+    <BookingRow
+      key={b.booking_id}
+      booking={b}
+      busyId={busyId}
+      panel={panel}
+      onPay={pay}
+      onOpenPanel={(bookingId, kind) => {
+        setNotice(null);
+        setPanel({ bookingId, kind });
+      }}
+      onClosePanel={() => setPanel(null)}
+      onConfirm={(bk) =>
+        run(
+          bk,
+          () => confirmBookingEvent(bk.booking_id),
+          "Thanks — your confirmation is recorded. The payment releases once the vendor confirms too.",
+          "Couldn't confirm this booking. Please try again.",
+        )
+      }
+      onRefund={(bk) =>
+        run(
+          bk,
+          () => refundBooking(bk.booking_id),
+          "Refund requested. It should appear on your statement within a few days.",
+          "Couldn't process the refund. Please try again.",
+        )
+      }
+      onDispute={(bk, reason) =>
+        run(
+          bk,
+          () => disputeBooking(bk.booking_id, reason),
+          "Reported. This booking's payment is frozen while our team reviews it.",
+          "Couldn't submit the report. Please try again.",
+        )
+      }
+      onSwap={(bk) => {
+        setNotice(null);
+        setSwapping(bk);
+      }}
+      onRemove={(bk) =>
+        run(
+          bk,
+          () => removeBookingFromBundle(bundleId!, bk.booking_id),
+          "Removed from your bundle.",
+          "Couldn't remove that booking. Please try again.",
+        )
+      }
+      onNegotiated={() => {
+        setNotice("Price agreed — the booking is approved at the new price.");
+        void load();
+      }}
+    />
+  );
+
   return (
     <div className="mx-auto w-[min(880px,100%-2rem)] py-10">
       <Link href="/bundles" className="text-sm text-ink-soft hover:text-ink">
-        ← Your bundles
+        ← Planning
       </Link>
 
       <header className="mt-5">
@@ -643,64 +703,74 @@ function BundleInner() {
         </p>
       ) : null}
 
+      {/* What's outstanding, before the ledger of who's on the team. Same rules
+          as the "Needs you" badge — see lib/planning. */}
+      {plan.tasks.length > 0 ? (
+        <section className="mt-6 rounded-2xl border border-card-edge bg-card p-5">
+          <h2 className="serif text-lg text-ink">
+            {plan.tasks.length} {plan.tasks.length === 1 ? "thing needs" : "things need"} you
+          </h2>
+          <ul className="mt-3 grid gap-2">
+            {plan.tasks.map((task) => (
+              <li
+                key={task.id}
+                className="flex items-start gap-2.5 rounded-xl bg-panel px-3 py-2.5"
+              >
+                <span
+                  aria-hidden="true"
+                  className={`mt-1.5 size-1.5 shrink-0 rounded-full ${
+                    task.tone === "urgent" ? "bg-maroon dark:bg-gold" : "bg-gold/60"
+                  }`}
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-ink">{task.title}</span>
+                  {taskDetail(task) ? (
+                    <span className="block text-xs text-ink-soft">{taskDetail(task)}</span>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <VenueCheckIn bookings={bundle.bookings} onCheckedIn={load} />
 
-      <section className="mt-8 grid gap-3">
-        {bundle.bookings.map((b) => (
-          <BookingRow
-            key={b.booking_id}
-            booking={b}
-            busyId={busyId}
-            panel={panel}
-            onPay={pay}
-            onOpenPanel={(bookingId, kind) => {
-              setNotice(null);
-              setPanel({ bookingId, kind });
-            }}
-            onClosePanel={() => setPanel(null)}
-            onConfirm={(bk) =>
-              run(
-                bk,
-                () => confirmBookingEvent(bk.booking_id),
-                "Thanks — your confirmation is recorded. The payment releases once the vendor confirms too.",
-                "Couldn't confirm this booking. Please try again.",
-              )
-            }
-            onRefund={(bk) =>
-              run(
-                bk,
-                () => refundBooking(bk.booking_id),
-                "Refund requested. It should appear on your statement within a few days.",
-                "Couldn't process the refund. Please try again.",
-              )
-            }
-            onDispute={(bk, reason) =>
-              run(
-                bk,
-                () => disputeBooking(bk.booking_id, reason),
-                "Reported. This booking's payment is frozen while our team reviews it.",
-                "Couldn't submit the report. Please try again.",
-              )
-            }
-            onSwap={(bk) => {
-              setNotice(null);
-              setSwapping(bk);
-            }}
-            onRemove={(bk) =>
-              run(
-                bk,
-                () => removeBookingFromBundle(bundleId!, bk.booking_id),
-                "Removed from your bundle.",
-                "Couldn't remove that booking. Please try again.",
-              )
-            }
-            onNegotiated={() => {
-              setNotice("Price agreed — the booking is approved at the new price.");
-              void load();
-            }}
-          />
-        ))}
-      </section>
+      {/* The team, split by where each vendor actually stands: on it, still
+          deciding, or gone. One flat list made a declined vendor look the same
+          as a booked one until you read its status pill. */}
+      {plan.booked.length > 0 ? (
+        <section className="mt-8">
+          <h2 className="eyebrow mb-3">Booked · {plan.booked.length}</h2>
+          <div className="grid gap-3">{plan.booked.map(renderRow)}</div>
+        </section>
+      ) : null}
+
+      {plan.awaiting.length > 0 ? (
+        <section className="mt-8">
+          <h2 className="eyebrow mb-3">Awaiting the vendor · {plan.awaiting.length}</h2>
+          <p className="mb-3 text-sm text-ink-soft">
+            Requested — nothing to do until they answer.
+          </p>
+          <div className="grid gap-3">{plan.awaiting.map(renderRow)}</div>
+        </section>
+      ) : null}
+
+      {plan.closed.length > 0 ? (
+        <section className="mt-8">
+          <h2 className="eyebrow mb-3">Not going ahead · {plan.closed.length}</h2>
+          <p className="mb-3 text-sm text-ink-soft">
+            Declined, cancelled, or refunded. Swap in a replacement from the Marketplace.
+          </p>
+          <div className="grid gap-3">{plan.closed.map(renderRow)}</div>
+        </section>
+      ) : null}
+
+      {bundle.bookings.length === 0 ? (
+        <p className="mt-8 rounded-2xl border border-card-edge bg-panel p-6 text-center text-ink-soft">
+          No vendors in this bundle yet.
+        </p>
+      ) : null}
 
       {swapping ? (
         <ServiceSwapPanel

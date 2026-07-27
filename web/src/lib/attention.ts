@@ -18,6 +18,7 @@ import {
   listVendorBookings,
 } from "@/lib/jorna";
 import { eventHasPassed, type BundleDetail, type VendorBooking } from "@/lib/types";
+import { ATTENTION_KINDS, planForBundle, taskDetail } from "@/lib/planning";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -34,57 +35,35 @@ export interface AttentionItem {
   tone: Tone;
 }
 
-/** What the client still has to do, from their bundles. */
+/**
+ * What the client still has to do, from their bundles.
+ *
+ * The rules themselves live in lib/planning, which the dashboard and the bundle
+ * page also read — one set of rules, so the badge and the planning checklist
+ * can't disagree. Only ATTENTION_KINDS are surfaced here: planning also derives
+ * event-detail gaps and vendor-reply waits, and neither was ever in this badge.
+ */
 function clientItems(bundles: BundleDetail[]): AttentionItem[] {
   const items: AttentionItem[] = [];
 
   for (const bundle of bundles) {
     const where = bundle.event_name || bundle.name || "your bundle";
     const href = `/bundle?id=${bundle.bundle_id}`;
+    const byId = new Map((bundle.bookings ?? []).map((b) => [b.booking_id, b]));
 
-    for (const b of bundle.bookings ?? []) {
-      const pay = b.payment_status ?? "unpaid";
-      const service = b.service_name || "a service";
-      const vendor = b.vendor_name || "the vendor";
-
-      // Money is held and the event is over — the client's confirm is the only
-      // thing between the vendor and their payout. Gated on the booking's LAST
-      // day, like the backend's event_confirmable_date.
-      if (pay === "paid" && !b.customer_confirmed_at && eventHasPassed(b.date_end || b.date_iso)) {
-        items.push({
-          id: `confirm-${b.booking_id}`,
-          title: `Confirm ${service} happened`,
-          detail: `${vendor} · ${where} — this releases their payment.`,
-          href,
-          cta: "Confirm",
-          tone: "urgent",
-        });
-        continue;
-      }
-
-      // Approved and waiting on payment. Mirrors the checkout guard: a total
-      // still pending a quantity can't be paid, so don't offer a Pay button.
-      if (b.status === "approved" && (pay === "unpaid" || pay === "processing")) {
-        if (b.price_pending_quantity) {
-          items.push({
-            id: `quantity-${b.booking_id}`,
-            title: `${service} needs a guest count or dates`,
-            detail: `${vendor} · ${where} — its total can't be worked out until then, so it can't be paid yet.`,
-            href,
-            cta: "View",
-            tone: "normal",
-          });
-        } else {
-          items.push({
-            id: `pay-${b.booking_id}`,
-            title: `Pay for ${service}`,
-            detail: `${vendor} · ${where}`,
-            href,
-            cta: `Pay ${money(b.price)}`,
-            tone: "normal",
-          });
-        }
-      }
+    for (const task of planForBundle(bundle).tasks) {
+      if (!ATTENTION_KINDS.includes(task.kind)) continue;
+      const booking = task.bookingId ? byId.get(task.bookingId) : undefined;
+      items.push({
+        id: task.id,
+        title: task.title,
+        detail: taskDetail(task, where),
+        href,
+        // The amount belongs on the button, and only planning's caller knows
+        // it's a button rather than a checklist line.
+        cta: task.kind === "payment" && booking ? `Pay ${money(booking.price)}` : task.cta,
+        tone: task.tone,
+      });
     }
   }
   return items;

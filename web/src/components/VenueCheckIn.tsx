@@ -15,24 +15,10 @@ import { useState } from "react";
 import { ApiError } from "@/lib/api";
 import { checkInBooking } from "@/lib/jorna";
 import { formatCheckInTime, type BundleBooking } from "@/lib/types";
+import { hasLiveVenue, isDeadBooking as isDead } from "@/lib/planning";
 import { Button, Card } from "@/components/ui";
 
-// Mirrors the backend's _live_venue_booking / _DEAD_* constants.
-const DEAD_STATUSES = ["rejected", "cancelled"];
-
-function isDead(b: BundleBooking): boolean {
-  return DEAD_STATUSES.includes(b.status) || (b.payment_status ?? "unpaid") === "refunded";
-}
-
-/**
- * Does the event still have a venue to check into? Mirrors the backend's
- * source of truth (the bundle's live venue booking) rather than any cached
- * coords — a rejected or refunded venue stops anchoring, and check-in 400s.
- * (A disputed venue still anchors, which falls out of the same rule.)
- */
-export function hasLiveVenue(bookings: BundleBooking[]): boolean {
-  return bookings.some((b) => b.service_category === "venue" && !isDead(b));
-}
+export { hasLiveVenue };
 
 /** The bookings worth telling "your client has arrived" — real engagements, not
  *  dead ones or requests a vendor hasn't accepted yet. */

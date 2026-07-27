@@ -4,7 +4,7 @@
 // (search/filter/browse, split out of the Home landing page — vendors don't
 // shop for other vendors, so it's client-only) and "Needs you".
 //
-//   Client: Home · Marketplace · Build · Bundles · Needs you · Messages · Profile
+//   Client: Home · Marketplace · Build · Planning · Needs you · Messages · Profile
 //   Vendor: Home · Bookings · Needs you · Messages · Profile
 //
 // Role is "has a vendor profile" (getMyVendor != null), the same signal iOS
@@ -73,7 +73,7 @@ const CLIENT_TABS: Tab[] = [
     match: ["/marketplace", "/vendor"],
   },
   { href: "/plan", label: "Build", icon: icon(I.build), match: ["/plan"] },
-  { href: "/bundles", label: "Bundles", icon: icon(I.bundles), match: ["/bundles", "/bundle", "/book", "/events", "/event"] },
+  { href: "/bundles", label: "Planning", icon: icon(I.bundles), match: ["/bundles", "/bundle", "/book", "/events", "/event"] },
   NEEDS_YOU,
   { href: "/messages", label: "Messages", icon: icon(I.messages), match: ["/messages"] },
   { href: "/profile", label: "Profile", icon: icon(I.profile), match: ["/profile"] },

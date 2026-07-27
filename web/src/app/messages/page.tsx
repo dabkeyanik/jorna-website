@@ -83,7 +83,7 @@ export default function MessagesPage() {
             No chats yet. A group chat opens once a bundle is confirmed.
           </p>
           <LinkButton href="/bundles" variant="ghost" className="mt-5">
-            Your bundles
+            Planning
           </LinkButton>
         </div>
       ) : (

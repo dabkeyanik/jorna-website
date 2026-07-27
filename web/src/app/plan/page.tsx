@@ -91,12 +91,17 @@ function PlanInner() {
     }
   }, [loading, user, router, celebration]);
 
-  const [location, setLocation] = useState("");
+  // Arriving from a celebration on the dashboard (/plan?date=&city=&guests=).
+  // Seeded in the initializers, like `needed` below, so the form is filled on
+  // the first paint. These only prefill: the generated bundle still creates its
+  // own event, because neither /chatbot/bundles nor PATCH /bundles takes an
+  // event_id to attach to an existing one.
+  const [location, setLocation] = useState(params.get("city") ?? "");
   // Set when a suggested city is picked, so we can send coordinates for
   // distance-based matching; null when the location was free-typed.
   const [coords, setCoords] = useState<Coords | null>(null);
-  const [eventDate, setEventDate] = useState("");
-  const [guests, setGuests] = useState("");
+  const [eventDate, setEventDate] = useState(params.get("date") ?? "");
+  const [guests, setGuests] = useState(params.get("guests") ?? "");
   const [budget, setBudget] = useState("mid-range");
   const [styles, setStyles] = useState<string[]>([]);
   // Seeded in the initializer rather than an effect, so an arriving celebration's
