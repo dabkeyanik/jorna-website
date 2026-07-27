@@ -321,6 +321,13 @@ export function listingHealth(opts: {
 // and optionally a date_end, so a multi-day job belongs to every day it covers
 // rather than only the one it started on.
 
+/**
+ * A day's state, matching the iOS calendar (VendorCalendarView.swift):
+ * approved and payment_confirmed read as booked, pending and
+ * negotiation_ongoing as tentative, rejected shows as nothing at all.
+ */
+export type DayStatus = "booked" | "tentative" | "free";
+
 export interface CalendarDay {
   dateIso: string;
   /** Day of the month, 1-31. */
@@ -329,7 +336,28 @@ export interface CalendarDay {
   inMonth: boolean;
   isToday: boolean;
   isPast: boolean;
+  status: DayStatus;
+  /** Busy in the vendor's connected Google Calendar, with nothing booked here. */
+  googleBusy: boolean;
   bookings: VendorBooking[];
+}
+
+/** iOS maps booking status onto the calendar's three states this way. */
+export function statusOfBooking(b: VendorBooking): DayStatus {
+  if (b.status === "approved" || b.status === "payment_confirmed") return "booked";
+  if (b.status === "pending" || b.status === "negotiation_ongoing") return "tentative";
+  return "free";
+}
+
+/** Booked wins over tentative on a day that holds both. */
+export function dayStatus(bookings: VendorBooking[]): DayStatus {
+  let seen: DayStatus = "free";
+  for (const b of bookings) {
+    const s = statusOfBooking(b);
+    if (s === "booked") return "booked";
+    if (s === "tentative") seen = "tentative";
+  }
+  return seen;
 }
 
 function isoOf(d: Date): string {
@@ -379,6 +407,8 @@ export function calendarMonth(
   bookings: VendorBooking[],
   year: number,
   month: number,
+  /** ISO days the vendor's Google Calendar reports as busy. */
+  googleBusyDays: Set<string> = new Set(),
 ): CalendarDay[] {
   const byDay = bookingsByDay(bookings);
   const todayIso = isoOf(new Date());
@@ -393,13 +423,19 @@ export function calendarMonth(
   // as you page through.
   for (let i = 0; i < 42; i++) {
     const iso = isoOf(cursor);
+    const dayBookings = byDay.get(iso) ?? [];
+    const status = dayStatus(dayBookings);
     days.push({
       dateIso: iso,
       day: cursor.getDate(),
       inMonth: cursor.getMonth() === month,
       isToday: iso === todayIso,
       isPast: iso < todayIso,
-      bookings: byDay.get(iso) ?? [],
+      status,
+      // Only worth saying when nothing of Jorna's own is on that day; a booked
+      // day is already accounted for.
+      googleBusy: status === "free" && googleBusyDays.has(iso),
+      bookings: dayBookings,
     });
     cursor.setDate(cursor.getDate() + 1);
   }

@@ -1,31 +1,42 @@
 "use client";
 
-// The vendor's calendar: a month of their bookings, and what's coming next.
+// The vendor's calendar, following the iOS one
+// (front_end_desiconnect/Jorna/Jorna/NavigationFlow/VendorCalendarView.swift and
+// docs/VENDOR_CALENDAR_IMPLEMENTATION.md): a month grid and a year overview, days
+// tinted by state, today ringed, a selected day filled, and a legend.
+//
+// The three states are iOS's, mapped from booking status in lib/vendorPlan:
+// approved and payment_confirmed read as booked, pending and negotiation_ongoing
+// as tentative, rejected shows as nothing. iOS colours them red / orange / green;
+// this palette has no red or orange, so booked is maroon and tentative gold —
+// the same severity order in the colours the app actually has.
+//
+// Google-busy days come from the vendor's own availability endpoint and, as on
+// iOS, the legend only mentions Google when a calendar is actually connected.
 //
 // It takes the slot "Hours" used to hold in the seller nav. Weekly hours still
-// exist and still matter — they're what a host filtering by a date is matched
-// against — so this links through to them rather than dropping them; the
-// summary here says at a glance whether any are set.
-//
-// A booking spanning several days appears on each of them (see bookingsByDay),
-// because a three-day marquee hire is three days of work, not one.
+// matter — they're what a host filtering by a date is matched against — so this
+// links through to them rather than dropping them.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { getMyAvailability, getMyVendor, listVendorBookings } from "@/lib/jorna";
+import {
+  getMyAvailability,
+  getMyVendor,
+  getVendorAvailability,
+  listVendorBookings,
+} from "@/lib/jorna";
 import {
   calendarMonth,
+  dayStatus,
   vendorJobs,
   type CalendarDay,
+  type DayStatus,
   type VendorJob,
 } from "@/lib/vendorPlan";
-import {
-  WEEKDAYS,
-  type AvailabilitySlot,
-  type VendorBooking,
-} from "@/lib/types";
+import { WEEKDAYS, type AvailabilitySlot, type VendorBooking } from "@/lib/types";
 import { Button, Card, LinkButton } from "@/components/ui";
 import { VendorNav } from "@/components/VendorNav";
 
@@ -33,6 +44,26 @@ const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+
+/**
+ * iOS: red booked, orange tentative, green available. This palette has no red or
+ * orange, so booked is maroon and tentative gold.
+ *
+ * Both hold in dark mode too, deliberately: maroon lightens to #8A1B34 there and
+ * gold to #E0B457, which stay two distinct hues. An earlier pass mapped booked to
+ * gold in dark for contrast, and the legend then showed two identical dots
+ * against different labels.
+ */
+const DOT: Record<DayStatus, string> = {
+  booked: "bg-maroon",
+  tentative: "bg-gold",
+  free: "bg-green/50",
+};
+const TINT: Record<DayStatus, string> = {
+  booked: "bg-maroon/20",
+  tentative: "bg-gold/15",
+  free: "",
+};
 
 function clock(raw?: string | null): string | null {
   if (!raw) return null;
@@ -48,11 +79,26 @@ function prettyDate(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
   return Number.isNaN(d.getTime())
     ? iso
-    : d.toLocaleDateString(undefined, {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-      });
+    : d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+}
+
+function Legend({ google }: { google: boolean }) {
+  const items: [string, string][] = [
+    ["Available", "bg-green/40"],
+    ["Tentative", "bg-gold"],
+    ["Booked", "bg-maroon"],
+  ];
+  if (google) items.push(["Google", "bg-ink-faint"]);
+  return (
+    <div className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 border-t border-line-soft pt-4">
+      {items.map(([label, dot]) => (
+        <span key={label} className="flex items-center gap-1.5 text-xs text-ink-faint">
+          <span aria-hidden="true" className={`size-2 rounded-full ${dot}`} />
+          {label}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function DayCell({
@@ -64,43 +110,76 @@ function DayCell({
   selected: boolean;
   onSelect: (iso: string) => void;
 }) {
-  const has = day.bookings.length > 0;
+  const marked = day.status !== "free" || day.googleBusy;
   return (
     <button
       type="button"
       onClick={() => onSelect(day.dateIso)}
       aria-current={day.isToday ? "date" : undefined}
-      aria-label={`${day.dateIso}${has ? `, ${day.bookings.length} booked` : ""}`}
-      className={`flex aspect-square flex-col items-center justify-start gap-1 rounded-lg p-1.5 transition sm:p-2 ${
-        selected
-          ? "bg-maroon text-ground dark:bg-gold dark:text-[#2A0C19]"
-          : day.isToday
-            ? "bg-gold/15 text-ink"
-            : has
-              ? "bg-panel text-ink hover:bg-gold/10"
-              : "text-ink-faint hover:bg-panel"
-      } ${day.inMonth ? "" : "opacity-35"} ${day.isPast && !selected ? "opacity-60" : ""}`}
+      aria-label={`${day.dateIso}${day.status !== "free" ? `, ${day.status}` : ""}`}
+      className={`flex h-11 items-center justify-center ${day.inMonth ? "" : "opacity-40"}`}
     >
       <span
-        className={`text-xs tabular-nums sm:text-sm ${
-          day.isToday && !selected ? "font-bold" : ""
-        }`}
+        className={`relative flex size-9 items-center justify-center rounded-full text-sm tabular-nums transition ${
+          selected
+            ? "bg-maroon font-semibold text-ground dark:bg-gold dark:text-[#2A0C19]"
+            : `${day.googleBusy ? "bg-ink-faint/15" : TINT[day.status]} text-ink hover:bg-gold/10`
+        } ${day.isToday && !selected ? "font-bold ring-2 ring-inset ring-gold" : ""}`}
       >
         {day.day}
+        {marked && !selected ? (
+          <span
+            aria-hidden="true"
+            className={`absolute -bottom-0.5 size-1 rounded-full ${
+              day.googleBusy && day.status === "free" ? "bg-ink-faint" : DOT[day.status]
+            }`}
+          />
+        ) : null}
       </span>
-      {has ? (
-        <span className="flex flex-wrap justify-center gap-0.5">
-          {day.bookings.slice(0, 3).map((b, i) => (
-            <span
-              key={i}
-              aria-hidden="true"
-              className={`size-1.5 rounded-full ${
-                selected ? "bg-ground dark:bg-[#2A0C19]" : "bg-gold"
-              }`}
-            />
-          ))}
-        </span>
-      ) : null}
+    </button>
+  );
+}
+
+/** A month at a glance — one dot per day, as iOS's MiniDayCell does. */
+function MiniMonth({
+  year,
+  month,
+  bookings,
+  googleBusy,
+  onOpen,
+}: {
+  year: number;
+  month: number;
+  bookings: VendorBooking[];
+  googleBusy: Set<string>;
+  onOpen: (month: number) => void;
+}) {
+  const days = useMemo(
+    () => calendarMonth(bookings, year, month, googleBusy).filter((d) => d.inMonth),
+    [bookings, year, month, googleBusy],
+  );
+  const busy = days.filter((d) => d.status !== "free").length;
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(month)}
+      className="rounded-xl border border-card-edge bg-card p-3 text-left transition hover:border-gold/60"
+    >
+      <p className="text-sm font-semibold text-ink">{MONTHS[month]}</p>
+      <p className="text-[0.68rem] text-ink-faint">
+        {busy === 0 ? "Free" : `${busy} ${busy === 1 ? "day" : "days"}`}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-[3px]">
+        {days.map((d) => (
+          <span
+            key={d.dateIso}
+            aria-hidden="true"
+            className={`size-1.5 rounded-full ${
+              d.googleBusy && d.status === "free" ? "bg-ink-faint/60" : DOT[d.status]
+            }`}
+          />
+        ))}
+      </div>
     </button>
   );
 }
@@ -109,14 +188,18 @@ export default function VendorCalendarPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
+  const [vendorId, setVendorId] = useState<string | null>(null);
   const [bookings, setBookings] = useState<VendorBooking[]>([]);
   const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
+  const [googleBusy, setGoogleBusy] = useState<Set<string>>(new Set());
+  const [googleConnected, setGoogleConnected] = useState(false);
   const [notVendor, setNotVendor] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const today = useMemo(() => new Date(), []);
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
+  const [view, setView] = useState<"month" | "year">("month");
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
@@ -145,6 +228,7 @@ export default function VendorCalendarPage() {
         setLoading(false);
         return;
       }
+      setVendorId(snap.vendor.vendor_id);
       setBookings(snap.bookings ?? []);
       setAvailability(snap.availability ?? []);
       setLoading(false);
@@ -154,9 +238,32 @@ export default function VendorCalendarPage() {
     };
   }, [fetchAll]);
 
+  // Google-busy days for the year on show. Its own effect because it depends on
+  // the year, and a failure only costs the fourth legend entry.
+  useEffect(() => {
+    if (!vendorId) return;
+    let cancelled = false;
+    getVendorAvailability(vendorId, `${year}-01-01`, `${year}-12-31`)
+      .then((a) => {
+        if (cancelled) return;
+        setGoogleConnected(Boolean(a.google_calendar_connected));
+        const days = new Set<string>();
+        for (const slot of a.google_busy_times ?? []) {
+          const s = slot as { start?: unknown; start_time?: unknown };
+          const start = typeof s.start === "string" ? s.start : s.start_time;
+          if (typeof start === "string" && start.length >= 10) days.add(start.slice(0, 10));
+        }
+        setGoogleBusy(days);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [vendorId, year]);
+
   const days = useMemo(
-    () => calendarMonth(bookings, year, month),
-    [bookings, year, month],
+    () => calendarMonth(bookings, year, month, googleBusy),
+    [bookings, year, month, googleBusy],
   );
   const upcoming = useMemo(() => vendorJobs(bookings), [bookings]);
   const selectedDay = selected ? days.find((d) => d.dateIso === selected) : undefined;
@@ -186,103 +293,171 @@ export default function VendorCalendarPage() {
     );
   }
 
-  const bookedThisMonth = days.filter((d) => d.inMonth && d.bookings.length > 0).length;
+  const withWork = days.filter((d) => d.inMonth && d.status !== "free").length;
 
   return (
     <div className="mx-auto w-[min(880px,100%-2rem)] py-10">
-      <header>
-        <span className="eyebrow">Vendor</span>
-        <h1 className="serif mt-1 text-4xl text-maroon dark:text-gold">Calendar</h1>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <span className="eyebrow">Vendor</span>
+          <h1 className="serif mt-1 text-4xl text-maroon dark:text-gold">Calendar</h1>
+        </div>
+        {/* iOS toggles the same two modes. */}
+        <div className="flex gap-1 rounded-full border border-card-edge p-1">
+          {(["month", "year"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setView(v)}
+              className={`rounded-full px-3.5 py-1 text-sm font-semibold capitalize transition ${
+                view === v
+                  ? "bg-maroon text-ground dark:bg-gold dark:text-[#2A0C19]"
+                  : "text-ink-soft hover:text-ink"
+              }`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
       </header>
 
       <div className="mt-6">
         <VendorNav />
       </div>
 
-      {/* ── The month ── */}
       <Card className="p-4 sm:p-5">
         <div className="flex items-center justify-between gap-3">
-          <Button variant="ghost" size="md" onClick={() => step(-1)}>
+          <Button
+            variant="ghost"
+            size="md"
+            onClick={() => (view === "month" ? step(-1) : setYear(year - 1))}
+          >
             ←
           </Button>
           <div className="text-center">
             <h2 className="serif text-xl text-ink">
-              {MONTHS[month]} {year}
+              {view === "month" ? `${MONTHS[month]} ${year}` : year}
             </h2>
-            <p className="text-xs text-ink-faint">
-              {bookedThisMonth === 0
-                ? "Nothing booked this month"
-                : `${bookedThisMonth} ${bookedThisMonth === 1 ? "day" : "days"} booked`}
-            </p>
+            {view === "month" ? (
+              <p className="text-xs text-ink-faint">
+                {withWork === 0
+                  ? "Nothing on this month"
+                  : `${withWork} ${withWork === 1 ? "day" : "days"} with work`}
+              </p>
+            ) : null}
           </div>
-          <Button variant="ghost" size="md" onClick={() => step(1)}>
+          <Button
+            variant="ghost"
+            size="md"
+            onClick={() => (view === "month" ? step(1) : setYear(year + 1))}
+          >
             →
           </Button>
         </div>
 
-        <div className="mt-4 grid grid-cols-7 gap-1">
-          {WEEKDAYS.map((d) => (
-            <p
-              key={d}
-              className="pb-1 text-center text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-ink-faint"
-            >
-              {d.slice(0, 3)}
-            </p>
-          ))}
-          {days.map((d) => (
-            <DayCell
-              key={d.dateIso}
-              day={d}
-              selected={selected === d.dateIso}
-              onSelect={(iso) => setSelected(iso === selected ? null : iso)}
-            />
-          ))}
-        </div>
-
-        {selectedDay ? (
-          <div className="mt-4 border-t border-line-soft pt-4">
-            <p className="text-sm font-semibold text-ink">
-              {prettyDate(selectedDay.dateIso)}
-            </p>
-            {selectedDay.bookings.length === 0 ? (
-              <p className="mt-1 text-sm text-ink-soft">Nothing booked.</p>
-            ) : (
-              <ul className="mt-2 grid gap-2">
-                {selectedDay.bookings.map((b) => (
-                  <li
-                    key={b.booking_id}
-                    className="rounded-xl bg-panel px-3 py-2.5 text-sm"
-                  >
-                    <p className="font-medium text-ink">
-                      {b.service_name || "Service"}
-                      {b.client_name ? (
-                        <span className="font-normal text-ink-soft">
-                          {" "}
-                          · {b.client_name}
-                        </span>
-                      ) : null}
-                    </p>
-                    <p className="text-xs text-ink-faint">
-                      {[
-                        clock(b.time_start)
-                          ? `${clock(b.time_start)}${
-                              clock(b.time_end) ? ` – ${clock(b.time_end)}` : ""
-                            }`
-                          : null,
-                        b.location,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || "No time set"}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
+        {view === "year" ? (
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            {MONTHS.map((_, i) => (
+              <MiniMonth
+                key={i}
+                year={year}
+                month={i}
+                bookings={bookings}
+                googleBusy={googleBusy}
+                onOpen={(m) => {
+                  setMonth(m);
+                  setView("month");
+                  setSelected(null);
+                }}
+              />
+            ))}
           </div>
-        ) : null}
+        ) : (
+          <>
+            <div className="mt-4 grid grid-cols-7 gap-y-1">
+              {WEEKDAYS.map((d) => (
+                <p
+                  key={d}
+                  className="pb-1 text-center text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-ink-faint"
+                >
+                  {d.slice(0, 3)}
+                </p>
+              ))}
+              {days.map((d) => (
+                <DayCell
+                  key={d.dateIso}
+                  day={d}
+                  selected={selected === d.dateIso}
+                  onSelect={(iso) => setSelected(iso === selected ? null : iso)}
+                />
+              ))}
+            </div>
+
+            {selectedDay ? (
+              <div className="mt-4 border-t border-line-soft pt-4">
+                <p className="text-sm font-semibold text-ink">
+                  {prettyDate(selectedDay.dateIso)}
+                </p>
+                {selectedDay.bookings.length === 0 ? (
+                  <p className="mt-1 text-sm text-ink-soft">
+                    {selectedDay.googleBusy
+                      ? "Busy in your Google Calendar. Nothing booked through Jorna."
+                      : "Nothing booked."}
+                  </p>
+                ) : (
+                  <ul className="mt-2 grid gap-2">
+                    {selectedDay.bookings.map((b) => {
+                      const booked = dayStatus([b]) === "booked";
+                      return (
+                        <li
+                          key={b.booking_id}
+                          className="rounded-xl bg-panel px-3 py-2.5 text-sm"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-medium text-ink">
+                              {b.service_name || "Service"}
+                              {b.client_name ? (
+                                <span className="font-normal text-ink-soft">
+                                  {" "}
+                                  · {b.client_name}
+                                </span>
+                              ) : null}
+                            </p>
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-[0.68rem] font-medium ${
+                                booked
+                                  ? "bg-maroon/12 text-maroon dark:bg-gold/15 dark:text-gold"
+                                  : "bg-gold/15 text-gold"
+                              }`}
+                            >
+                              {booked ? "Booked" : "Tentative"}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 text-xs text-ink-faint">
+                            {[
+                              clock(b.time_start)
+                                ? `${clock(b.time_start)}${
+                                    clock(b.time_end) ? ` – ${clock(b.time_end)}` : ""
+                                  }`
+                                : null,
+                              b.location,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ") || "No time set"}
+                          </p>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            ) : null}
+          </>
+        )}
+
+        <Legend google={googleConnected} />
       </Card>
 
-      {/* ── What's coming ── */}
       <section className="mt-8">
         <h2 className="eyebrow mb-3">Upcoming</h2>
         {upcoming.length === 0 ? (
@@ -317,10 +492,7 @@ export default function VendorCalendarPage() {
                     prettyDate(job.dateIso)
                   )}
                   {clock(job.booking.time_start) ? (
-                    <span className="text-ink-faint">
-                      {" "}
-                      · {clock(job.booking.time_start)}
-                    </span>
+                    <span className="text-ink-faint"> · {clock(job.booking.time_start)}</span>
                   ) : null}
                 </p>
               </div>
@@ -329,9 +501,8 @@ export default function VendorCalendarPage() {
         )}
       </section>
 
-      {/* ── Weekly hours ──
-          Not shown in the nav any more, but still the thing a host filtering by
-          a date is matched against, so it keeps a way in from here. */}
+      {/* Not in the nav any more, but still what a host filtering by a date is
+          matched against, so it keeps a way in from here. */}
       <section className="mt-8">
         <h2 className="eyebrow mb-3">Weekly hours</h2>
         <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
