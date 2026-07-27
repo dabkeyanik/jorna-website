@@ -331,27 +331,18 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
         </ul>
       ) : null}
 
-      <div className="mt-5 flex flex-wrap gap-2">
+      {/* One way in. This card used to offer "Open plan" and "Event details"
+          side by side, which asked you to guess which held what — the plan now
+          carries the event's details too, so there's one door. A celebration
+          with several bundles opens the first; the plan links the rest. */}
+      <div className="mt-5">
         {bundles.length === 0 ? (
           // Prefill only — the builder can't attach to an existing event, so
           // this carries the details across rather than pretending to link.
           <LinkButton href={`/plan${buildQuery(celebration)}`}>Build a bundle</LinkButton>
         ) : (
-          bundles.map((b) => (
-            <LinkButton
-              key={b.bundle_id}
-              href={`/bundle?id=${b.bundle_id}`}
-              variant={bundles.length === 1 ? "primary" : "ghost"}
-            >
-              {bundles.length === 1 ? "Open plan" : b.name || "Bundle"}
-            </LinkButton>
-          ))
+          <LinkButton href={`/bundle?id=${bundles[0].bundle_id}`}>Open plan</LinkButton>
         )}
-        {celebration.event ? (
-          <LinkButton href={`/event?id=${celebration.event.event_id}`} variant="ghost">
-            Event details
-          </LinkButton>
-        ) : null}
       </div>
     </Card>
   );

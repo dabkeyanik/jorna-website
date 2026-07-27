@@ -9,9 +9,12 @@ import {
   confirmBookingEvent,
   createCheckoutSession,
   deleteBundle,
+  deleteEvent,
   disputeBooking,
   getBundle,
   refundBooking,
+  listBundles,
+  listEvents,
   removeBookingFromBundle,
   renameBundle,
   updateEvent,
@@ -33,12 +36,22 @@ import {
   type BundleDetail,
   type BundleEventInfo,
   type EventCreateInput,
+  type EventItem,
 } from "@/lib/types";
 import { moneyForBundle, planForBundle, taskDetail } from "@/lib/planning";
 import { Avatar, Button, Card, Field, LinkButton } from "@/components/ui";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
+}
+
+/** "2026-08-08" → "8 Aug 2026". Raw ISO reads like a database row. */
+function prettyDate(iso?: string | null): string | null {
+  if (!iso || iso === "TBD") return null;
+  const d = new Date(`${iso}T00:00:00`);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
 type PanelKind = "refund" | "dispute" | "remove";
@@ -321,35 +334,71 @@ function Detail({ label, value, muted }: { label: string; value: string; muted?:
 }
 
 /**
- * Edit the event's general details — date, location, guest count. These are
- * event-level metadata (the Event, back-filled for every bundle); per-vendor
- * dates/quantities that drive pricing stay on each booking. Only non-empty
- * fields are sent (PATCH is exclude_unset), so saving never blanks a value.
+ * The celebration behind this bundle — everything the event records, in one
+ * place, editable.
+ *
+ * It used to show date, location and guests only, because that's all a bundle's
+ * embedded `event` summary carries; budget, description, and what the host said
+ * they needed lived on a separate /event page reached by a second button. The
+ * dashboard now opens straight here, so the full event is loaded alongside and
+ * shown together.
+ *
+ * `full` is the real EventItem when it could be fetched (there is no
+ * GET /events/{id} — the list is the source), and null when it couldn't. The
+ * summary always exists, so the panel degrades to what it always showed rather
+ * than to nothing.
+ *
+ * Only non-empty fields are sent (PATCH is exclude_unset), so saving never
+ * blanks a value.
  */
-function EventDetailsEditor({
-  event,
+function CelebrationPanel({
+  summary,
+  full,
   onSaved,
 }: {
-  event: BundleEventInfo;
+  summary: BundleEventInfo;
+  full: EventItem | null;
   onSaved: () => void | Promise<void>;
 }) {
-  const hasDate = Boolean(event.date_iso && event.date_iso !== "TBD");
+  const dateIso = full?.date_iso ?? summary.date_iso;
+  const hasDate = Boolean(dateIso && dateIso !== "TBD");
+  const location = full?.location ?? summary.location;
+  const guestCount = full?.guest_count ?? summary.guest_count;
+  const budget = full?.budget ?? null;
+
   const [editing, setEditing] = useState(false);
-  const [date, setDate] = useState(hasDate ? (event.date_iso as string) : "");
-  const [location, setLocation] = useState(event.location ?? "");
-  const [guests, setGuests] = useState(event.guest_count != null ? String(event.guest_count) : "");
+  const [date, setDate] = useState(hasDate ? (dateIso as string) : "");
+  const [place, setPlace] = useState(location ?? "");
+  const [guests, setGuests] = useState(guestCount != null ? String(guestCount) : "");
+  const [spend, setSpend] = useState(budget != null ? String(budget) : "");
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function remove() {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteEvent(summary.event_id);
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't delete this celebration.");
+    } finally {
+      setBusy(false);
+      setConfirming(false);
+    }
+  }
 
   async function save() {
     setBusy(true);
     setError(null);
     const updates: Partial<EventCreateInput> = {};
     if (date) updates.date_iso = date;
-    if (location.trim()) updates.location = location.trim();
+    if (place.trim()) updates.location = place.trim();
     if (guests) updates.guest_count = Number(guests);
+    if (spend) updates.budget = Number(spend);
     try {
-      if (Object.keys(updates).length > 0) await updateEvent(event.event_id, updates);
+      if (Object.keys(updates).length > 0) await updateEvent(summary.event_id, updates);
       setEditing(false);
       await onSaved();
     } catch (err) {
@@ -359,58 +408,127 @@ function EventDetailsEditor({
     }
   }
 
-  if (!editing) {
+  if (editing) {
     return (
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-card-edge bg-card p-4">
-        <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
-          <Detail label="Date" value={hasDate ? (event.date_iso as string) : "Not set"} muted={!hasDate} />
-          <Detail label="Location" value={event.location || "Not set"} muted={!event.location} />
-          <Detail
+      <div className="mt-4 rounded-2xl border border-card-edge bg-card p-4">
+        <p className="mb-3 text-sm font-medium text-ink-soft">Your celebration</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <CityCombobox
+            label="Location"
+            placeholder="Start typing a city…"
+            value={place}
+            onChange={(v) => setPlace(v)}
+          />
+          <Field
             label="Guests"
-            value={event.guest_count != null ? String(event.guest_count) : "Not set"}
-            muted={event.guest_count == null}
+            type="number"
+            min={1}
+            placeholder="200"
+            value={guests}
+            onChange={(e) => setGuests(e.target.value)}
+          />
+          <Field
+            label="Budget"
+            type="number"
+            min={0}
+            placeholder="40000"
+            hint="What you're aiming to spend across every vendor."
+            value={spend}
+            onChange={(e) => setSpend(e.target.value)}
           />
         </div>
-        <Button variant="ghost" size="md" onClick={() => setEditing(true)}>
-          Edit details
-        </Button>
+        {error ? (
+          <p className="mt-3 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
+            {error}
+          </p>
+        ) : null}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button size="md" disabled={busy} onClick={save}>
+            {busy ? "Saving…" : "Save details"}
+          </Button>
+          <Button variant="ghost" size="md" onClick={() => setEditing(false)}>
+            Cancel
+          </Button>
+          {/* Carried over from the old /event page rather than dropped with it.
+              Tucked inside the editor: it's rare, and it sits near a Delete
+              bundle that means something quite different. */}
+          {!confirming ? (
+            <Button variant="quiet" size="md" onClick={() => setConfirming(true)}>
+              Delete celebration
+            </Button>
+          ) : null}
+        </div>
+
+        {confirming ? (
+          <div className="mt-3 rounded-xl bg-panel p-3">
+            <p className="text-sm text-ink-soft">
+              Delete this celebration? Your bundles and bookings aren&apos;t deleted —
+              they just stop being grouped under it.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <Button size="md" disabled={busy} onClick={remove}>
+                {busy ? "Deleting…" : "Delete celebration"}
+              </Button>
+              <Button variant="ghost" size="md" onClick={() => setConfirming(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </div>
     );
   }
 
   return (
     <div className="mt-4 rounded-2xl border border-card-edge bg-card p-4">
-      <p className="mb-3 text-sm font-medium text-ink-soft">Event details</p>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Event date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        <CityCombobox
-          label="Location"
-          placeholder="Start typing a city…"
-          value={location}
-          onChange={(v) => setLocation(v)}
-        />
-        <Field
-          label="Guests"
-          type="number"
-          min={1}
-          placeholder="200"
-          value={guests}
-          onChange={(e) => setGuests(e.target.value)}
-        />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
+          <Detail
+            label="Date"
+            value={prettyDate(dateIso) ?? "Not set"}
+            muted={!hasDate}
+          />
+          <Detail label="Location" value={location || "Not set"} muted={!location} />
+          <Detail
+            label="Guests"
+            value={guestCount != null ? String(guestCount) : "Not set"}
+            muted={guestCount == null}
+          />
+          <Detail
+            label="Budget"
+            value={budget != null ? money(budget) : "Not set"}
+            muted={budget == null}
+          />
+        </div>
+        <Button variant="ghost" size="md" onClick={() => setEditing(true)}>
+          Edit details
+        </Button>
       </div>
-      {error ? (
-        <p className="mt-3 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
-          {error}
+
+      {full?.description ? (
+        <p className="mt-4 border-t border-line-soft pt-3 text-sm text-ink-soft">
+          {full.description}
         </p>
       ) : null}
-      <div className="mt-3 flex gap-2">
-        <Button size="md" disabled={busy} onClick={save}>
-          {busy ? "Saving…" : "Save details"}
-        </Button>
-        <Button variant="ghost" size="md" onClick={() => setEditing(false)}>
-          Cancel
-        </Button>
-      </div>
+
+      {full?.services_needed?.length ? (
+        <div className="mt-4 border-t border-line-soft pt-3">
+          <p className="text-[0.64rem] uppercase tracking-[0.14em] text-ink-faint">
+            You said you needed
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {full.services_needed.map((c) => (
+              <span
+                key={c}
+                className="rounded-full border border-card-edge bg-ground-2 px-2.5 py-0.5 text-xs text-ink-soft"
+              >
+                {categoryLabel(c)}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -422,6 +540,10 @@ function BundleInner() {
   const bundleId = params.get("id");
 
   const [bundle, setBundle] = useState<BundleDetail | null>(null);
+  // The event in full, and any other bundles filed under it. Both are extras:
+  // the page works without either, so a failure here doesn't block the plan.
+  const [event, setEvent] = useState<EventItem | null>(null);
+  const [siblings, setSiblings] = useState<BundleDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -442,7 +564,25 @@ function BundleInner() {
   const load = useCallback(async () => {
     if (!bundleId || !user) return;
     try {
-      setBundle(await getBundle(bundleId));
+      const detail = await getBundle(bundleId);
+      setBundle(detail);
+
+      // There is no GET /events/{id}, so the list is the source of the event's
+      // full record — budget, description, and what they said they needed, none
+      // of which the bundle's embedded summary carries.
+      const eventId = detail.event_id ?? detail.event?.event_id ?? null;
+      if (eventId) {
+        void listEvents()
+          .then((all) => setEvent(all.find((e) => e.event_id === eventId) ?? null))
+          .catch(() => {});
+        void listBundles()
+          .then((all) =>
+            setSiblings(
+              all.filter((b) => b.bundle_id !== detail.bundle_id && b.event_id === eventId),
+            ),
+          )
+          .catch(() => {});
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't load this bundle.");
     } finally {
@@ -616,9 +756,19 @@ function BundleInner() {
           </div>
         ) : (
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <h1 className="serif text-4xl text-maroon dark:text-gold">
-              {bundle.event_name || bundle.name}
-            </h1>
+            {/* The celebration leads. You arrive here from a card headed
+                "Priya & Arjun's Wedding", and landing on a page titled with the
+                bundle's own name ("Balanced") reads as somewhere else. The
+                bundle's name is kept underneath when it says something the
+                celebration's doesn't. */}
+            <div className="min-w-0">
+              <h1 className="serif text-4xl text-maroon dark:text-gold">
+                {event?.name || bundle.event_name || bundle.name}
+              </h1>
+              {bundle.name && bundle.name !== (event?.name || bundle.event_name) ? (
+                <p className="mt-1 text-sm text-ink-faint">{bundle.name}</p>
+              ) : null}
+            </div>
             <div className="flex shrink-0 gap-2">
               <Button
                 variant="ghost"
@@ -628,14 +778,14 @@ function BundleInner() {
                   setRenaming(true);
                 }}
               >
-                Rename
+                Rename bundle
               </Button>
               <Button
                 variant="quiet"
                 size="md"
                 onClick={() => setConfirmDelete(true)}
               >
-                Delete
+                Delete bundle
               </Button>
             </div>
           </div>
@@ -729,7 +879,27 @@ function BundleInner() {
         </div>
       </header>
 
-      {bundle.event ? <EventDetailsEditor event={bundle.event} onSaved={load} /> : null}
+      {bundle.event ? (
+        <CelebrationPanel summary={bundle.event} full={event} onSaved={load} />
+      ) : null}
+
+      {/* The dashboard opens the first bundle, so any others under the same
+          celebration would otherwise be unreachable from here. */}
+      {siblings.length > 0 ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-ink-faint">Also under this celebration:</span>
+          {siblings.map((b) => (
+            <Link
+              key={b.bundle_id}
+              href={`/bundle?id=${b.bundle_id}`}
+              className="rounded-full border border-card-edge px-3 py-1 text-ink-soft transition hover:border-gold/60 hover:text-ink"
+            >
+              {b.name || "Bundle"} · {b.booking_count}{" "}
+              {b.booking_count === 1 ? "vendor" : "vendors"}
+            </Link>
+          ))}
+        </div>
+      ) : null}
 
       {notice ? (
         <p className="mt-6 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
