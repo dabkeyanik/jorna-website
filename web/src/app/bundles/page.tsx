@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { createEvent, listBundles, listEvents } from "@/lib/jorna";
 import {
+  compareByDate,
   missingCategories,
   moneyForBundle,
   planForBundle,
@@ -166,15 +167,12 @@ function toCelebrations(events: EventItem[], bundles: BundleDetail[]): Celebrati
     entry.missing = missingCategories(entry.event?.services_needed, entry.bundles);
   }
 
-  // Soonest first; undated last, since there's nothing to count down to.
-  return [...byKey.values()].sort((a, b) => {
-    const da = daysAway(a.dateIso);
-    const db = daysAway(b.dateIso);
-    if (da == null && db == null) return a.name.localeCompare(b.name);
-    if (da == null) return 1;
-    if (db == null) return -1;
-    return da - db;
-  });
+  // Upcoming first, soonest at the top; then finished, most recent first; then
+  // undated. See compareByDate — a plain ascending sort put last year's wedding
+  // above the one three weeks away.
+  return [...byKey.values()].sort(
+    (a, b) => compareByDate(a.dateIso, b.dateIso) || a.name.localeCompare(b.name),
+  );
 }
 
 /** Carry what's known about a celebration into the builder's form. */

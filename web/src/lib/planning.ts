@@ -126,6 +126,32 @@ export function daysUntil(iso?: string | null): number | null {
 }
 
 /**
+ * Order celebrations by date, anchored on today.
+ *
+ * Upcoming first, soonest at the top; then finished ones, most recent first;
+ * then anything undated, since there is nothing to place it against. A plain
+ * ascending sort on the date reads as "date order" but puts last year's wedding
+ * above the one three weeks out, which is the wrong end of the list to be
+ * looking at on a planning screen.
+ *
+ * Returns a comparator result; ties fall through to the caller.
+ */
+export function compareByDate(aIso?: string | null, bIso?: string | null): number {
+  const a = daysUntil(aIso);
+  const b = daysUntil(bIso);
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+
+  const aPast = a < 0;
+  const bPast = b < 0;
+  if (aPast !== bPast) return aPast ? 1 : -1;
+  // Upcoming: soonest first. Past: most recent first — so both read as
+  // "closest to now at the top".
+  return aPast ? b - a : a - b;
+}
+
+/**
  * How close the event has to be before an outstanding task counts as urgent.
  *
  * The same unpaid booking is background noise three months out and a real
