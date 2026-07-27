@@ -166,8 +166,8 @@ function VendorInner() {
     return (
       <div className="py-20 text-center">
         <p className="text-ink-soft">{error ?? "Vendor not found."}</p>
-        <LinkButton href="/browse" variant="ghost" className="mt-5">
-          Back to browse
+        <LinkButton href="/marketplace" variant="ghost" className="mt-5">
+          Back to marketplace
         </LinkButton>
       </div>
     );
@@ -196,8 +196,8 @@ function VendorInner() {
 
   return (
     <div className="mx-auto w-[min(1080px,100%-2rem)] py-10">
-      <Link href="/browse" className="text-sm text-ink-soft hover:text-ink">
-        ← Back to browse
+      <Link href="/marketplace" className="text-sm text-ink-soft hover:text-ink">
+        ← Back to marketplace
       </Link>
 
       {/* Hero */}

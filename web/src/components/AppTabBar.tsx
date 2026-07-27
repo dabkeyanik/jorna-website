@@ -1,8 +1,10 @@
 "use client";
 
-// Bottom tab bar mirroring the iOS app, plus a web-only "Needs you" tab.
+// Bottom tab bar mirroring the iOS app, plus two web-only tabs: "Marketplace"
+// (search/filter/browse, split out of the Home landing page — vendors don't
+// shop for other vendors, so it's client-only) and "Needs you".
 //
-//   Client: Home · Build · Bundles · Needs you · Messages · Profile
+//   Client: Home · Marketplace · Build · Bundles · Needs you · Messages · Profile
 //   Vendor: Home · Bookings · Needs you · Messages · Profile
 //
 // Role is "has a vendor profile" (getMyVendor != null), the same signal iOS
@@ -29,6 +31,9 @@ const I = {
     <path d="M12 3l1.8 4.7L18.5 9l-4.7 1.3L12 15l-1.8-4.7L5.5 9l4.7-1.3L12 3ZM18 14l.9 2.1 2.1.9-2.1.9L18 20l-.9-2.1L15 17l2.1-.9L18 14Z" />
   ),
   bundles: <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3Zm0 0v18M4 7.5l8 4.5 8-4.5" />,
+  marketplace: (
+    <path d="M4 9.5 5.5 4h13L20 9.5M4 9.5v9.5h16V9.5M4 9.5a2.5 2.5 0 0 0 5 0M9 9.5a2.5 2.5 0 0 0 5 0M14 9.5a2.5 2.5 0 0 0 5 0" />
+  ),
   calendar: (
     <path d="M4 6.5h16v14H4v-14ZM4 10h16M8 3v4M16 3v4" />
   ),
@@ -60,7 +65,13 @@ const NEEDS_YOU: Tab = {
 };
 
 const CLIENT_TABS: Tab[] = [
-  { href: "/browse", label: "Home", icon: icon(I.home), match: ["/browse", "/vendor"] },
+  { href: "/browse", label: "Home", icon: icon(I.home), match: ["/browse"] },
+  {
+    href: "/marketplace",
+    label: "Marketplace",
+    icon: icon(I.marketplace),
+    match: ["/marketplace", "/vendor"],
+  },
   { href: "/plan", label: "Build", icon: icon(I.build), match: ["/plan"] },
   { href: "/bundles", label: "Bundles", icon: icon(I.bundles), match: ["/bundles", "/bundle", "/book", "/events", "/event"] },
   NEEDS_YOU,

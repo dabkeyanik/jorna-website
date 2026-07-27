@@ -83,8 +83,8 @@ function BookInner() {
     return (
       <div className="py-20 text-center">
         <p className="text-ink-soft">{error ?? "Service not found."}</p>
-        <Link href="/browse" className="mt-4 inline-block text-sm text-gold hover:underline">
-          Back to browse
+        <Link href="/marketplace" className="mt-4 inline-block text-sm text-gold hover:underline">
+          Back to marketplace
         </Link>
       </div>
     );
