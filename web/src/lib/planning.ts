@@ -115,6 +115,52 @@ function eventTasks(event: BundleEventInfo | null | undefined): PlanTask[] {
   return missing;
 }
 
+/** Days until an event; negative once past, null when there's no date. */
+export function daysUntil(iso?: string | null): number | null {
+  if (!iso || iso === "TBD") return null;
+  const day = Date.parse(`${iso}T00:00:00`);
+  if (Number.isNaN(day)) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((day - today.getTime()) / 86_400_000);
+}
+
+/**
+ * How close the event has to be before an outstanding task counts as urgent.
+ *
+ * The same unpaid booking is background noise three months out and a real
+ * problem three days out, and a checklist that never changes its mind stops
+ * being read. Confirming after the event is urgent regardless — that one is
+ * holding up someone else's money.
+ */
+const URGENT_WITHIN_DAYS: Partial<Record<TaskKind, number>> = {
+  payment: 21,
+  quantity: 30,
+  "vendor-reply": 14,
+  "event-detail": 45,
+};
+
+function sharpen(task: PlanTask, days: number | null): PlanTask {
+  if (task.tone === "urgent" || days == null || days < 0) return task;
+  const window = URGENT_WITHIN_DAYS[task.kind];
+  if (window == null || days > window) return task;
+
+  const clause =
+    days === 0
+      ? "The event is today."
+      : days === 1
+        ? "The event is tomorrow."
+        : `Only ${days} days to go.`;
+  const base = task.note?.trim();
+  return {
+    ...task,
+    tone: "urgent",
+    // The existing note is a sentence, so end it before starting another —
+    // joining them raw produced "…until they answer. only 12 days to go."
+    note: base ? `${base.replace(/\.?$/, ".")} ${clause}` : clause,
+  };
+}
+
 /** What one booking still needs. At most one task each, most pressing first. */
 function bookingTask(b: BundleBooking): PlanTask | null {
   const pay = b.payment_status ?? "unpaid";
@@ -192,10 +238,14 @@ export function planForBundle(bundle: BundleDetail): BundlePlan {
     else booked.push(b);
   }
 
+  const days = daysUntil(bundle.event?.date_iso);
   const tasks = [
     ...eventTasks(bundle.event),
-    ...bookings.filter((b) => !isDeadBooking(b)).map(bookingTask).filter((t): t is PlanTask => t !== null),
-  ];
+    ...bookings
+      .filter((b) => !isDeadBooking(b))
+      .map(bookingTask)
+      .filter((t): t is PlanTask => t !== null),
+  ].map((t) => sharpen(t, days));
   // Urgent first; otherwise the order they were derived in.
   tasks.sort((a, b) => (a.tone === b.tone ? 0 : a.tone === "urgent" ? -1 : 1));
 
@@ -216,4 +266,190 @@ export function taskDetail(task: PlanTask, where?: string): string {
   const lead = [task.vendor, where].filter(Boolean).join(" · ");
   if (!task.note) return lead;
   return lead ? `${lead} — ${task.note}` : task.note;
+}
+
+// ── Money ────────────────────────────────────────────────────────────
+//
+// "2 of 5 paid" is a count, and the question a host actually has is about
+// money: how much have I committed, how much is already gone, and what's still
+// coming. Every figure here comes off the bookings.
+
+export interface MoneyBreakdown {
+  /** Everything still live — what the celebration will cost as booked. */
+  committed: number;
+  /** Paid, held by Jorna, not yet the vendor's. */
+  inEscrow: number;
+  /** Paid out. */
+  released: number;
+  /** Approved and payable, not yet paid. */
+  outstanding: number;
+  /** Approved but unpayable until a guest count or date range lands. */
+  awaitingQuantity: number;
+  refunded: number;
+}
+
+export function moneyForBundle(bundle: BundleDetail): MoneyBreakdown {
+  const sum: MoneyBreakdown = {
+    committed: 0,
+    inEscrow: 0,
+    released: 0,
+    outstanding: 0,
+    awaitingQuantity: 0,
+    refunded: 0,
+  };
+
+  for (const b of bundle.bookings ?? []) {
+    const pay = b.payment_status ?? "unpaid";
+    const price = b.price ?? 0;
+
+    if (pay === "refunded") {
+      sum.refunded += price;
+      continue;
+    }
+    if (isDeadBooking(b)) continue;
+
+    sum.committed += price;
+    if (pay === "paid" || pay === "disputed") sum.inEscrow += price;
+    else if (pay === "released") sum.released += price;
+    else if (b.status === "approved") {
+      if (b.price_pending_quantity) sum.awaitingQuantity += price;
+      else sum.outstanding += price;
+    }
+  }
+  return sum;
+}
+
+// ── Schedule ─────────────────────────────────────────────────────────
+//
+// Every booking carries a required time_start/time_end and its own location,
+// none of which the app showed anywhere — so a host couldn't say what time the
+// photographer arrives without asking. This turns the bookings into a run
+// sheet: the day, in order, with who's coming and where.
+
+export interface ScheduleEntry {
+  booking: BundleBooking;
+  /** Minutes past midnight, or null when the time can't be read. */
+  startMinutes: number | null;
+  start: string | null;
+  end: string | null;
+}
+
+export interface ScheduleDay {
+  dateIso: string;
+  entries: ScheduleEntry[];
+  /** Vendors who have checked in at the venue. */
+  arrived: number;
+  /** Vendors expected — the ones a check-in could come from. */
+  expected: number;
+  /**
+   * False when the day's times can't be trusted: all identical, or all
+   * midnight. Bookings are created with a required time, so an unset one
+   * arrives as a default rather than as nothing, and a run sheet that laid
+   * five vendors on top of each other at 12:00am would invent a schedule
+   * nobody entered. The day still lists its vendors, just without clock times.
+   */
+  timesKnown: boolean;
+}
+
+/** "18:00", "18:00:00", "6:00 PM" → minutes past midnight. Null if unreadable. */
+export function parseTime(raw?: string | null): number | null {
+  if (!raw) return null;
+  const m = raw.trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(am|pm)?$/i);
+  if (!m) return null;
+  let hours = Number(m[1]);
+  const mins = Number(m[2]);
+  if (hours > 23 || mins > 59) return null;
+  const suffix = m[3]?.toLowerCase();
+  if (suffix === "pm" && hours < 12) hours += 12;
+  if (suffix === "am" && hours === 12) hours = 0;
+  return hours * 60 + mins;
+}
+
+function clock(raw?: string | null): string | null {
+  const mins = parseTime(raw);
+  if (mins == null) return null;
+  const d = new Date(2000, 0, 1, Math.floor(mins / 60), mins % 60);
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+/** Every date this bundle touches, each with its bookings in time order. */
+export function scheduleFor(bundle: BundleDetail): ScheduleDay[] {
+  const byDate = new Map<string, BundleBooking[]>();
+
+  for (const b of bundle.bookings ?? []) {
+    if (isDeadBooking(b)) continue;
+    const date = b.date_iso;
+    if (!date || date === "TBD") continue;
+    // A booking spanning days belongs to each of them — a three-day tent hire
+    // should appear on all three, not only the day it started.
+    for (const day of daysBetween(date, b.date_end)) {
+      const list = byDate.get(day);
+      if (list) list.push(b);
+      else byDate.set(day, [b]);
+    }
+  }
+
+  return [...byDate.entries()]
+    .map(([dateIso, bookings]) => {
+      const entries: ScheduleEntry[] = bookings
+        .map((booking) => ({
+          booking,
+          startMinutes: parseTime(booking.time_start),
+          start: clock(booking.time_start),
+          end: clock(booking.time_end),
+        }))
+        .sort((a, b) => (a.startMinutes ?? 1e9) - (b.startMinutes ?? 1e9));
+
+      const starts = entries.map((e) => e.startMinutes);
+      const known =
+        starts.some((s) => s != null) &&
+        !starts.every((s) => s === 0) &&
+        new Set(starts).size > 1;
+
+      return {
+        dateIso,
+        entries,
+        arrived: bookings.filter((b) => b.vendor_checked_in_at).length,
+        expected: bookings.length,
+        timesKnown: known,
+      };
+    })
+    .sort((a, b) => a.dateIso.localeCompare(b.dateIso));
+}
+
+/** Inclusive list of ISO days from `start` to `end`, capped so a bad range can't run away. */
+function daysBetween(start: string, end?: string | null): string[] {
+  if (!end || end === "TBD" || end === start) return [start];
+  const from = Date.parse(`${start}T00:00:00`);
+  const to = Date.parse(`${end}T00:00:00`);
+  if (Number.isNaN(from) || Number.isNaN(to) || to < from) return [start];
+  const days: string[] = [];
+  for (let t = from; t <= to && days.length < 31; t += 86_400_000) {
+    days.push(new Date(t).toISOString().slice(0, 10));
+  }
+  return days;
+}
+
+// ── Categories the plan is still missing ─────────────────────────────
+
+/**
+ * Categories the host said they needed that nothing live covers.
+ *
+ * Read off the event's own services_needed, so this is a comparison against
+ * what they asked for rather than a guess at what a wedding "should" have.
+ */
+export function missingCategories(
+  servicesNeeded: string[] | null | undefined,
+  bundles: BundleDetail[],
+): string[] {
+  if (!servicesNeeded?.length) return [];
+  const covered = new Set<string>();
+  for (const bundle of bundles) {
+    for (const b of bundle.bookings ?? []) {
+      if (isDeadBooking(b)) continue;
+      if (b.service_category) covered.add(b.service_category.toLowerCase());
+      if (b.service_subcategory) covered.add(b.service_subcategory.toLowerCase());
+    }
+  }
+  return servicesNeeded.filter((c) => !covered.has(c.toLowerCase()));
 }

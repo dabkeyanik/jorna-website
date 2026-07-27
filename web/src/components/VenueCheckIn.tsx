@@ -106,9 +106,11 @@ export function VenueCheckIn({
         <div className="min-w-0">
           <h2 className="serif text-lg text-ink">At the venue?</h2>
           <p className="mt-0.5 text-sm text-ink-soft">
-            Check in to let your {pending.length === 1 ? "vendor" : "vendors"} know
-            you&apos;ve arrived. This doesn&apos;t release any payment — you confirm
-            that separately, after the event.
+            {/* Explicit {" "}: JSX strips the space at the line break after the
+                expression, which shipped as "let your vendorsknow you've arrived". */}
+            Check in to let your {pending.length === 1 ? "vendor" : "vendors"}{" "}
+            know you&apos;ve arrived. This doesn&apos;t release any payment — you
+            confirm that separately, after the event.
           </p>
         </div>
         <Button disabled={busy} onClick={checkIn}>

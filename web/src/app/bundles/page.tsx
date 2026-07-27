@@ -25,8 +25,15 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { createEvent, listBundles, listEvents } from "@/lib/jorna";
-import { planForBundle, taskDetail, type PlanTask } from "@/lib/planning";
-import type { BundleDetail, EventItem } from "@/lib/types";
+import {
+  missingCategories,
+  moneyForBundle,
+  planForBundle,
+  taskDetail,
+  type MoneyBreakdown,
+  type PlanTask,
+} from "@/lib/planning";
+import { categoryLabel, type BundleDetail, type EventItem } from "@/lib/types";
 import { Button, Card, Field, LinkButton } from "@/components/ui";
 import { CityCombobox } from "@/components/CityCombobox";
 
@@ -76,7 +83,21 @@ interface Celebration {
   paid: number;
   live: number;
   spend: number;
+  /** What the host set out to spend, when they told us. */
+  budget: number | null;
+  money: MoneyBreakdown;
+  /** Categories they said they needed that nothing live covers. */
+  missing: string[];
 }
+
+const ZERO_MONEY: MoneyBreakdown = {
+  committed: 0,
+  inEscrow: 0,
+  released: 0,
+  outstanding: 0,
+  awaitingQuantity: 0,
+  refunded: 0,
+};
 
 /**
  * Join events and bundles into celebrations.
@@ -100,6 +121,9 @@ function toCelebrations(events: EventItem[], bundles: BundleDetail[]): Celebrati
     paid: 0,
     live: 0,
     spend: 0,
+    budget: event?.budget ?? null,
+    money: { ...ZERO_MONEY },
+    missing: [],
   });
 
   for (const event of events) {
@@ -125,6 +149,11 @@ function toCelebrations(events: EventItem[], bundles: BundleDetail[]): Celebrati
     entry.paid += plan.paidCount;
     entry.live += plan.liveCount;
     entry.spend += bundle.total_estimated_cost ?? 0;
+
+    const cash = moneyForBundle(bundle);
+    for (const k of Object.keys(entry.money) as (keyof MoneyBreakdown)[]) {
+      entry.money[k] += cash[k];
+    }
   }
 
   // An event's own gaps are derived per bundle, so two bundles on one event
@@ -132,6 +161,9 @@ function toCelebrations(events: EventItem[], bundles: BundleDetail[]): Celebrati
   for (const entry of byKey.values()) {
     const seen = new Set<string>();
     entry.tasks = entry.tasks.filter((t) => !seen.has(t.id) && seen.add(t.id));
+    // Compared across all of a celebration's bundles: a photographer booked in
+    // one of them isn't missing just because the other doesn't have one.
+    entry.missing = missingCategories(entry.event?.services_needed, entry.bundles);
   }
 
   // Soonest first; undated last, since there's nothing to count down to.
@@ -165,10 +197,17 @@ function Fact({ label, value }: { label: string; value: string | null }) {
 }
 
 function CelebrationCard({ celebration }: { celebration: Celebration }) {
-  const { name, bundles, tasks, paid, live, spend, dateIso } = celebration;
+  const { name, bundles, tasks, paid, live, spend, dateIso, budget } = celebration;
   const urgent = tasks.filter((t) => t.tone === "urgent").length;
   const when = countdown(dateIso);
   const total = money(spend);
+  const overBudget = budget != null && celebration.money.committed > budget;
+  // Scale against the budget when there is one, so the bar shows how much of it
+  // is spoken for; against the committed total otherwise, and never past 100%.
+  const barBase = Math.max(
+    budget && !overBudget ? budget : celebration.money.committed,
+    1,
+  );
 
   return (
     <Card className="p-5 sm:p-6">
@@ -206,26 +245,61 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
           label="Guests"
           value={celebration.guestCount != null ? String(celebration.guestCount) : null}
         />
-        {total ? <Fact label="Estimated" value={total} /> : null}
+        {/* Spend lives in the money row below, where it can be read against the
+            budget; repeating it here as a bare "Estimated" said less. */}
+        {live === 0 && total ? <Fact label="Estimated" value={total} /> : null}
       </div>
 
       {live > 0 ? (
         <div className="mt-4">
-          <div className="flex items-baseline justify-between text-xs text-ink-soft">
-            <span>
-              {paid} of {live} paid
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 text-xs">
+            <span className="text-ink-soft">
+              {money(celebration.money.committed)} committed
+              {celebration.budget ? (
+                <span className={overBudget ? "text-maroon dark:text-gold" : "text-ink-faint"}>
+                  {" "}
+                  of {money(celebration.budget)} budget
+                  {overBudget ? " — over" : ""}
+                </span>
+              ) : null}
             </span>
             <span className="text-ink-faint">
-              {live} {live === 1 ? "vendor" : "vendors"} on the team
+              {paid} of {live} {live === 1 ? "vendor" : "vendors"} paid
             </span>
           </div>
-          <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-line-soft">
-            <div
-              className="h-full rounded-full bg-gold transition-[width]"
-              style={{ width: `${live ? (paid / live) * 100 : 0}%` }}
-            />
+
+          {/* Released, then held, then what's still to pay. Against the budget
+              when there is one, so the bar reads as "of what I meant to spend". */}
+          <div className="mt-1.5 flex h-2 overflow-hidden rounded-full bg-line-soft">
+            {[
+              { value: celebration.money.released, className: "bg-green" },
+              { value: celebration.money.inEscrow, className: "bg-gold" },
+              { value: celebration.money.outstanding, className: "bg-gold/35" },
+            ].map((seg, i) =>
+              seg.value > 0 ? (
+                <div
+                  key={i}
+                  className={seg.className}
+                  style={{ width: `${Math.min(100, (seg.value / barBase) * 100)}%` }}
+                />
+              ) : null,
+            )}
           </div>
+
+          {celebration.money.outstanding > 0 ? (
+            <p className="mt-1.5 text-xs text-ink-faint">
+              {money(celebration.money.outstanding)} still to pay
+            </p>
+          ) : null}
         </div>
+      ) : null}
+
+      {celebration.missing.length > 0 ? (
+        <p className="mt-4 rounded-xl bg-gold/10 px-3 py-2.5 text-sm text-ink-soft">
+          <span className="font-medium text-ink">Still to book:</span>{" "}
+          {celebration.missing.map((c) => categoryLabel(c)).join(", ")} — you listed
+          {celebration.missing.length === 1 ? " it" : " them"} when you set this up.
+        </p>
       ) : null}
 
       {tasks.length > 0 ? (

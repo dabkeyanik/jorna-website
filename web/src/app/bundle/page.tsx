@@ -20,6 +20,7 @@ import { ServiceSwapPanel } from "@/components/ServiceSwapPanel";
 import { NegotiationPanel } from "@/components/NegotiationPanel";
 import { ReviewPanel } from "@/components/ReviewPanel";
 import { VenueCheckIn } from "@/components/VenueCheckIn";
+import { RunSheet } from "@/components/RunSheet";
 import { CityCombobox } from "@/components/CityCombobox";
 import {
   BOOKING_STATUS_LABELS,
@@ -33,7 +34,7 @@ import {
   type BundleEventInfo,
   type EventCreateInput,
 } from "@/lib/types";
-import { planForBundle, taskDetail } from "@/lib/planning";
+import { moneyForBundle, planForBundle, taskDetail } from "@/lib/planning";
 import { Avatar, Button, Card, Field, LinkButton } from "@/components/ui";
 
 function money(n: number) {
@@ -531,6 +532,7 @@ function BundleInner() {
   }
 
   const plan = planForBundle(bundle);
+  const cash = moneyForBundle(bundle);
 
   // The same row wherever a booking appears — the sections below differ only in
   // which bookings they hold, not in what a booking can do.
@@ -664,34 +666,66 @@ function BundleInner() {
           {bundle.booking_count} {bundle.booking_count === 1 ? "vendor" : "vendors"}
         </p>
 
-        {/* Total + a paid-progress bar across the bundle's bookings. */}
-        <div className="mt-4 flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-card-edge bg-panel p-4">
-          <div>
-            <p className="text-[0.68rem] uppercase tracking-[0.16em] text-ink-faint">
-              Estimated total
-            </p>
-            <p className="serif text-3xl text-ink">{money(bundle.total_estimated_cost)}</p>
+        {/* Where the money is. "2 of 5 paid" was a count; the question is how
+            much is committed, how much has gone, and what's still to come. */}
+        <div className="mt-4 rounded-2xl border border-card-edge bg-panel p-4">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-[0.68rem] uppercase tracking-[0.16em] text-ink-faint">
+                Committed
+              </p>
+              <p className="serif text-3xl text-ink">{money(cash.committed)}</p>
+            </div>
+            {cash.outstanding > 0 ? (
+              <p className="text-sm text-ink-soft">
+                <span className="font-semibold text-maroon dark:text-gold">
+                  {money(cash.outstanding)}
+                </span>{" "}
+                still to pay
+              </p>
+            ) : null}
           </div>
-          {bundle.booking_count > 0
-            ? (() => {
-                const paid = bundle.bookings.filter((b) =>
-                  ["paid", "released"].includes(b.payment_status ?? ""),
-                ).length;
-                return (
-                  <div className="min-w-[180px] flex-1">
-                    <p className="text-xs text-ink-soft">
-                      {paid} of {bundle.booking_count} paid
-                    </p>
-                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-line-soft">
-                      <div
-                        className="h-full rounded-full bg-gold transition-[width]"
-                        style={{ width: `${(paid / bundle.booking_count) * 100}%` }}
-                      />
+
+          {cash.committed > 0 ? (
+            <>
+              <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-line-soft">
+                {[
+                  { value: cash.released, className: "bg-green" },
+                  { value: cash.inEscrow, className: "bg-gold" },
+                ].map((seg, i) =>
+                  seg.value > 0 ? (
+                    <div
+                      key={i}
+                      className={seg.className}
+                      style={{ width: `${(seg.value / cash.committed) * 100}%` }}
+                    />
+                  ) : null,
+                )}
+              </div>
+              <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs">
+                {[
+                  { label: "In escrow", value: cash.inEscrow, tone: "text-gold" },
+                  { label: "Released", value: cash.released, tone: "text-green" },
+                  { label: "To pay", value: cash.outstanding, tone: "text-ink" },
+                  {
+                    label: "Awaiting a guest count",
+                    value: cash.awaitingQuantity,
+                    tone: "text-ink-soft",
+                  },
+                  { label: "Refunded", value: cash.refunded, tone: "text-ink-faint" },
+                ]
+                  .filter((row) => row.value > 0)
+                  .map((row) => (
+                    <div key={row.label} className="flex items-baseline gap-1.5">
+                      <dt className="text-ink-faint">{row.label}</dt>
+                      <dd className={`font-semibold tabular-nums ${row.tone}`}>
+                        {money(row.value)}
+                      </dd>
                     </div>
-                  </div>
-                );
-              })()
-            : null}
+                  ))}
+              </dl>
+            </>
+          ) : null}
         </div>
       </header>
 
@@ -733,6 +767,8 @@ function BundleInner() {
           </ul>
         </section>
       ) : null}
+
+      <RunSheet bundle={bundle} />
 
       <VenueCheckIn bookings={bundle.bookings} onCheckedIn={load} />
 
