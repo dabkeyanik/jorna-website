@@ -361,7 +361,7 @@ export default function DashboardPage() {
         <div>
           <span className="eyebrow">Your celebrations</span>
           <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold sm:text-5xl">
-            Planning
+            Dashboard
           </h1>
           {celebrations && celebrations.length > 0 ? (
             <p className="mt-2 text-ink-soft">

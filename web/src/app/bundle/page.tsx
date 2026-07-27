@@ -524,7 +524,7 @@ function BundleInner() {
       <div className="py-20 text-center">
         <p className="text-ink-soft">{error ?? "Bundle not found."}</p>
         <LinkButton href="/bundles" variant="ghost" className="mt-5">
-          Back to planning
+          Back to the dashboard
         </LinkButton>
       </div>
     );
@@ -592,7 +592,7 @@ function BundleInner() {
   return (
     <div className="mx-auto w-[min(880px,100%-2rem)] py-10">
       <Link href="/bundles" className="text-sm text-ink-soft hover:text-ink">
-        ← Planning
+        ← Dashboard
       </Link>
 
       <header className="mt-5">

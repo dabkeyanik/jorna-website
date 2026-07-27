@@ -21,9 +21,9 @@ export default function EventsPage() {
 
   return (
     <div className="py-20 text-center">
-      <p className="text-ink-soft">Your celebrations live on the planning dashboard now.</p>
+      <p className="text-ink-soft">Your celebrations live on the dashboard now.</p>
       <LinkButton href="/bundles" variant="ghost" className="mt-5">
-        Go to planning
+        Go to the dashboard
       </LinkButton>
     </div>
   );

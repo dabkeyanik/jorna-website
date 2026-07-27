@@ -80,7 +80,7 @@ export default function ProfilePage() {
         <p className="eyebrow mb-3">Your celebrations</p>
         <div className="grid gap-2">
           <Row href="/activity" title="Needs you" sub="Everything waiting on you, in one place" />
-          <Row href="/bundles" title="Planning" sub="Your celebrations and what each still needs" />
+          <Row href="/bundles" title="Dashboard" sub="Your celebrations and what each still needs" />
           <Row href="/marketplace" title="Browse vendors" sub="Find and book more" />
           <Row href="/blocked" title="Blocked" sub="People you've blocked" />
         </div>
