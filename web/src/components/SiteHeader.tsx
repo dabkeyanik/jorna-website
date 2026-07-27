@@ -2,28 +2,60 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
+import { NavBadge, NEEDS_YOU, useAppNav } from "./nav";
 import { Button, LinkButton } from "./ui";
 
-// Slim top bar. Primary navigation lives in the bottom tab bar (AppTabBar,
-// mirroring iOS); the header just carries the wordmark and the auth affordance.
+// The top bar: wordmark, then the primary navigation, then the auth action.
+//
+// Navigation used to live only in the bottom tab bar, mirroring iOS. It's up
+// here on desktop now, because a row of links beside the wordmark is what a
+// website looks like — the bar stays on phones (AppTabBar, md:hidden), where a
+// thumb-reachable row is still the right answer. Both read components/nav, so
+// the two can't drift.
+//
+// Text-only, no icons: the icons earn their place in a 68px-wide tab, and read
+// as clutter in a header.
 export function SiteHeader() {
   const { user, loading, logout } = useAuth();
+  const { items, attention, isActive } = useAppNav();
 
   return (
     <header className="sticky top-0 z-20 border-b border-line-soft bg-ground/85 backdrop-blur">
-      <div className="mx-auto flex w-[min(1080px,100%-2rem)] items-center justify-between py-3">
+      <div className="mx-auto flex w-[min(1080px,100%-2rem)] items-center justify-between gap-6 py-3">
         {/* The wordmark goes Home — the ordinary thing a logo does. It points at
             /browse rather than "/", which is the app entry that only redirects
-            here anyway.
-
-            There used to be a "← main site" link beside it, back when the root
-            was the marketing page. The root is the app now, so leaving is no
-            longer a thing the header needs to offer: the walkthrough is on the
-            "?" on Home and in the footer. */}
-        <Link href="/browse" className="serif text-2xl text-maroon dark:text-gold">
+            here anyway. */}
+        <Link href="/browse" className="serif shrink-0 text-2xl text-maroon dark:text-gold">
           Jorna
         </Link>
-        <nav className="flex items-center gap-2">
+
+        {items ? (
+          <nav
+            className="hidden min-w-0 flex-1 items-center justify-end gap-5 md:flex lg:gap-6"
+            aria-label="Primary"
+          >
+            {items.map((item) => {
+              const active = isActive(item);
+              const badge = item.href === NEEDS_YOU.href ? attention : 0;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  aria-label={badge > 0 ? `${item.label}, ${badge} waiting` : undefined}
+                  className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm font-medium transition ${
+                    active ? "text-gold" : "text-ink-soft hover:text-ink"
+                  }`}
+                >
+                  {item.label}
+                  <NavBadge count={badge} />
+                </Link>
+              );
+            })}
+          </nav>
+        ) : null}
+
+        <nav className="flex shrink-0 items-center gap-2">
           {loading ? null : user ? (
             <Button variant="ghost" onClick={logout}>
               Sign out

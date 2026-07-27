@@ -16,6 +16,8 @@ import {
   useState,
 } from "react";
 import { apiFetch, configureTokens } from "./api";
+import { clearAttentionCache } from "./attention";
+import { clearRoleCache } from "./role";
 import type { TokenPair, User } from "./types";
 
 const ACCESS_KEY = "jorna_access";
@@ -77,6 +79,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const clear = useCallback(() => {
     persist(null);
     setUser(null);
+    // Anything derived from the session goes with it, or the next person to
+    // sign in on this browser inherits the previous one's badge and tabs for
+    // as long as the caches live. Also covers onAuthLost below, which is a
+    // session ending too.
+    clearAttentionCache();
+    clearRoleCache();
   }, [persist]);
 
   // Wire the api client to our token storage (once).
