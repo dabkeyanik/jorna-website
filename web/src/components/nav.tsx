@@ -98,6 +98,7 @@ export const VENDOR_TABS: NavItem[] = [
     match: [
       "/my-dashboard",
       "/my-bookings",
+      "/my-calendar",
       "/my-services",
       "/my-availability",
       "/my-earnings",

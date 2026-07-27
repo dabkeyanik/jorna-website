@@ -314,3 +314,94 @@ export function listingHealth(opts: {
 
   return issues;
 }
+
+// ── Calendar ─────────────────────────────────────────────────────────
+//
+// A month of the vendor's work. Bookings carry a date, a start and end time,
+// and optionally a date_end, so a multi-day job belongs to every day it covers
+// rather than only the one it started on.
+
+export interface CalendarDay {
+  dateIso: string;
+  /** Day of the month, 1-31. */
+  day: number;
+  /** False for the leading/trailing days that pad the grid to whole weeks. */
+  inMonth: boolean;
+  isToday: boolean;
+  isPast: boolean;
+  bookings: VendorBooking[];
+}
+
+function isoOf(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+}
+
+/** Inclusive ISO days from `start` to `end`, capped so a bad range can't run away. */
+function spanDays(start: string, end?: string | null): string[] {
+  if (!end || end === "TBD" || end === start) return [start];
+  const from = new Date(`${start}T00:00:00`);
+  const to = new Date(`${end}T00:00:00`);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to < from) {
+    return [start];
+  }
+  const days: string[] = [];
+  for (const d = new Date(from); d <= to && days.length < 62; d.setDate(d.getDate() + 1)) {
+    days.push(isoOf(d));
+  }
+  return days;
+}
+
+/** Every live booking indexed by each day it covers. */
+export function bookingsByDay(bookings: VendorBooking[]): Map<string, VendorBooking[]> {
+  const byDay = new Map<string, VendorBooking[]>();
+  for (const b of bookings) {
+    if (isDeadVendorBooking(b)) continue;
+    if (!b.date_iso || b.date_iso === "TBD") continue;
+    for (const day of spanDays(b.date_iso, b.date_end)) {
+      const list = byDay.get(day);
+      if (list) list.push(b);
+      else byDay.set(day, [b]);
+    }
+  }
+  for (const list of byDay.values()) {
+    list.sort((a, b) => (a.time_start ?? "").localeCompare(b.time_start ?? ""));
+  }
+  return byDay;
+}
+
+/**
+ * A month as whole weeks starting Monday, so the grid is always 7 wide and the
+ * columns line up with WEEKDAYS. `month` is 0-indexed, like Date.
+ */
+export function calendarMonth(
+  bookings: VendorBooking[],
+  year: number,
+  month: number,
+): CalendarDay[] {
+  const byDay = bookingsByDay(bookings);
+  const todayIso = isoOf(new Date());
+
+  const first = new Date(year, month, 1);
+  // getDay() counts from Sunday; the grid starts Monday, like WEEKDAYS.
+  const lead = (first.getDay() + 6) % 7;
+  const cursor = new Date(year, month, 1 - lead);
+
+  const days: CalendarDay[] = [];
+  // Six weeks always covers a month, and a fixed height stops the grid jumping
+  // as you page through.
+  for (let i = 0; i < 42; i++) {
+    const iso = isoOf(cursor);
+    days.push({
+      dateIso: iso,
+      day: cursor.getDate(),
+      inMonth: cursor.getMonth() === month,
+      isToday: iso === todayIso,
+      isPast: iso < todayIso,
+      bookings: byDay.get(iso) ?? [],
+    });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return days;
+}
