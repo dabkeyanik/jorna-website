@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import {
-  checkInBooking,
   confirmBookingEvent,
   getMyVendor,
   listVendorBookings,
   setBookingStatus,
 } from "@/lib/jorna";
+import { checkInAtVenue } from "@/lib/checkin";
 import {
   BOOKING_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
@@ -138,25 +138,13 @@ export default function MyBookingsPage() {
     }
   }
 
+  // The geolocation half lives in lib/checkin, shared with the vendor
+  // dashboard, which offers the same action.
   function checkIn(b: VendorBooking) {
-    if (!navigator.geolocation) {
-      setError("This browser can't share a location, so it can't verify you're at the venue.");
-      return;
-    }
-    setBusyId(b.booking_id);
-    setError(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) =>
-        void release(
-          b,
-          () => checkInBooking(b.booking_id, pos.coords.latitude, pos.coords.longitude),
-          "Couldn't check you in — make sure you're at the venue.",
-        ),
-      () => {
-        setBusyId(null);
-        setError("Couldn't read your location. You need to allow it to check in at the venue.");
-      },
-      { enableHighAccuracy: true, timeout: 15000 },
+    void release(
+      b,
+      () => checkInAtVenue(b.booking_id),
+      "Couldn't check you in — make sure you're at the venue.",
     );
   }
 

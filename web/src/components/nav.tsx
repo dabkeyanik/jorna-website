@@ -5,7 +5,7 @@
 // (AppTabBar). Only one is visible at a time — the split is CSS, so both mount.
 //
 //   Client: Home · Builder · Marketplace · Dashboard · Needs you · Messages · Profile
-//   Vendor: Home · Bookings · Needs you · Messages · Profile
+//   Vendor: Home · Dashboard · Bookings · Needs you · Messages · Profile
 //
 // Role is "has a vendor profile" (getMyVendor != null), the same signal iOS uses
 // (vendorID != nil). Shown only to a signed-in user; the whole app lives under
@@ -88,6 +88,12 @@ export const CLIENT_TABS: NavItem[] = [
 
 export const VENDOR_TABS: NavItem[] = [
   { href: "/browse", label: "Home", icon: icon(I.home), match: ["/browse", "/vendor"] },
+  {
+    href: "/my-dashboard",
+    label: "Dashboard",
+    icon: icon(I.dashboard),
+    match: ["/my-dashboard"],
+  },
   {
     href: "/my-bookings",
     label: "Bookings",

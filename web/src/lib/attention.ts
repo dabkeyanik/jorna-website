@@ -19,6 +19,7 @@ import {
 } from "@/lib/jorna";
 import { eventHasPassed, type BundleDetail, type VendorBooking } from "@/lib/types";
 import { ATTENTION_KINDS, planForBundle, taskDetail } from "@/lib/planning";
+import { vendorTasks } from "@/lib/vendorPlan";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -69,47 +70,25 @@ function clientItems(bundles: BundleDetail[]): AttentionItem[] {
   return items;
 }
 
-/** What the vendor still has to do, from their booking requests. */
-function vendorItems(bookings: VendorBooking[]): AttentionItem[] {
-  const items: AttentionItem[] = [];
-
-  for (const b of bookings) {
-    const service = b.service_name || "a service";
-    const client = b.client_name || "A client";
-
-    // Someone is waiting on an answer.
-    if (b.status === "pending") {
-      items.push({
-        id: `request-${b.booking_id}`,
-        title: `${client} wants to book ${service}`,
-        detail: b.date_iso && b.date_iso !== "TBD" ? `For ${b.date_iso}` : "Date to be confirmed",
-        href: "/my-bookings",
-        cta: "Answer",
-        tone: "urgent",
-      });
-      continue;
-    }
-
-    // Paid, but the vendor's half of the release is outstanding — this is their
-    // own money waiting.
-    if ((b.payment_status ?? "unpaid") === "paid" && !b.vendor_confirmed_at) {
-      const atVenue = b.venue_latitude != null && b.venue_longitude != null;
-      const canAct = atVenue || eventHasPassed(b.date_end || b.date_iso);
-      if (canAct) {
-        items.push({
-          id: `release-${b.booking_id}`,
-          title: atVenue
-            ? `Check in at the venue for ${service}`
-            : `Confirm ${service} happened`,
-          detail: `${client} — your payout is waiting on this.`,
-          href: "/my-bookings",
-          cta: atVenue ? "Check in" : "Confirm",
-          tone: "urgent",
-        });
-      }
-    }
-  }
-  return items;
+/**
+ * What the vendor still has to do.
+ *
+ * The rules live in lib/vendorPlan, which the vendor dashboard also reads, so
+ * the badge and the dashboard's action list can't disagree. Stripe is derived
+ * there too, which is why it no longer needs adding separately below.
+ */
+function vendorItems(bookings: VendorBooking[], stripeComplete: boolean | null): AttentionItem[] {
+  return vendorTasks(bookings, stripeComplete).map((task) => ({
+    id: task.id,
+    title: task.title,
+    detail: task.detail,
+    // Stripe is the account's problem, not a booking's, so it points at the
+    // page that fixes it; everything else at the bookings list.
+    href: task.kind === "stripe" ? "/my-earnings" : "/my-bookings",
+    cta: task.cta,
+    // The feed has two tones, and an alarm is an urgent one.
+    tone: task.tone === "normal" ? "normal" : "urgent",
+  }));
 }
 
 async function derive(): Promise<AttentionItem[]> {
@@ -125,17 +104,7 @@ async function derive(): Promise<AttentionItem[]> {
         .then((r) => r.items)
         .catch(() => [] as VendorBooking[]),
     ]);
-    if (stripe && !stripe.stripe_onboarding_complete) {
-      found.push({
-        id: "stripe",
-        title: "Finish your payment setup",
-        detail: "Until this is done you can accept bookings, but clients can't pay you.",
-        href: "/my-earnings",
-        cta: "Set up",
-        tone: "urgent",
-      });
-    }
-    found.push(...vendorItems(bookings));
+    found.push(...vendorItems(bookings, stripe ? stripe.stripe_onboarding_complete : null));
   }
 
   const bundles = await listBundles().catch(() => [] as BundleDetail[]);
