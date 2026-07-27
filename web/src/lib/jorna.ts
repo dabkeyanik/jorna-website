@@ -26,6 +26,7 @@ import type {
   VendorDetail,
   VendorSearchItem,
   VendorSearchParams,
+  VendorAvailability,
 } from "./types";
 
 /** Generate the three comparison bundles (Budget / Balanced / Top Rated). */
@@ -504,6 +505,22 @@ export function sendConversationMessage(
 
 export function getMyAvailability(): Promise<AvailabilitySlot[]> {
   return apiFetch<AvailabilitySlot[]>("/vendors/me/availability");
+}
+
+/**
+ * A vendor's open slots over a date range — public, like the rest of browsing,
+ * so the Marketplace's date filter works for a signed-out visitor. Dates are
+ * "YYYY-MM-DD"; both bounds are required by the backend.
+ */
+export function getVendorAvailability(
+  vendorId: string,
+  startDate: string,
+  endDate: string,
+): Promise<VendorAvailability> {
+  return apiFetch<VendorAvailability>(
+    `/vendors/${vendorId}/availability${query({ start_date: startDate, end_date: endDate })}`,
+    { auth: false },
+  );
 }
 
 /** Replace all weekly availability slots. Send [] to clear. */

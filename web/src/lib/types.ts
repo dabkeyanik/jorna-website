@@ -433,6 +433,24 @@ export const WEEKDAYS = [
   "Sunday",
 ];
 
+/**
+ * GET /vendors/{id}/availability — a vendor's published hours plus the times
+ * they're already taken, over a queried date range.
+ *
+ * The backend declares no response schema for this endpoint, so these fields
+ * are inferred from live responses (all empty at the time of writing) and are
+ * deliberately loose. lib/availability reads them defensively and fails open.
+ */
+export interface VendorAvailability {
+  vendor_id?: string;
+  /** Published working hours, keyed by day-of-week or ISO date depending on the backend. */
+  baseline_hours_map?: Record<string, unknown>;
+  internal_busy_times?: unknown[];
+  google_busy_times?: unknown[];
+  google_calendar_connected?: boolean;
+  google_calendar_error?: string | null;
+}
+
 // ── Vendor-side bookings ─────────────────────────────────────────────
 
 /** A booking as the vendor sees it (the fuller `_booking_dict` payload). */
