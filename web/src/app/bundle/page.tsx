@@ -334,8 +334,10 @@ function Detail({ label, value, muted }: { label: string; value: string; muted?:
 }
 
 /**
- * The celebration behind this bundle — everything the event records, in one
- * place, editable.
+ * The event — everything it records, in one place, editable.
+ *
+ * Event and bundle are one thing to whoever's planning; "bundle" is the
+ * backend's word for it. This panel shows the event's side of that pair.
  *
  * It used to show date, location and guests only, because that's all a bundle's
  * embedded `event` summary carries; budget, description, and what the host said
@@ -372,22 +374,7 @@ function CelebrationPanel({
   const [guests, setGuests] = useState(guestCount != null ? String(guestCount) : "");
   const [spend, setSpend] = useState(budget != null ? String(budget) : "");
   const [busy, setBusy] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  async function remove() {
-    setBusy(true);
-    setError(null);
-    try {
-      await deleteEvent(summary.event_id);
-      await onSaved();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't delete this celebration.");
-    } finally {
-      setBusy(false);
-      setConfirming(false);
-    }
-  }
 
   async function save() {
     setBusy(true);
@@ -411,7 +398,7 @@ function CelebrationPanel({
   if (editing) {
     return (
       <div className="mt-4 rounded-2xl border border-card-edge bg-card p-4">
-        <p className="mb-3 text-sm font-medium text-ink-soft">Your celebration</p>
+        <p className="mb-3 text-sm font-medium text-ink-soft">Event details</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           <CityCombobox
@@ -443,6 +430,10 @@ function CelebrationPanel({
             {error}
           </p>
         ) : null}
+        {/* No delete here. Deleting is one action on one thing, and it lives
+            in the header beside the name — a second one down here, worded as
+            though the event were separable from its bookings, is exactly the
+            split this page no longer has. */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button size="md" disabled={busy} onClick={save}>
             {busy ? "Saving…" : "Save details"}
@@ -450,32 +441,7 @@ function CelebrationPanel({
           <Button variant="ghost" size="md" onClick={() => setEditing(false)}>
             Cancel
           </Button>
-          {/* Carried over from the old /event page rather than dropped with it.
-              Tucked inside the editor: it's rare, and it sits near a Delete
-              bundle that means something quite different. */}
-          {!confirming ? (
-            <Button variant="quiet" size="md" onClick={() => setConfirming(true)}>
-              Delete celebration
-            </Button>
-          ) : null}
         </div>
-
-        {confirming ? (
-          <div className="mt-3 rounded-xl bg-panel p-3">
-            <p className="text-sm text-ink-soft">
-              Delete this celebration? Your bundles and bookings aren&apos;t deleted —
-              they just stop being grouped under it.
-            </p>
-            <div className="mt-3 flex gap-2">
-              <Button size="md" disabled={busy} onClick={remove}>
-                {busy ? "Deleting…" : "Delete celebration"}
-              </Button>
-              <Button variant="ghost" size="md" onClick={() => setConfirming(false)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        ) : null}
       </div>
     );
   }
@@ -615,28 +581,50 @@ function BundleInner() {
     }
   }
 
+  /**
+   * One name, written to both records.
+   *
+   * The backend keeps an event and a bundle, but to whoever's planning they are
+   * a single thing — the bundle is the backend's word for it. Renaming only the
+   * bundle left the event still called what the builder generated, and the
+   * dashboard reads the event's name, so the change appeared to do nothing.
+   */
   async function saveName() {
     if (!bundleId || !newName.trim()) return;
+    const name = newName.trim();
+    const eventId = bundle?.event_id ?? bundle?.event?.event_id ?? null;
     setBundleBusy(true);
     try {
-      await renameBundle(bundleId, newName.trim());
+      await renameBundle(bundleId, name);
+      if (eventId) await updateEvent(eventId, { name });
       setRenaming(false);
       await load();
     } catch (err) {
-      setNotice(err instanceof ApiError ? err.message : "Couldn't rename this bundle.");
+      setNotice(err instanceof ApiError ? err.message : "Couldn't rename this event.");
     } finally {
       setBundleBusy(false);
     }
   }
 
+  /**
+   * Delete the whole thing — bundle and event both, for the same reason rename
+   * writes to both. Deleting only the bundle left the event behind as an empty
+   * card on the dashboard, which looked like the delete had half-failed.
+   *
+   * The bundle goes first because it's the one carrying the bookings; if the
+   * event delete then fails, what's left is an empty event the dashboard offers
+   * to rebuild rather than anything broken.
+   */
   async function removeBundle() {
     if (!bundleId) return;
+    const eventId = bundle?.event_id ?? bundle?.event?.event_id ?? null;
     setBundleBusy(true);
     try {
       await deleteBundle(bundleId);
+      if (eventId) await deleteEvent(eventId).catch(() => {});
       router.push("/bundles");
     } catch (err) {
-      setNotice(err instanceof ApiError ? err.message : "Couldn't delete this bundle.");
+      setNotice(err instanceof ApiError ? err.message : "Couldn't delete this event.");
       setBundleBusy(false);
     }
   }
@@ -756,19 +744,13 @@ function BundleInner() {
           </div>
         ) : (
           <div className="flex flex-wrap items-start justify-between gap-3">
-            {/* The celebration leads. You arrive here from a card headed
-                "Priya & Arjun's Wedding", and landing on a page titled with the
-                bundle's own name ("Balanced") reads as somewhere else. The
-                bundle's name is kept underneath when it says something the
-                celebration's doesn't. */}
-            <div className="min-w-0">
-              <h1 className="serif text-4xl text-maroon dark:text-gold">
-                {event?.name || bundle.event_name || bundle.name}
-              </h1>
-              {bundle.name && bundle.name !== (event?.name || bundle.event_name) ? (
-                <p className="mt-1 text-sm text-ink-faint">{bundle.name}</p>
-              ) : null}
-            </div>
+            {/* One name. The event's is the one shown everywhere else, so it
+                wins where the two records still disagree — older bundles kept
+                whatever tier name the builder gave them ("Balanced"), which is
+                the backend's word for this, not the customer's. */}
+            <h1 className="serif text-4xl text-maroon dark:text-gold">
+              {event?.name || bundle.event_name || bundle.name}
+            </h1>
             <div className="flex shrink-0 gap-2">
               <Button
                 variant="ghost"
@@ -778,14 +760,14 @@ function BundleInner() {
                   setRenaming(true);
                 }}
               >
-                Rename bundle
+                Rename
               </Button>
               <Button
                 variant="quiet"
                 size="md"
                 onClick={() => setConfirmDelete(true)}
               >
-                Delete bundle
+                Delete
               </Button>
             </div>
           </div>
@@ -794,12 +776,12 @@ function BundleInner() {
         {confirmDelete ? (
           <div className="mt-3 rounded-xl bg-panel p-3">
             <p className="text-sm text-ink-soft">
-              Delete this bundle and all of its booking requests? This can&apos;t be
+              Delete this event and all of its booking requests? This can&apos;t be
               undone.
             </p>
             <div className="mt-3 flex gap-2">
               <Button size="md" disabled={bundleBusy} onClick={removeBundle}>
-                {bundleBusy ? "Deleting…" : "Delete bundle"}
+                {bundleBusy ? "Deleting…" : "Delete event"}
               </Button>
               <Button
                 variant="ghost"
@@ -884,10 +866,12 @@ function BundleInner() {
       ) : null}
 
       {/* The dashboard opens the first bundle, so any others under the same
-          celebration would otherwise be unreachable from here. */}
+          event would otherwise be unreachable from here. Rare: the builder
+          generates three drafts and selecting one discards the rest, so an
+          event normally has exactly one. */}
       {siblings.length > 0 ? (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-ink-faint">Also under this celebration:</span>
+          <span className="text-ink-faint">Also under this event:</span>
           {siblings.map((b) => (
             <Link
               key={b.bundle_id}
