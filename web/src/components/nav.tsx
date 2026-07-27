@@ -5,7 +5,7 @@
 // (AppTabBar). Only one is visible at a time — the split is CSS, so both mount.
 //
 //   Client: Home · Builder · Marketplace · Dashboard · Needs you · Messages · Profile
-//   Vendor: Home · Dashboard · Bookings · Needs you · Messages · Profile
+//   Vendor: Home · Dashboard · Needs you · Messages · Profile
 //
 // Role is "has a vendor profile" (getMyVendor != null), the same signal iOS uses
 // (vendorID != nil). Shown only to a signed-in user; the whole app lives under
@@ -36,7 +36,6 @@ const I = {
     <path d="M4 9.5 5.5 4h13L20 9.5M4 9.5v9.5h16V9.5M4 9.5a2.5 2.5 0 0 0 5 0M9 9.5a2.5 2.5 0 0 0 5 0M14 9.5a2.5 2.5 0 0 0 5 0" />
   ),
   dashboard: <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3Zm0 0v18M4 7.5l8 4.5 8-4.5" />,
-  calendar: <path d="M4 6.5h16v14H4v-14ZM4 10h16M8 3v4M16 3v4" />,
   messages: <path d="M4 5h16v11H9l-5 4V5Z" />,
   profile: <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM5 20a7 7 0 0 1 14 0" />,
   needsYou: (
@@ -92,22 +91,22 @@ export const VENDOR_TABS: NavItem[] = [
     href: "/my-dashboard",
     label: "Dashboard",
     icon: icon(I.dashboard),
-    match: ["/my-dashboard"],
-  },
-  {
-    href: "/my-bookings",
-    label: "Bookings",
-    icon: icon(I.calendar),
-    match: ["/my-bookings"],
+    // Every seller page hangs off the dashboard now, reached through VendorNav,
+    // so they all keep this tab current. They used to light Profile, back when
+    // Profile was the only tab that owned them — two tabs matching the same
+    // path would light both.
+    match: [
+      "/my-dashboard",
+      "/my-bookings",
+      "/my-services",
+      "/my-availability",
+      "/my-earnings",
+      "/vendor-profile",
+    ],
   },
   NEEDS_YOU,
   { href: "/messages", label: "Messages", icon: icon(I.messages), match: ["/messages"] },
-  {
-    href: "/profile",
-    label: "Profile",
-    icon: icon(I.profile),
-    match: ["/profile", "/my-services", "/my-availability", "/my-earnings", "/vendor-profile"],
-  },
+  { href: "/profile", label: "Profile", icon: icon(I.profile), match: ["/profile"] },
 ];
 
 /**

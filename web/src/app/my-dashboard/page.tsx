@@ -69,6 +69,7 @@ import {
   type VendorDetail,
 } from "@/lib/types";
 import { Avatar, Button, Card, LinkButton, Stars } from "@/components/ui";
+import { VendorNav } from "@/components/VendorNav";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -390,8 +391,12 @@ export default function VendorDashboardPage() {
         </div>
       </header>
 
+      <div className="mt-6">
+        <VendorNav />
+      </div>
+
       {notice ? (
-        <p className="mt-6 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
+        <p className="mb-6 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
           {notice}
         </p>
       ) : null}
@@ -495,7 +500,15 @@ export default function VendorDashboardPage() {
       {/* ── Next jobs ── */}
       {jobs.length > 0 ? (
         <section className="mt-10">
-          <SectionLabel>Next jobs</SectionLabel>
+          <div className="flex items-baseline justify-between gap-3">
+            <SectionLabel>Next jobs</SectionLabel>
+            <Link
+              href="/my-bookings"
+              className="mb-3 text-sm font-medium text-maroon transition hover:text-gold dark:text-gold"
+            >
+              All bookings
+            </Link>
+          </div>
           <div className="grid gap-2.5">
             {jobs.slice(0, 6).map((job) => (
               <JobRow key={job.booking.booking_id} job={job} />
@@ -675,17 +688,10 @@ export default function VendorDashboardPage() {
       ) : null}
 
       <p className="mt-10 text-center text-sm text-ink-faint">
-        <Link href="/my-services" className="text-gold hover:underline">
-          Services
-        </Link>
-        {" · "}
-        <Link href="/my-earnings" className="text-gold hover:underline">
-          Earnings
-        </Link>
-        {" · "}
-        <Link href="/vendor-profile" className="text-gold hover:underline">
-          Your profile
-        </Link>
+        <Link href="/my-bookings" className="text-gold hover:underline">
+          All your bookings
+        </Link>{" "}
+        — including the ones already done.
       </p>
     </div>
   );

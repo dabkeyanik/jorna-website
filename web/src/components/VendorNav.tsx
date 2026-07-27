@@ -5,8 +5,15 @@ import { usePathname } from "next/navigation";
 
 // The seller-side pages, linked from each other so a vendor isn't hunting
 // through the header. basePath is applied by next/link, so hrefs stay app-relative.
+//
+// Bookings used to also be a tab in the main nav; it isn't any more — the
+// dashboard is the way into the seller side, and this row is how you move
+// around inside it. "All bookings" rather than "Requests" because the dashboard
+// already has a Requests section holding just the ones awaiting an answer, and
+// this page is the whole list.
 const TABS = [
-  { href: "/my-bookings", label: "Requests" },
+  { href: "/my-dashboard", label: "Dashboard" },
+  { href: "/my-bookings", label: "All bookings" },
   { href: "/my-services", label: "Services" },
   { href: "/my-availability", label: "Hours" },
   { href: "/my-earnings", label: "Earnings" },
