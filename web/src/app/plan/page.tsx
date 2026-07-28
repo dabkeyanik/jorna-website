@@ -28,6 +28,14 @@ const IconPin = (
     <circle cx="12" cy="10" r="2.5" />
   </svg>
 );
+/**
+ * Categories normally sold per head. Not a rule the backend enforces — services
+ * carry their own price_unit and the real check happens per booking — but at
+ * generation time there are no services yet, only the categories asked for, so
+ * this is what can be known.
+ */
+const PER_HEAD_CATEGORIES = ["catering", "bar_beverage", "cakes_desserts"];
+
 const IconCalendar = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className={svg}>
     <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
@@ -140,6 +148,25 @@ function PlanInner() {
   async function generate() {
     if (needed.length === 0) {
       setError("Pick at least one category to include.");
+      return;
+    }
+    // Selecting a bundle creates real booking requests, and a vendor accepting
+    // one is agreeing to be somewhere on a date. Both were optional here, so a
+    // bundle could be generated with neither and the requests still went out.
+    if (!eventDate) {
+      setError("Add your event date — vendors are asked to hold it.");
+      return;
+    }
+    if (!location.trim()) {
+      setError("Add where it's happening — vendors need somewhere to travel to.");
+      return;
+    }
+    // Per-person pricing can't be totalled without a headcount, and the
+    // categories most likely to be priced that way are pickable here.
+    if (needed.some((c) => PER_HEAD_CATEGORIES.includes(c)) && !(Number(guests) > 0)) {
+      setError(
+        "Add a guest count — catering and bar are usually priced per person, so their totals need one.",
+      );
       return;
     }
     setBusy(true);

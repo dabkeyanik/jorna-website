@@ -38,7 +38,22 @@ import {
   type EventCreateInput,
   type EventItem,
 } from "@/lib/types";
-import { moneyForBundle, planForBundle, taskDetail } from "@/lib/planning";
+import {
+  bookingGaps,
+  describeGaps,
+  isDeadBooking,
+  moneyForBundle,
+  planForBundle,
+  taskDetail,
+} from "@/lib/planning";
+import {
+  formatAddress,
+  isCompleteAddress,
+  parseAddress,
+  zipFromVenue,
+  type Address,
+} from "@/lib/address";
+import { AddressFields } from "@/components/AddressFields";
 import { Avatar, Button, Card, Field, LinkButton } from "@/components/ui";
 
 function money(n: number) {
@@ -87,6 +102,7 @@ function statusLine(b: BundleBooking): { text: string; tone: string } {
 
 function BookingRow({
   booking,
+  event,
   busyId,
   panel,
   onPay,
@@ -100,6 +116,7 @@ function BookingRow({
   onNegotiated,
 }: {
   booking: BundleBooking;
+  event: BundleEventInfo | null | undefined;
   busyId: string | null;
   panel: Panel;
   onPay: (b: BundleBooking) => void;
@@ -131,6 +148,7 @@ function BookingRow({
   const youConfirmed = Boolean(booking.customer_confirmed_at);
   const canConfirm = held && !youConfirmed && eventHasPassed(booking.date_iso);
   const refundable = held && withinRefundWindow(booking.paid_at);
+  const gaps = bookingGaps(booking, event);
 
   return (
     <Card className="p-4">
@@ -158,6 +176,16 @@ function BookingRow({
           {unit ? <p className="text-xs text-ink-faint">{unit}</p> : null}
         </div>
       </div>
+
+      {/* A request the vendor can't really answer. The booking exists — the
+          backend made it — so the honest thing is to say what's missing rather
+          than pretend it's on its way. */}
+      {gaps.length > 0 && !isBeyondActionable(booking) ? (
+        <p className="mt-3 rounded-lg border border-maroon/40 bg-maroon/[0.06] px-3 py-2 text-xs text-maroon dark:border-gold/40 dark:bg-gold/[0.08] dark:text-gold">
+          {booking.vendor_name || "The vendor"} can&apos;t act on this until it has{" "}
+          {describeGaps(gaps)}. Add {gaps.length === 1 ? "it" : "them"} above.
+        </p>
+      ) : null}
 
       {/* Payment */}
       {blockedOnQuantity ? (
@@ -356,12 +384,21 @@ function Detail({ label, value, muted }: { label: string; value: string; muted?:
 function CelebrationPanel({
   summary,
   full,
+  bookings,
   onSaved,
 }: {
   summary: BundleEventInfo;
   full: EventItem | null;
+  bookings: BundleBooking[];
   onSaved: () => void | Promise<void>;
 }) {
+  // A booked venue already knows the postcode; asking for it twice is asking
+  // the client to look up something the plan contains.
+  const venueZip = zipFromVenue(
+    bookings
+      .filter((b) => b.service_category === "venue" && !isDeadBooking(b))
+      .map((b) => b.location),
+  );
   const dateIso = full?.date_iso ?? summary.date_iso;
   const hasDate = Boolean(dateIso && dateIso !== "TBD");
   const location = full?.location ?? summary.location;
@@ -370,7 +407,14 @@ function CelebrationPanel({
 
   const [editing, setEditing] = useState(false);
   const [date, setDate] = useState(hasDate ? (dateIso as string) : "");
-  const [place, setPlace] = useState(location ?? "");
+  // The venue's postcode fills the field rather than merely suggesting it — a
+  // hint you still have to retype isn't autofill. It only ever fills a blank:
+  // an address already carrying a zip keeps its own.
+  const [addr, setAddr] = useState<Address>(() => {
+    const parsed = parseAddress(location);
+    return parsed.zip || !venueZip ? parsed : { ...parsed, zip: venueZip };
+  });
+  const [showGaps, setShowGaps] = useState(false);
   const [guests, setGuests] = useState(guestCount != null ? String(guestCount) : "");
   const [spend, setSpend] = useState(budget != null ? String(budget) : "");
   const [busy, setBusy] = useState(false);
@@ -379,9 +423,16 @@ function CelebrationPanel({
   async function save() {
     setBusy(true);
     setError(null);
+    // A half-written address is worse than none: vendors are sent to it.
+    if (!isCompleteAddress(addr)) {
+      setShowGaps(true);
+      setBusy(false);
+      setError("Add the full address before saving — vendors travel to it.");
+      return;
+    }
     const updates: Partial<EventCreateInput> = {};
     if (date) updates.date_iso = date;
-    if (place.trim()) updates.location = place.trim();
+    updates.location = formatAddress(addr);
     if (guests) updates.guest_count = Number(guests);
     if (spend) updates.budget = Number(spend);
     try {
@@ -401,12 +452,6 @@ function CelebrationPanel({
         <p className="mb-3 text-sm font-medium text-ink-soft">Event details</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          <CityCombobox
-            label="Location"
-            placeholder="Start typing a city…"
-            value={place}
-            onChange={(v) => setPlace(v)}
-          />
           <Field
             label="Guests"
             type="number"
@@ -423,6 +468,16 @@ function CelebrationPanel({
             hint="What you're aiming to spend across every vendor."
             value={spend}
             onChange={(e) => setSpend(e.target.value)}
+          />
+        </div>
+
+        <div className="mt-4 border-t border-line-soft pt-4">
+          <p className="mb-3 text-sm font-medium text-ink-soft">Where it&apos;s happening</p>
+          <AddressFields
+            value={addr}
+            onChange={setAddr}
+            showGaps={showGaps}
+            zipHint={venueZip && venueZip === addr.zip ? venueZip : null}
           />
         </div>
         {error ? (
@@ -668,6 +723,7 @@ function BundleInner() {
     <BookingRow
       key={b.booking_id}
       booking={b}
+      event={bundle.event}
       busyId={busyId}
       panel={panel}
       onPay={pay}
@@ -862,7 +918,12 @@ function BundleInner() {
       </header>
 
       {bundle.event ? (
-        <CelebrationPanel summary={bundle.event} full={event} onSaved={load} />
+        <CelebrationPanel
+          summary={bundle.event}
+          full={event}
+          bookings={bundle.bookings}
+          onSaved={load}
+        />
       ) : null}
 
       {/* The dashboard opens the first bundle, so any others under the same

@@ -18,6 +18,7 @@ import {
   type BundleDetail,
   type BundleEventInfo,
 } from "./types";
+import { isCompleteLocation } from "./address";
 
 export type TaskKind =
   /** The event itself is missing a date, place, or headcount. */
@@ -498,4 +499,76 @@ export function missingCategories(
     }
   }
   return servicesNeeded.filter((c) => !covered.has(c.toLowerCase()));
+}
+
+// ── Is this booking fit to send to a vendor? ─────────────────────────
+//
+// A vendor accepting a request is agreeing to be somewhere, at a time, for a
+// price. If any of those three is unknown the request isn't really a request —
+// it's a question the client hasn't answered yet, and answering it is not the
+// vendor's job.
+//
+// Which pricing detail is needed depends on the unit and nothing else: per
+// person wants a headcount, per hour wants a start and end, per day wants the
+// dates it spans. A flat-rate service wants none of them.
+
+export type BookingGapField = "date" | "location" | "guests" | "hours";
+
+export interface BookingGap {
+  field: BookingGapField;
+  /** What to tell the client is missing. */
+  label: string;
+}
+
+export function bookingGaps(
+  b: BundleBooking,
+  event?: BundleEventInfo | null,
+): BookingGap[] {
+  const gaps: BookingGap[] = [];
+
+  if (!b.date_iso || b.date_iso === "TBD") {
+    gaps.push({ field: "date", label: "a date" });
+  }
+
+  // The booking's own location, or the event's — a booking made from an event
+  // inherits it, and a venue brings its own.
+  const where = b.location || event?.location || "";
+  if (!isCompleteLocation(where)) {
+    gaps.push({ field: "location", label: "a full address" });
+  }
+
+  switch (priceUnitKind(b.price_unit)) {
+    case "person":
+      if (!(b.guest_count ?? event?.guest_count ?? 0)) {
+        gaps.push({ field: "guests", label: "a guest count" });
+      }
+      break;
+    case "hour":
+      if (!b.time_start || !b.time_end) {
+        gaps.push({ field: "hours", label: "a start and end time" });
+      }
+      break;
+    // Per day is covered by the date above; a single-day booking is a valid
+    // span, so date_end being absent isn't a gap.
+    case "day":
+    case "event":
+      break;
+  }
+
+  return gaps;
+}
+
+/** Ready to be somebody's job. */
+export function isBookingSendable(
+  b: BundleBooking,
+  event?: BundleEventInfo | null,
+): boolean {
+  return bookingGaps(b, event).length === 0;
+}
+
+/** One sentence naming what's missing: "a date and a full address". */
+export function describeGaps(gaps: BookingGap[]): string {
+  const labels = gaps.map((g) => g.label);
+  if (labels.length <= 1) return labels[0] ?? "";
+  return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
 }
