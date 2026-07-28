@@ -66,7 +66,7 @@ export const NEEDS_YOU: NavItem = {
 };
 
 export const CLIENT_TABS: NavItem[] = [
-  { href: "/browse", label: "Home", icon: icon(I.home), match: ["/browse"] },
+  { href: "/home", label: "Home", icon: icon(I.home), match: ["/home", "/browse"] },
   { href: "/plan", label: "Builder", icon: icon(I.build), match: ["/plan"] },
   {
     href: "/marketplace",
@@ -86,7 +86,7 @@ export const CLIENT_TABS: NavItem[] = [
 ];
 
 export const VENDOR_TABS: NavItem[] = [
-  { href: "/browse", label: "Home", icon: icon(I.home), match: ["/browse", "/vendor"] },
+  { href: "/home", label: "Home", icon: icon(I.home), match: ["/home", "/browse", "/vendor"] },
   {
     href: "/my-dashboard",
     label: "Dashboard",

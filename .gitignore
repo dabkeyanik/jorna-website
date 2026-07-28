@@ -20,3 +20,10 @@ web/.env.local
 
 # Incremental typecheck cache from `tsc --noEmit`
 web/tsconfig.tsbuildinfo
+
+# Figma Make exports. The design lives in Figma; these are 1.4 MB snapshots of
+# it, and what mattered from them is already ported into web/src (see the
+# marketing home and the vendor dashboard). Keep them locally to re-read — the
+# code inside is a git repo in packfiles, so `unzip` then rebuild from
+# make_repos/ — but they don't belong in this history.
+*.make

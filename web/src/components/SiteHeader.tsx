@@ -23,11 +23,36 @@ export function SiteHeader() {
     <header className="sticky top-0 z-20 border-b border-line-soft bg-ground/85 backdrop-blur">
       <div className="mx-auto flex w-[min(1080px,100%-2rem)] items-center justify-between gap-3 py-3 md:gap-6">
         {/* The wordmark goes Home — the ordinary thing a logo does. It points at
-            /browse rather than "/", which is the app entry that only redirects
+            /home rather than "/", which is the app entry that only redirects
             here anyway. */}
-        <Link href="/browse" className="serif shrink-0 text-2xl text-maroon dark:text-gold">
+        <Link href="/home" className="serif shrink-0 text-2xl text-maroon dark:text-gold">
           Jorna
         </Link>
+
+        {/* Signed out, the header was the wordmark and two buttons — which on a
+            page that now reads as a marketing site left nothing to navigate
+            with. These are the parts of it a visitor can actually reach: the
+            marketplace is public, and the rest are sections of the home page. */}
+        {!items && !loading ? (
+          <nav
+            className="hidden min-w-0 flex-1 items-center justify-end gap-5 md:flex lg:gap-6"
+            aria-label="About Jorna"
+          >
+            {[
+              { href: "/marketplace", label: "Browse vendors" },
+              { href: "/home#how", label: "How it works" },
+              { href: "/home#vendors", label: "For vendors" },
+            ].map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="shrink-0 whitespace-nowrap text-sm font-medium text-ink-soft transition hover:text-ink"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        ) : null}
 
         {items ? (
           <nav

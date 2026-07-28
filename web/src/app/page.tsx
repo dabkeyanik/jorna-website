@@ -8,7 +8,7 @@
 // one only when someone tries to book beats a sign-in wall on arrival.
 //
 // That also means no waiting on the session to load before deciding — this
-// redirects immediately. The root shim points straight at /app/browse/, so this
+// redirects immediately. The root shim points straight at /app/home/, so this
 // only catches anyone arriving at /app/ directly.
 
 import { useEffect } from "react";
@@ -20,7 +20,7 @@ export default function AppEntry() {
   useEffect(() => {
     // replace() so Back returns where they came from rather than bouncing
     // forward through here again.
-    router.replace("/browse");
+    router.replace("/home");
   }, [router]);
 
   return <p className="py-24 text-center text-ink-soft">Taking you in…</p>;
