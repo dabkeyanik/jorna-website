@@ -17,15 +17,15 @@ import { Button, LinkButton } from "./ui";
 // as clutter in a header.
 export function SiteHeader() {
   const { user, loading, logout } = useAuth();
-  const { items, attention, isActive } = useAppNav();
+  const { items, attention, home, isActive } = useAppNav();
 
   return (
     <header className="sticky top-0 z-20 border-b border-line-soft bg-ground/85 backdrop-blur">
       <div className="mx-auto flex w-[min(1080px,100%-2rem)] items-center justify-between gap-3 py-3 md:gap-6">
         {/* The wordmark goes Home — the ordinary thing a logo does. It points at
             /home rather than "/", which is the app entry that only redirects
-            here anyway. */}
-        <Link href="/home" className="serif shrink-0 text-2xl text-maroon dark:text-gold">
+            here anyway; for a vendor, home is their dashboard. */}
+        <Link href={home} className="serif shrink-0 text-2xl text-maroon dark:text-gold">
           Jorna
         </Link>
 

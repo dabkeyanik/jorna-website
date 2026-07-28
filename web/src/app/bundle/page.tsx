@@ -60,6 +60,7 @@ import {
 } from "@/lib/address";
 import { AddressFields } from "@/components/AddressFields";
 import { DraftDetails } from "@/components/DraftDetails";
+import { ClientOnlyRoute } from "@/components/ClientOnlyRoute";
 import { Avatar, Button, Card, Field, LinkButton } from "@/components/ui";
 
 function money(n: number) {
@@ -1149,8 +1150,10 @@ function BundleInner() {
 
 export default function BundlePage() {
   return (
-    <Suspense fallback={<p className="py-20 text-center text-ink-soft">Loading…</p>}>
-      <BundleInner />
-    </Suspense>
+    <ClientOnlyRoute>
+      <Suspense fallback={<p className="py-20 text-center text-ink-soft">Loading…</p>}>
+        <BundleInner />
+      </Suspense>
+    </ClientOnlyRoute>
   );
 }

@@ -10,6 +10,7 @@ import { CATEGORY_LABELS, categoryLabel, type BundleOption } from "@/lib/types";
 import { unchosenBundleIds } from "@/lib/planning";
 import { Button, Card, Chip, Field, Rule } from "@/components/ui";
 import { BundleResults } from "@/components/BundleResults";
+import { ClientOnlyRoute } from "@/components/ClientOnlyRoute";
 import { CityCombobox, type Coords } from "@/components/CityCombobox";
 
 const BUDGETS = [
@@ -346,8 +347,10 @@ function PlanInner() {
 // useSearchParams needs a Suspense boundary to prerender in the static export.
 export default function PlanPage() {
   return (
-    <Suspense fallback={null}>
-      <PlanInner />
-    </Suspense>
+    <ClientOnlyRoute>
+      <Suspense fallback={null}>
+        <PlanInner />
+      </Suspense>
+    </ClientOnlyRoute>
   );
 }

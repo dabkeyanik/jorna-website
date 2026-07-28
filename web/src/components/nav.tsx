@@ -85,8 +85,11 @@ export const CLIENT_TABS: NavItem[] = [
   { href: "/profile", label: "Profile", icon: icon(I.profile), match: ["/profile"] },
 ];
 
+// No Home tab. /home is a marketing page written to sell the bundle builder to
+// someone planning an event — every button on it leads somewhere a vendor is
+// now turned away from. A seller's home is the dashboard: what's been requested
+// of them, when they're working, and what they're owed.
 export const VENDOR_TABS: NavItem[] = [
-  { href: "/home", label: "Home", icon: icon(I.home), match: ["/home", "/browse", "/vendor"] },
   {
     href: "/my-dashboard",
     label: "Dashboard",
@@ -95,6 +98,10 @@ export const VENDOR_TABS: NavItem[] = [
     // so they all keep this tab current. They used to light Profile, back when
     // Profile was the only tab that owned them — two tabs matching the same
     // path would light both.
+    // Browsing is in here too, now that Home is gone: a vendor reading the
+    // marketplace or another listing shouldn't leave the whole bar unlit.
+    // "/vendor" is safe beside "/vendor-profile" — isActive matches a whole
+    // segment, so the shorter one can't swallow the longer.
     match: [
       "/my-dashboard",
       "/my-bookings",
@@ -103,6 +110,10 @@ export const VENDOR_TABS: NavItem[] = [
       "/my-availability",
       "/my-earnings",
       "/vendor-profile",
+      "/marketplace",
+      "/vendor",
+      "/home",
+      "/browse",
     ],
   },
   NEEDS_YOU,
@@ -117,6 +128,7 @@ export const VENDOR_TABS: NavItem[] = [
 export function useAppNav(): {
   items: NavItem[] | null;
   attention: number;
+  home: string;
   isActive: (item: NavItem) => boolean;
 } {
   const { user, loading } = useAuth();
@@ -156,6 +168,9 @@ export function useAppNav(): {
   return {
     items: loading || !user ? null : isVendor ? VENDOR_TABS : CLIENT_TABS,
     attention,
+    // Where the wordmark goes. A logo goes home, and home for a seller is their
+    // dashboard — not the page selling the builder to everyone else.
+    home: isVendor ? "/my-dashboard" : "/home",
     isActive: (item) =>
       item.match.some((m) => pathname === m || pathname.startsWith(`${m}/`)),
   };

@@ -14,6 +14,7 @@ import {
   type ServiceItem,
 } from "@/lib/types";
 import { Button, Card, Field } from "@/components/ui";
+import { ClientOnlyRoute } from "@/components/ClientOnlyRoute";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -316,8 +317,10 @@ function BookInner() {
 
 export default function BookPage() {
   return (
-    <Suspense fallback={<p className="py-20 text-center text-ink-soft">Loading…</p>}>
-      <BookInner />
-    </Suspense>
+    <ClientOnlyRoute>
+      <Suspense fallback={<p className="py-20 text-center text-ink-soft">Loading…</p>}>
+        <BookInner />
+      </Suspense>
+    </ClientOnlyRoute>
   );
 }

@@ -38,6 +38,7 @@ import {
 import { categoryLabel, type BundleDetail, type EventItem } from "@/lib/types";
 import { Button, Card, Field, LinkButton } from "@/components/ui";
 import { CityCombobox } from "@/components/CityCombobox";
+import { ClientOnlyRoute } from "@/components/ClientOnlyRoute";
 
 function money(n?: number | null) {
   return n == null ? null : `$${Math.round(n).toLocaleString()}`;
@@ -357,6 +358,14 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
 }
 
 export default function DashboardPage() {
+  return (
+    <ClientOnlyRoute>
+      <DashboardInner />
+    </ClientOnlyRoute>
+  );
+}
+
+function DashboardInner() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 

@@ -107,8 +107,14 @@ async function derive(): Promise<AttentionItem[]> {
     found.push(...vendorItems(bookings, stripe ? stripe.stripe_onboarding_complete : null));
   }
 
-  const bundles = await listBundles().catch(() => [] as BundleDetail[]);
-  found.push(...clientItems(bundles));
+  // Only for a client. A vendor's own plans — if the account made any back when
+  // the builder was reachable from any URL — now live behind a guard that sends
+  // them to their dashboard, so listing a task here would be an item that can't
+  // be opened. One account is one side of the marketplace.
+  if (!vendor) {
+    const bundles = await listBundles().catch(() => [] as BundleDetail[]);
+    found.push(...clientItems(bundles));
+  }
 
   const unread = await getUnreadCount().catch(() => ({ unread_count: 0 }));
   if (unread.unread_count > 0) {
