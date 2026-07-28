@@ -629,3 +629,22 @@ export const GAP_LABELS: Record<BookingGapField, string> = {
   guests: "a guest count",
   hours: "start and end times",
 };
+
+/**
+ * The drafts to discard when one of a generated set is chosen.
+ *
+ * /bundles/{id}/select would do this, but it also notifies vendors, and those
+ * two want to happen at different moments — so the discard is done by id and
+ * select is left to be the act of sending.
+ *
+ * Options without an id are skipped rather than guessed at: deleting the wrong
+ * bundle is not recoverable.
+ */
+export function unchosenBundleIds(
+  options: { bundle_id?: string | null }[],
+  chosenId: string,
+): string[] {
+  return options
+    .map((o) => o.bundle_id)
+    .filter((id): id is string => Boolean(id) && id !== chosenId);
+}

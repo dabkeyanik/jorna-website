@@ -5,8 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { celebrationByKey } from "@/lib/celebrations";
-import { generateBundles } from "@/lib/jorna";
+import { deleteBundle, generateBundles } from "@/lib/jorna";
 import { CATEGORY_LABELS, categoryLabel, type BundleOption } from "@/lib/types";
+import { unchosenBundleIds } from "@/lib/planning";
 import { Button, Card, Chip, Field, Rule } from "@/components/ui";
 import { BundleResults } from "@/components/BundleResults";
 import { CityCombobox, type Coords } from "@/components/CityCombobox";
@@ -126,9 +127,29 @@ function PlanInner() {
    * stay until then — /select is what discards them — and since all three share
    * an event they appear as one celebration, not three.
    */
-  function choose(option: BundleOption) {
+  async function choose(option: BundleOption) {
     if (!option.bundle_id) return;
     setChoosingLabel(option.label);
+    setError(null);
+
+    // Discarding the two you didn't pick and telling vendors about the one you
+    // did are the same call — /bundles/{id}/select does both — and they want to
+    // happen at different times. Deferring select to keep vendors uninformed
+    // therefore left all three drafts on the dashboard, so the discard is done
+    // here instead, and select still runs later as the act of sending.
+    //
+    // Each is deleted on its own: one failure shouldn't strand the other or
+    // stop you opening the bundle you chose. A survivor shows up as its own
+    // draft, which is visible and deletable, rather than as a silent orphan.
+    const others = unchosenBundleIds(options ?? [], option.bundle_id);
+    await Promise.all(
+      others.map((id) =>
+        deleteBundle(id).catch(() => {
+          console.warn("Couldn't discard unchosen bundle", id);
+        }),
+      ),
+    );
+
     router.push(`/bundle?id=${option.bundle_id}`);
   }
 
