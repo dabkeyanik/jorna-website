@@ -109,7 +109,12 @@ export function vendorTasks(
     // Paid, but the vendor's half of the release is outstanding — this is their
     // own money waiting. Mirrors lib/attention, which had these rules first.
     if ((b.payment_status ?? "unpaid") === "paid" && !b.vendor_confirmed_at) {
-      const atVenue = b.venue_latitude != null && b.venue_longitude != null;
+      // The anchor the server will actually measure against — a booked venue's
+      // pin, or the event's own address when the plan has no venue. Gating on
+      // venue_latitude alone meant a wedding in a family hall offered nobody a
+      // check-in, so the vendor's payout waited on a confirmation that had no
+      // way of being given.
+      const atVenue = b.checkin_latitude != null && b.checkin_longitude != null;
       const canAct = atVenue || eventHasPassed(b.date_end || b.date_iso);
       if (canAct) {
         tasks.push({

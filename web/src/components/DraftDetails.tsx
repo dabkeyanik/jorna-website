@@ -31,6 +31,7 @@ import {
   zipFromVenue,
   type Address,
 } from "@/lib/address";
+import { addressPin } from "@/lib/geocode";
 import { isDeadBooking, sendReadiness, type BookingGapField } from "@/lib/planning";
 import { priceUnitKind, type BundleDetail, type BundleBooking } from "@/lib/types";
 import { AddressFields } from "@/components/AddressFields";
@@ -151,6 +152,7 @@ export function DraftDetails({
           ...(date ? { date_iso: date } : {}),
           ...(location ? { location } : {}),
           ...(count != null ? { guest_count: count } : {}),
+          ...(await addressPin(addr)),
         }).catch(() => {});
       }
 

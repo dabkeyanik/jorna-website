@@ -475,6 +475,11 @@ export interface VendorBooking {
   location?: string | null;
   venue_latitude?: number | null;
   venue_longitude?: number | null;
+  /** The point check-in is measured against: the venue's pin, or the event's
+      own address when no venue is booked. Gate the button on this, not on
+      venue_latitude — the server resolves it the same way. */
+  checkin_latitude?: number | null;
+  checkin_longitude?: number | null;
   status: string;
   payment_status?: string | null;
   amount_cents?: number | null;
@@ -546,6 +551,12 @@ export interface EventCreateInput {
   guest_count?: number | null;
   budget?: number | null;
   services_needed?: string[] | null;
+  // Where `location` actually is, so a plan held somewhere the client arranged
+  // themselves can still be checked into. Distinct from the event's
+  // venue_latitude/longitude, which the backend derives from a booked venue and
+  // clears when that venue goes — these are the client's and survive it.
+  address_latitude?: number | null;
+  address_longitude?: number | null;
 }
 
 /** Booking lifecycle labels. Mirrors the backend BookingStatus values. */

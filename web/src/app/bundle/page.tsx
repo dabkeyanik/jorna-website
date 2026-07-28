@@ -61,6 +61,7 @@ import {
 import { AddressFields } from "@/components/AddressFields";
 import { DraftDetails } from "@/components/DraftDetails";
 import { ClientOnlyRoute } from "@/components/ClientOnlyRoute";
+import { addressPin } from "@/lib/geocode";
 import { Avatar, Button, Card, Field, LinkButton } from "@/components/ui";
 
 function money(n: number) {
@@ -494,6 +495,10 @@ function CelebrationPanel({
     updates.location = formatAddress(addr);
     if (guests) updates.guest_count = Number(guests);
     if (spend) updates.budget = Number(spend);
+    // The address as a point, so a plan held somewhere the client arranged
+    // themselves can still be checked into. Silent when it can't be resolved —
+    // the address is what was asked for, and the pin is the app's problem.
+    Object.assign(updates, await addressPin(addr));
     try {
       if (Object.keys(updates).length > 0) await updateEvent(summary.event_id, updates);
       setEditing(false);

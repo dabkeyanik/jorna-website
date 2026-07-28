@@ -44,9 +44,11 @@ function matches(filter: Filter, b: VendorBooking): boolean {
   return b.status === "approved" || b.status === "payment_confirmed";
 }
 
-/** A booking is venue-anchored when it carries the event's mirrored coords. */
+/** Can this be checked into? True when the plan has a place — a booked venue,
+    or the event's own address. Mirrors what the server resolves, so the button
+    is never offered for a call it has to refuse. */
 function hasVenue(b: VendorBooking): boolean {
-  return b.venue_latitude != null && b.venue_longitude != null;
+  return b.checkin_latitude != null && b.checkin_longitude != null;
 }
 
 export default function MyBookingsPage() {
