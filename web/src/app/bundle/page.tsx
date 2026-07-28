@@ -87,8 +87,15 @@ function isBeyondActionable(b: BundleBooking): boolean {
   return ["paid", "released", "refunded", "disputed"].includes(ps);
 }
 
-/** Escrow-aware status line for one booking. */
-function statusLine(b: BundleBooking): { text: string; tone: string } {
+/**
+ * Escrow-aware status line for one booking.
+ *
+ * A draft's bookings are stored as "pending", whose label is "Awaiting vendor" —
+ * but on a draft no vendor has been given anything to await. The store's word
+ * for the row isn't the right word for the reader, so a draft says what's
+ * actually true of it.
+ */
+function statusLine(b: BundleBooking, draft: boolean): { text: string; tone: string } {
   const pay = b.payment_status ?? "unpaid";
   if (pay !== "unpaid" && pay !== "processing") {
     const tone =
@@ -98,6 +105,9 @@ function statusLine(b: BundleBooking): { text: string; tone: string } {
           ? "text-maroon dark:text-gold"
           : "text-gold";
     return { text: PAYMENT_STATUS_LABELS[pay] ?? pay, tone };
+  }
+  if (draft && (b.status === "pending" || b.status === "negotiation_ongoing")) {
+    return { text: "Not sent yet", tone: "text-ink-faint" };
   }
   return {
     text: BOOKING_STATUS_LABELS[b.status] ?? b.status,
@@ -140,7 +150,7 @@ function BookingRow({
   const [showNeg, setShowNeg] = useState(false);
   const pay = booking.payment_status ?? "unpaid";
   const unit = priceUnitLabel(booking.price_unit);
-  const status = statusLine(booking);
+  const status = statusLine(booking, draft);
   const busy = busyId === booking.booking_id;
   const openPanel = panel?.bookingId === booking.booking_id ? panel.kind : null;
 
