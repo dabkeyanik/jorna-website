@@ -90,6 +90,21 @@ function isBeyondActionable(b: BundleBooking): boolean {
 }
 
 /**
+ * Out with a vendor, and not yet answered.
+ *
+ * A request in this state is on somebody else's screen. Editing it from here
+ * means editing a question after it's been asked: swapping the service leaves
+ * the vendor holding a request for something that isn't in the plan any more,
+ * and haggling over a price they haven't agreed to supply yet is a conversation
+ * out of order. The one thing that's still honestly yours is withdrawing it, so
+ * that's the only thing offered.
+ */
+function isAwaitingVendor(b: BundleBooking, draft: boolean): boolean {
+  if (draft || isBeyondActionable(b)) return false;
+  return b.status === "pending" || b.status === "negotiation_ongoing";
+}
+
+/**
  * Escrow-aware status line for one booking.
  *
  * A draft's bookings are stored as "pending", whose label is "Awaiting vendor" —
@@ -110,6 +125,13 @@ function statusLine(b: BundleBooking, draft: boolean): { text: string; tone: str
   }
   if (draft && (b.status === "pending" || b.status === "negotiation_ongoing")) {
     return { text: "Not sent yet", tone: "text-ink-faint" };
+  }
+  // Said in full on this page: "Awaiting vendor" is what the shared label calls
+  // it, which reads fine in a vendor's own list and leaves a host wondering
+  // whether the request went anywhere. Spelling out what's being waited for
+  // answers that without them having to ask.
+  if (b.status === "pending") {
+    return { text: "Awaiting vendor approval", tone: "text-gold" };
   }
   return {
     text: BOOKING_STATUS_LABELS[b.status] ?? b.status,
@@ -153,6 +175,7 @@ function BookingRow({
   const pay = booking.payment_status ?? "unpaid";
   const price = priceLine(booking);
   const status = statusLine(booking, draft);
+  const awaiting = isAwaitingVendor(booking, draft);
   const busy = busyId === booking.booking_id;
   const openPanel = panel?.bookingId === booking.booking_id ? panel.kind : null;
 
@@ -227,8 +250,9 @@ function BookingRow({
         </div>
       ) : null}
 
-      {/* Negotiation — only on a negotiable service, before any money moves */}
-      {booking.open_to_price_negotiation && !isBeyondActionable(booking) ? (
+      {/* Negotiation — only on a negotiable service, before any money moves,
+          and not while the vendor is still deciding whether to take the job */}
+      {booking.open_to_price_negotiation && !isBeyondActionable(booking) && !awaiting ? (
         showNeg ? (
           <div className="mt-3">
             <NegotiationPanel
@@ -246,26 +270,35 @@ function BookingRow({
         )
       ) : null}
 
-      {/* Composition — only while no money has moved */}
+      {/* Composition — only while no money has moved. Once the request is out,
+          withdrawing it is the only change left that's honestly the host's to
+          make, so the row of options collapses to that one. */}
       {!isBeyondActionable(booking) ? (
         openPanel === "remove" ? (
           <div className="mt-3 rounded-lg bg-panel p-3">
             <p className="text-xs text-ink-soft">
-              Remove {booking.service_name || "this service"} from the bundle? The
-              rest of your bundle is unaffected.
+              {awaiting
+                ? `Withdraw your request to ${booking.vendor_name || "this vendor"}? They'll stop seeing it, and the rest of your plan carries on. You can book them again later.`
+                : `Remove ${booking.service_name || "this service"} from the bundle? The rest of your bundle is unaffected.`}
             </p>
             <div className="mt-3 flex gap-2">
               <Button size="md" disabled={busy} onClick={() => onRemove(booking)}>
-                {busy ? "Removing…" : "Remove"}
+                {busy
+                  ? awaiting
+                    ? "Cancelling…"
+                    : "Removing…"
+                  : awaiting
+                    ? "Cancel request"
+                    : "Remove"}
               </Button>
               <Button variant="ghost" size="md" onClick={onClosePanel}>
-                Cancel
+                Keep it
               </Button>
             </div>
           </div>
         ) : (
           <div className="mt-3 flex flex-wrap justify-end gap-2">
-            {booking.service_category ? (
+            {booking.service_category && !awaiting ? (
               <Button variant="ghost" size="md" onClick={() => onSwap(booking)}>
                 Swap service
               </Button>
@@ -275,7 +308,7 @@ function BookingRow({
               size="md"
               onClick={() => onOpenPanel(booking.booking_id, "remove")}
             >
-              Remove
+              {awaiting ? "Cancel request" : "Remove"}
             </Button>
           </div>
         )
@@ -984,7 +1017,7 @@ function BundleInner() {
               </h2>
               <p className="mt-1 max-w-[60ch] text-sm text-ink-soft">
                 {readiness.canSend
-                  ? "Sending asks each vendor to hold your date. You can still swap or remove anyone until they answer."
+                  ? "Sending asks each vendor to hold your date. Once it's out, a request is theirs to answer — you can still cancel it, but not change it."
                   : bundle.bookings.length === 0
                     ? "There's nothing in this plan yet."
                     : `Vendors are asked to be somewhere, at a time, for a price. This plan still needs ${readiness.missing
@@ -1003,18 +1036,47 @@ function BundleInner() {
               bookings, where they're always writable. */}
           <DraftDetails bundle={bundle} onSaved={load} />
         </section>
-      ) : readiness.blocked.length > 0 ? (
-        // Sent, and still short of something. Until now this was a dead end:
-        // the editor above only ever appeared on drafts, so a booking that
-        // reached its vendor without a guest count had nowhere on the web to
-        // gain one, and the notice on its card could only point at the iOS app.
-        <section
-          id="still-needed"
-          className="mt-6 scroll-mt-20 rounded-2xl border border-gold/50 bg-gold/[0.07] p-5"
-        >
-          <DraftDetails bundle={bundle} onSaved={load} sent />
-        </section>
-      ) : null}
+      ) : (
+        // Sent. These two are deliberately not a chain — a plan can be waiting
+        // on vendors and still short of a detail at the same time, and if the
+        // receipt hid the editor then the "add that above" link on a booking
+        // card would point at a section that wasn't rendered.
+        <>
+          {plan.awaiting.length > 0 ? (
+            // Sending used to be the moment the page went quiet: the draft
+            // banner was the only thing saying where the plan stood, and it
+            // disappears the instant you succeed — leaving a host to work out
+            // from a row of status pills whether anything had happened at all.
+            <section className="mt-6 rounded-2xl border border-gold/50 bg-gold/[0.07] p-5">
+              <h2 className="serif text-lg text-ink">
+                {plan.booked.length > 0
+                  ? `Waiting on ${plan.awaiting.length} of your vendors`
+                  : "Sent — waiting on your vendors"}
+              </h2>
+              <p className="mt-1 max-w-[60ch] text-sm text-ink-soft">
+                {plan.awaiting.length === 1
+                  ? `${plan.awaiting[0].vendor_name || "One vendor"} has your request and hasn't answered yet.`
+                  : `${plan.awaiting.length} vendors have your request and haven't answered yet.`}{" "}
+                Their answers appear here — nothing is charged until one accepts
+                and you pay. You can cancel a request while it&apos;s still open.
+              </p>
+            </section>
+          ) : null}
+
+          {readiness.blocked.length > 0 ? (
+            // Sent, and still short of something. Until this existed it was a
+            // dead end: the editor above only ever appeared on drafts, so a
+            // booking that reached its vendor without a guest count had nowhere
+            // on the web to gain one.
+            <section
+              id="still-needed"
+              className="mt-6 scroll-mt-20 rounded-2xl border border-gold/50 bg-gold/[0.07] p-5"
+            >
+              <DraftDetails bundle={bundle} onSaved={load} sent />
+            </section>
+          ) : null}
+        </>
+      )}
 
       {bundle.event ? (
         <CelebrationPanel
