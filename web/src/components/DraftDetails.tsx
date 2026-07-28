@@ -39,15 +39,29 @@ import { Button, Card, Field } from "@/components/ui";
 export function DraftDetails({
   bundle,
   onSaved,
+  sent = false,
 }: {
   bundle: BundleDetail;
   onSaved: () => void | Promise<void>;
+  /**
+   * The plan has already gone to its vendors and something is still missing —
+   * in practice a per-person total that can't be worked out, which blocks
+   * checkout. Only the gaps are shown then: an answered date or address is one
+   * a vendor has agreed to, and quietly editing it here would change the job
+   * without telling anyone.
+   */
+  sent?: boolean;
 }) {
   const readiness = sendReadiness(bundle);
   const live = (bundle.bookings ?? []).filter((b) => !isDeadBooking(b));
 
   const needs = (field: BookingGapField) =>
     readiness.blocked.some((r) => r.gaps.some((g) => g.field === field));
+
+  // An answered field stays on show while the plan is a draft, so it can be
+  // corrected. After it's sent, only what's missing appears.
+  const show = (field: BookingGapField, answered: boolean) =>
+    needs(field) || (!sent && answered);
 
   // Seed from whatever is already known — the event, then any booking that has
   // an answer, so a partly-filled plan doesn't ask again from scratch.
@@ -71,8 +85,13 @@ export function DraftDetails({
   );
   // Every booking charged by the hour, not merely the ones still missing times:
   // keyed off the gap, a field vanished as soon as it was filled, so a wrong
-  // time couldn't be corrected.
-  const hourly = live.filter((b) => priceUnitKind(b.price_unit) === "hour");
+  // time couldn't be corrected. Once the plan is sent that freedom is the wrong
+  // one — those times are what the vendor agreed to — so only the gaps remain.
+  const hourly = live.filter(
+    (b) =>
+      priceUnitKind(b.price_unit) === "hour" &&
+      (!sent || !b.time_start || !b.time_end),
+  );
   const [times, setTimes] = useState<Record<string, { start: string; end: string }>>(() =>
     Object.fromEntries(
       hourly.map((b) => [
@@ -146,15 +165,16 @@ export function DraftDetails({
   return (
     <Card className="mt-4 p-5">
       <h2 className="serif text-lg text-ink">
-        {readiness.canSend ? "Details" : "Before this can be sent"}
+        {sent ? "Still needed" : readiness.canSend ? "Details" : "Before this can be sent"}
       </h2>
       <p className="mt-1 text-sm text-ink-soft">
-        These go to every vendor in the plan. Save as much as you have — you can
-        come back for the rest.
+        {sent
+          ? "Your vendors have this plan, but a total can't be worked out without these — and nothing can be paid until it can."
+          : "These go to every vendor in the plan. Save as much as you have — you can come back for the rest."}
       </p>
 
       <div className="mt-4 grid gap-4">
-        {needs("date") || date ? (
+        {show("date", Boolean(date)) ? (
           <Field
             label="Event date"
             type="date"
@@ -163,7 +183,7 @@ export function DraftDetails({
           />
         ) : null}
 
-        {needs("guests") || guests ? (
+        {show("guests", Boolean(guests)) ? (
           <Field
             label="Guest count"
             type="number"
@@ -175,7 +195,7 @@ export function DraftDetails({
           />
         ) : null}
 
-        {needs("location") || formatAddress(addr) ? (
+        {show("location", Boolean(formatAddress(addr))) ? (
           <div>
             <p className="mb-2 text-sm font-medium text-ink-soft">Where it&apos;s happening</p>
             <AddressFields

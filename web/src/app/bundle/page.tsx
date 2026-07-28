@@ -212,7 +212,11 @@ function BookingRow({
           {/* Reached only when the quantity is still pending, so the caption is
               the rate label rather than a total. */}
           This service is priced {price.caption || "per unit"}. Its total needs a guest count
-          or date range before it can be paid — add those in the Jorna app.
+          or date range before it can be paid —{" "}
+          <a href="#still-needed" className="font-medium text-gold hover:underline">
+            add that above
+          </a>
+          .
         </p>
       ) : payable ? (
         <div className="mt-3 flex justify-end">
@@ -997,6 +1001,17 @@ function BundleInner() {
               builder may not have one — so the details live here, on the
               bookings, where they're always writable. */}
           <DraftDetails bundle={bundle} onSaved={load} />
+        </section>
+      ) : readiness.blocked.length > 0 ? (
+        // Sent, and still short of something. Until now this was a dead end:
+        // the editor above only ever appeared on drafts, so a booking that
+        // reached its vendor without a guest count had nowhere on the web to
+        // gain one, and the notice on its card could only point at the iOS app.
+        <section
+          id="still-needed"
+          className="mt-6 scroll-mt-20 rounded-2xl border border-gold/50 bg-gold/[0.07] p-5"
+        >
+          <DraftDetails bundle={bundle} onSaved={load} sent />
         </section>
       ) : null}
 

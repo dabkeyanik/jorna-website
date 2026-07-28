@@ -544,7 +544,14 @@ export function bookingGaps(
 
   switch (priceUnitKind(b.price_unit)) {
     case "person":
-      if (!(b.guest_count ?? event?.guest_count ?? 0)) {
+      // The booking's own count, and not the event's. Unlike the date and the
+      // address, this one is arithmetic: the backend resolves the total from
+      // the booking it prices, so an event-level headcount satisfied this check
+      // without satisfying the backend. The plan would send, the vendor would
+      // approve, and the booking arrived at checkout still flagged
+      // price_pending_quantity — unpayable, and past the only screen that could
+      // have fixed it.
+      if (!(b.guest_count ?? 0)) {
         gaps.push({ field: "guests", label: "a guest count" });
       }
       break;
