@@ -294,6 +294,32 @@ export function eventHasPassed(dateIso?: string | null): boolean {
   return Date.now() > day;
 }
 
+/** When a booking finishes: its end date if it spans days, else its date. */
+export function lastDay(b: {
+  date_iso?: string | null;
+  date_end?: string | null;
+}): string | null | undefined {
+  return b.date_end || b.date_iso;
+}
+
+/**
+ * Whether a booking is over, which is the gate on confirming it for escrow
+ * release.
+ *
+ * The backend's event_confirmable_date measures the LAST day, so a Friday-to-
+ * Sunday booking isn't confirmable on the Saturday. This was written out by
+ * hand in five places and one of them said `date_iso` — which offered the
+ * client "Confirm & release" partway through their own multi-day event, and
+ * got them a refusal naming a date the same screen hadn't mentioned. It's a
+ * function now so there's nothing left to mistype.
+ */
+export function eventIsOver(b: {
+  date_iso?: string | null;
+  date_end?: string | null;
+}): boolean {
+  return eventHasPassed(lastDay(b));
+}
+
 export interface BundleDetail {
   bundle_id: string;
   user_id: string;

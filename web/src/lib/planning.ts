@@ -11,7 +11,7 @@
 // action the server must reject.
 
 import {
-  eventHasPassed,
+  eventIsOver,
   priceUnitKind,
   priceUnitLabel,
   type BundleBooking,
@@ -217,7 +217,7 @@ function bookingTask(b: BundleBooking): PlanTask | null {
   // Money is held and the event is over — the client's confirm is the only
   // thing between the vendor and their payout. Gated on the booking's LAST day,
   // like the backend's event_confirmable_date.
-  if (pay === "paid" && !b.customer_confirmed_at && eventHasPassed(b.date_end || b.date_iso)) {
+  if (pay === "paid" && !b.customer_confirmed_at && eventIsOver(b)) {
     return {
       id: `confirm-${b.booking_id}`,
       kind: "confirm",

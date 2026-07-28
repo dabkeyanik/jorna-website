@@ -15,7 +15,7 @@ import {
   BOOKING_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
   categoryLabel,
-  eventHasPassed,
+  eventIsOver,
   formatCheckInTime,
   priceLine,
   type VendorBooking,
@@ -373,7 +373,7 @@ export default function MyBookingsPage() {
                           {busyId === b.booking_id ? "Checking in…" : "Check in at venue"}
                         </Button>
                       </div>
-                    ) : eventHasPassed(b.date_end || b.date_iso) ? (
+                    ) : eventIsOver(b) ? (
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-xs text-ink-faint">
                           Confirm the event happened to release your payment.

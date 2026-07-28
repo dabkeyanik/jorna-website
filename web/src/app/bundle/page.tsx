@@ -30,7 +30,8 @@ import {
   BOOKING_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
   categoryLabel,
-  eventHasPassed,
+  eventIsOver,
+  lastDay,
   priceLine,
   withinRefundWindow,
   type BundleBooking,
@@ -189,7 +190,7 @@ function BookingRow({
   // Escrow actions only exist while the money is held on the platform.
   const held = pay === "paid";
   const youConfirmed = Boolean(booking.customer_confirmed_at);
-  const canConfirm = held && !youConfirmed && eventHasPassed(booking.date_iso);
+  const canConfirm = held && !youConfirmed && eventIsOver(booking);
   const refundable = held && withinRefundWindow(booking.paid_at);
   const gaps = bookingGaps(booking, event);
 
@@ -323,13 +324,14 @@ function BookingRow({
               You&apos;ve confirmed. The vendor still needs to confirm before the
               payment is released.
             </p>
-          ) : !eventHasPassed(booking.date_iso) ? (
+          ) : !canConfirm ? (
+            // The date named is the one being waited for — the last day, for a
+            // booking that spans several. Quoting the start date told a client
+            // with a Friday-to-Sunday booking they could confirm on the Friday.
             <p className="text-xs text-ink-soft">
               You can confirm after the event
-              {booking.date_iso && booking.date_iso !== "TBD"
-                ? ` (${booking.date_iso})`
-                : ""}
-              . Funds are never released before then.
+              {prettyDate(lastDay(booking)) ? ` (${prettyDate(lastDay(booking))})` : ""}.
+              Funds are never released before then.
             </p>
           ) : null}
 

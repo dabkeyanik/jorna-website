@@ -8,7 +8,7 @@
 // a vendor different things. Every rule mirrors a backend guard.
 
 import {
-  eventHasPassed,
+  eventIsOver,
   type AvailabilitySlot,
   type Earnings,
   type ServiceItem,
@@ -115,7 +115,7 @@ export function vendorTasks(
       // check-in, so the vendor's payout waited on a confirmation that had no
       // way of being given.
       const atVenue = b.checkin_latitude != null && b.checkin_longitude != null;
-      const canAct = atVenue || eventHasPassed(b.date_end || b.date_iso);
+      const canAct = atVenue || eventIsOver(b);
       if (canAct) {
         tasks.push({
           id: `release-${b.booking_id}`,
