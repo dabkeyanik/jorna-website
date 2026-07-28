@@ -10,27 +10,29 @@
 // bookings themselves. The event is updated too when there is one, so the two
 // don't disagree.
 //
-// Only what's missing is asked for. A plan of flat-rate services is never asked
+// Only what's relevant is asked for. A plan of flat-rate services is never asked
 // for a headcount, and per-hour times are asked for on the one booking that
-// needs them rather than across the plan.
+// needs them rather than across the plan. A field already answered stays on
+// show so it can be corrected.
+//
+// Saving takes whatever is filled in. Details arrive over weeks — the venue
+// before the headcount, the headcount before the times — and a form that only
+// saves once everything is present would make you hold them in your head until
+// the last one. Only the send button needs the whole set; that check is
+// unchanged, and a partial save simply leaves it blocked.
 
 import { useState } from "react";
 import { ApiError } from "@/lib/api";
 import { updateBooking, updateEvent } from "@/lib/jorna";
 import {
   formatAddress,
-  isCompleteAddress,
+  isValidZip,
   parseAddress,
   zipFromVenue,
   type Address,
 } from "@/lib/address";
-import {
-  bookingGaps,
-  isDeadBooking,
-  sendReadiness,
-  type BookingGapField,
-} from "@/lib/planning";
-import type { BundleDetail, BundleBooking } from "@/lib/types";
+import { isDeadBooking, sendReadiness, type BookingGapField } from "@/lib/planning";
+import { priceUnitKind, type BundleDetail, type BundleBooking } from "@/lib/types";
 import { AddressFields } from "@/components/AddressFields";
 import { Button, Card, Field } from "@/components/ui";
 
@@ -67,10 +69,10 @@ export function DraftDetails({
   const [guests, setGuests] = useState(
     bundle.event?.guest_count != null ? String(bundle.event.guest_count) : "",
   );
-  // Per-hour bookings each want their own start and end.
-  const hourly = live.filter((b) =>
-    bookingGaps(b, bundle.event).some((g) => g.field === "hours"),
-  );
+  // Every booking charged by the hour, not merely the ones still missing times:
+  // keyed off the gap, a field vanished as soon as it was filled, so a wrong
+  // time couldn't be corrected.
+  const hourly = live.filter((b) => priceUnitKind(b.price_unit) === "hour");
   const [times, setTimes] = useState<Record<string, { start: string; end: string }>>(() =>
     Object.fromEntries(
       hourly.map((b) => [
@@ -81,37 +83,28 @@ export function DraftDetails({
   );
 
   const [busy, setBusy] = useState(false);
-  const [showGaps, setShowGaps] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (readiness.canSend) return null;
-
+  /**
+   * Save what's here.
+   *
+   * The only thing refused is a malformed ZIP — that's not an incomplete
+   * answer, it's a wrong one, and it would be written into the address string
+   * and read back as rubbish. Everything else can be half-done.
+   */
   async function save() {
     setError(null);
-    if (needs("location") && !isCompleteAddress(addr)) {
-      setShowGaps(true);
-      setError("Add the full address — vendors travel to it.");
+    if (addr.zip.trim() && !isValidZip(addr.zip)) {
+      setError("That ZIP doesn't look right — five digits, or ZIP+4.");
       return;
-    }
-    if (needs("date") && !date) {
-      setError("Add the date.");
-      return;
-    }
-    if (needs("guests") && !(Number(guests) > 0)) {
-      setError("Add a guest count — something here is priced per person.");
-      return;
-    }
-    for (const b of hourly) {
-      const t = times[b.booking_id];
-      if (!t?.start || !t?.end) {
-        setError(`Add start and end times for ${b.service_name || "the hourly service"}.`);
-        return;
-      }
     }
 
     setBusy(true);
     try {
-      const location = isCompleteAddress(addr) ? formatAddress(addr) : undefined;
+      // A partial address still composes, and parses back into the same parts
+      // next time — it just won't satisfy the send check, which is right.
+      const composed = formatAddress(addr);
+      const location = composed || undefined;
       const count = Number(guests) > 0 ? Number(guests) : undefined;
 
       // Written onto every live booking, because that's what a vendor is sent
@@ -123,10 +116,10 @@ export function DraftDetails({
             ...(location ? { location } : {}),
             ...(count != null ? { guest_count: count } : {}),
             ...(times[b.booking_id]?.start
-              ? {
-                  time_start: times[b.booking_id].start,
-                  time_end: times[b.booking_id].end,
-                }
+              ? { time_start: times[b.booking_id].start }
+              : {}),
+            ...(times[b.booking_id]?.end
+              ? { time_end: times[b.booking_id].end }
               : {}),
           }),
         ),
@@ -152,13 +145,16 @@ export function DraftDetails({
 
   return (
     <Card className="mt-4 p-5">
-      <h2 className="serif text-lg text-ink">Before this can be sent</h2>
+      <h2 className="serif text-lg text-ink">
+        {readiness.canSend ? "Details" : "Before this can be sent"}
+      </h2>
       <p className="mt-1 text-sm text-ink-soft">
-        These go to every vendor in the plan.
+        These go to every vendor in the plan. Save as much as you have — you can
+        come back for the rest.
       </p>
 
       <div className="mt-4 grid gap-4">
-        {needs("date") ? (
+        {needs("date") || date ? (
           <Field
             label="Event date"
             type="date"
@@ -167,7 +163,7 @@ export function DraftDetails({
           />
         ) : null}
 
-        {needs("guests") ? (
+        {needs("guests") || guests ? (
           <Field
             label="Guest count"
             type="number"
@@ -179,13 +175,13 @@ export function DraftDetails({
           />
         ) : null}
 
-        {needs("location") ? (
+        {needs("location") || formatAddress(addr) ? (
           <div>
             <p className="mb-2 text-sm font-medium text-ink-soft">Where it&apos;s happening</p>
             <AddressFields
               value={addr}
               onChange={setAddr}
-              showGaps={showGaps}
+              showGaps={false}
               zipHint={venueZip && venueZip === addr.zip ? venueZip : null}
             />
           </div>
