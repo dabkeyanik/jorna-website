@@ -286,12 +286,17 @@ export function planForBundle(bundle: BundleDetail): BundlePlan {
   }
 
   const days = daysUntil(bundle.event?.date_iso);
+  // On a draft nothing has been sent, so nothing is waiting on a vendor. The
+  // bookings exist and carry status "pending", but that's the shape they're
+  // stored in — /chatbot/bundles holds the notifications until /select.
+  const draft = isDraftBundle(bundle);
   const tasks = [
     ...eventTasks(bundle.event, bookings),
     ...bookings
       .filter((b) => !isDeadBooking(b))
       .map(bookingTask)
-      .filter((t): t is PlanTask => t !== null),
+      .filter((t): t is PlanTask => t !== null)
+      .filter((t) => !(draft && t.kind === "vendor-reply")),
   ].map((t) => sharpen(t, days));
   // Urgent first; otherwise the order they were derived in.
   tasks.sort((a, b) => (a.tone === b.tone ? 0 : a.tone === "urgent" ? -1 : 1));
@@ -572,3 +577,55 @@ export function describeGaps(gaps: BookingGap[]): string {
   if (labels.length <= 1) return labels[0] ?? "";
   return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
 }
+
+// ── Drafts ───────────────────────────────────────────────────────────
+//
+// POST /chatbot/bundles persists its three options as *draft* bundles and holds
+// vendor notifications until one is selected; POST /bundles/{id}/select is what
+// releases them, discards the other two, and hands back the chosen one. So a
+// draft is a plan nobody outside this account knows about yet, and selecting is
+// the act of sending it.
+
+/** Whether this bundle is still private to the client. */
+export function isDraftBundle(bundle: BundleDetail): boolean {
+  return (bundle.status ?? "").trim().toLowerCase() === "draft";
+}
+
+export interface SendReadiness {
+  /** Bookings that can't be answered yet, with what each is missing. */
+  blocked: { booking: BundleBooking; gaps: BookingGap[] }[];
+  /** Every distinct thing missing across the bundle, in a stable order. */
+  missing: BookingGapField[];
+  canSend: boolean;
+}
+
+/**
+ * Can this draft go to its vendors?
+ *
+ * Only live bookings count — a declined one isn't waiting on anything — and an
+ * empty bundle can't be sent, because there's nobody to send it to.
+ */
+export function sendReadiness(bundle: BundleDetail): SendReadiness {
+  const live = (bundle.bookings ?? []).filter((b) => !isDeadBooking(b));
+  const blocked = live
+    .map((booking) => ({ booking, gaps: bookingGaps(booking, bundle.event) }))
+    .filter((r) => r.gaps.length > 0);
+
+  const order: BookingGapField[] = ["date", "location", "guests", "hours"];
+  const seen = new Set<BookingGapField>();
+  for (const r of blocked) for (const g of r.gaps) seen.add(g.field);
+
+  return {
+    blocked,
+    missing: order.filter((f) => seen.has(f)),
+    canSend: live.length > 0 && blocked.length === 0,
+  };
+}
+
+/** What the missing fields are called, for a summary line. */
+export const GAP_LABELS: Record<BookingGapField, string> = {
+  date: "a date",
+  location: "a full address",
+  guests: "a guest count",
+  hours: "start and end times",
+};

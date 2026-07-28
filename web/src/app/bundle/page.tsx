@@ -17,6 +17,7 @@ import {
   listEvents,
   removeBookingFromBundle,
   renameBundle,
+  selectBundle,
   updateEvent,
 } from "@/lib/jorna";
 import { ServiceSwapPanel } from "@/components/ServiceSwapPanel";
@@ -41,11 +42,15 @@ import {
 import {
   bookingGaps,
   describeGaps,
+  GAP_LABELS,
   isDeadBooking,
+  isDraftBundle,
   moneyForBundle,
   planForBundle,
+  sendReadiness,
   taskDetail,
 } from "@/lib/planning";
+import { clearAttentionCache } from "@/lib/attention";
 import {
   formatAddress,
   isCompleteAddress,
@@ -103,6 +108,7 @@ function statusLine(b: BundleBooking): { text: string; tone: string } {
 function BookingRow({
   booking,
   event,
+  draft,
   busyId,
   panel,
   onPay,
@@ -117,6 +123,7 @@ function BookingRow({
 }: {
   booking: BundleBooking;
   event: BundleEventInfo | null | undefined;
+  draft: boolean;
   busyId: string | null;
   panel: Panel;
   onPay: (b: BundleBooking) => void;
@@ -177,13 +184,14 @@ function BookingRow({
         </div>
       </div>
 
-      {/* A request the vendor can't really answer. The booking exists — the
-          backend made it — so the honest thing is to say what's missing rather
-          than pretend it's on its way. */}
+      {/* What this one still needs. On a draft nobody has been told anything
+          yet, so saying the vendor "can't act" would be describing a request
+          that hasn't been made. */}
       {gaps.length > 0 && !isBeyondActionable(booking) ? (
-        <p className="mt-3 rounded-lg border border-maroon/40 bg-maroon/[0.06] px-3 py-2 text-xs text-maroon dark:border-gold/40 dark:bg-gold/[0.08] dark:text-gold">
-          {booking.vendor_name || "The vendor"} can&apos;t act on this until it has{" "}
-          {describeGaps(gaps)}. Add {gaps.length === 1 ? "it" : "them"} above.
+        <p className="mt-3 rounded-lg border border-gold/50 bg-gold/[0.08] px-3 py-2 text-xs text-ink-soft">
+          {draft
+            ? `Needs ${describeGaps(gaps)} before ${booking.vendor_name || "this vendor"} can be asked.`
+            : `${booking.vendor_name || "The vendor"} can't act on this until it has ${describeGaps(gaps)}.`}
         </p>
       ) : null}
 
@@ -684,6 +692,29 @@ function BundleInner() {
     }
   }
 
+  /**
+   * Release the draft to its vendors.
+   *
+   * /bundles/{id}/select is the call that notifies them; it also discards the
+   * other two options from the same generation, which is why it's right that
+   * this happens once, deliberately, rather than at the moment of picking.
+   */
+  async function send() {
+    if (!bundleId || !bundle) return;
+    setBundleBusy(true);
+    setNotice(null);
+    try {
+      await selectBundle(bundleId);
+      clearAttentionCache();
+      setNotice("Sent. Your vendors have been asked — you'll see their answers here.");
+      await load();
+    } catch (err) {
+      setNotice(err instanceof ApiError ? err.message : "Couldn't send these requests. Try again.");
+    } finally {
+      setBundleBusy(false);
+    }
+  }
+
   async function pay(booking: BundleBooking) {
     setBusyId(booking.booking_id);
     setNotice(null);
@@ -716,6 +747,8 @@ function BundleInner() {
 
   const plan = planForBundle(bundle);
   const cash = moneyForBundle(bundle);
+  const draft = isDraftBundle(bundle);
+  const readiness = sendReadiness(bundle);
 
   // The same row wherever a booking appears — the sections below differ only in
   // which bookings they hold, not in what a booking can do.
@@ -724,6 +757,7 @@ function BundleInner() {
       key={b.booking_id}
       booking={b}
       event={bundle.event}
+      draft={draft}
       busyId={busyId}
       panel={panel}
       onPay={pay}
@@ -917,6 +951,37 @@ function BundleInner() {
         </div>
       </header>
 
+      {draft ? (
+        <section
+          className={`mt-6 rounded-2xl border p-5 ${
+            readiness.canSend
+              ? "border-green/40 bg-green/[0.06]"
+              : "border-gold/50 bg-gold/[0.07]"
+          }`}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="serif text-lg text-ink">
+                {readiness.canSend ? "Ready to send" : "Draft — nobody has been asked yet"}
+              </h2>
+              <p className="mt-1 max-w-[60ch] text-sm text-ink-soft">
+                {readiness.canSend
+                  ? "Sending asks each vendor to hold your date. You can still swap or remove anyone until they answer."
+                  : bundle.bookings.length === 0
+                    ? "There's nothing in this plan yet."
+                    : `Vendors are asked to be somewhere, at a time, for a price. This plan still needs ${readiness.missing
+                        .map((f) => GAP_LABELS[f])
+                        .join(", ")
+                        .replace(/, ([^,]*)$/, " and $1")}.`}
+              </p>
+            </div>
+            <Button disabled={!readiness.canSend || bundleBusy} onClick={send}>
+              {bundleBusy ? "Sending…" : "Send to vendors"}
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
       {bundle.event ? (
         <CelebrationPanel
           summary={bundle.event}
@@ -999,9 +1064,13 @@ function BundleInner() {
 
       {plan.awaiting.length > 0 ? (
         <section className="mt-8">
-          <h2 className="eyebrow mb-3">Awaiting the vendor · {plan.awaiting.length}</h2>
+          <h2 className="eyebrow mb-3">
+            {draft ? "In this plan" : "Awaiting the vendor"} · {plan.awaiting.length}
+          </h2>
           <p className="mb-3 text-sm text-ink-soft">
-            Requested — nothing to do until they answer.
+            {draft
+              ? "Nobody has been asked yet — sending does that."
+              : "Requested — nothing to do until they answer."}
           </p>
           <div className="grid gap-3">{plan.awaiting.map(renderRow)}</div>
         </section>

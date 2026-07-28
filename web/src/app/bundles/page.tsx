@@ -27,6 +27,7 @@ import { ApiError } from "@/lib/api";
 import { createEvent, listBundles, listEvents } from "@/lib/jorna";
 import {
   compareByDate,
+  isDraftBundle,
   missingCategories,
   moneyForBundle,
   planForBundle,
@@ -199,6 +200,9 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
   const urgent = tasks.filter((t) => t.tone === "urgent").length;
   const when = countdown(dateIso);
   const total = money(spend);
+  // Every bundle still a draft means nobody has been asked yet, which is a
+  // truer headline than a task count.
+  const allDraft = bundles.length > 0 && bundles.every(isDraftBundle);
   const overBudget = budget != null && celebration.money.committed > budget;
   // Scale against the budget when there is one, so the bar shows how much of it
   // is spoken for; against the committed total otherwise, and never past 100%.
@@ -219,7 +223,11 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
             </p>
           ) : null}
         </div>
-        {tasks.length > 0 ? (
+        {allDraft ? (
+          <span className="shrink-0 rounded-full bg-gold/15 px-3 py-1 text-xs font-semibold text-gold">
+            Draft
+          </span>
+        ) : tasks.length > 0 ? (
           <span
             className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
               urgent > 0
@@ -339,7 +347,9 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
           // this carries the details across rather than pretending to link.
           <LinkButton href={`/plan${buildQuery(celebration)}`}>Build a bundle</LinkButton>
         ) : (
-          <LinkButton href={`/bundle?id=${bundles[0].bundle_id}`}>Open plan</LinkButton>
+          <LinkButton href={`/bundle?id=${bundles[0].bundle_id}`}>
+            {allDraft ? "Review draft" : "Open plan"}
+          </LinkButton>
         )}
       </div>
     </Card>

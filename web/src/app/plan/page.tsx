@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { celebrationByKey } from "@/lib/celebrations";
-import { generateBundles, selectBundle } from "@/lib/jorna";
+import { generateBundles } from "@/lib/jorna";
 import { CATEGORY_LABELS, categoryLabel, type BundleOption } from "@/lib/types";
 import { Button, Card, Chip, Field, Rule } from "@/components/ui";
 import { BundleResults } from "@/components/BundleResults";
@@ -28,14 +28,6 @@ const IconPin = (
     <circle cx="12" cy="10" r="2.5" />
   </svg>
 );
-/**
- * Categories normally sold per head. Not a rule the backend enforces — services
- * carry their own price_unit and the real check happens per booking — but at
- * generation time there are no services yet, only the categories asked for, so
- * this is what can be known.
- */
-const PER_HEAD_CATEGORIES = ["catering", "bar_beverage", "cakes_desserts"];
-
 const IconCalendar = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className={svg}>
     <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
@@ -122,23 +114,22 @@ function PlanInner() {
   const [choosingLabel, setChoosingLabel] = useState<string | null>(null);
 
   /**
-   * Keep one of the three options. The backend persisted all three as drafts
-   * sharing a bundle_group_id; selecting keeps this one and discards the rest,
-   * then we go to the bundle to book and pay.
+   * Open one of the three options. It stays a draft.
+   *
+   * POST /chatbot/bundles persists all three as drafts and — its own words —
+   * holds vendor notifications until one is selected. This used to call
+   * /bundles/{id}/select right here, which is the call that notifies them, so
+   * vendors heard about plans that had no date and no address yet.
+   *
+   * Now the draft simply opens on the dashboard, where the missing details are
+   * asked for; sending is a separate, deliberate act there. The other two drafts
+   * stay until then — /select is what discards them — and since all three share
+   * an event they appear as one celebration, not three.
    */
-  async function choose(option: BundleOption) {
+  function choose(option: BundleOption) {
     if (!option.bundle_id) return;
     setChoosingLabel(option.label);
-    setError(null);
-    try {
-      await selectBundle(option.bundle_id);
-      router.push(`/bundle?id=${option.bundle_id}`);
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Couldn't select that bundle. Try again.",
-      );
-      setChoosingLabel(null);
-    }
+    router.push(`/bundle?id=${option.bundle_id}`);
   }
 
   function toggle(list: string[], setList: (v: string[]) => void, value: string) {
@@ -148,25 +139,6 @@ function PlanInner() {
   async function generate() {
     if (needed.length === 0) {
       setError("Pick at least one category to include.");
-      return;
-    }
-    // Selecting a bundle creates real booking requests, and a vendor accepting
-    // one is agreeing to be somewhere on a date. Both were optional here, so a
-    // bundle could be generated with neither and the requests still went out.
-    if (!eventDate) {
-      setError("Add your event date — vendors are asked to hold it.");
-      return;
-    }
-    if (!location.trim()) {
-      setError("Add where it's happening — vendors need somewhere to travel to.");
-      return;
-    }
-    // Per-person pricing can't be totalled without a headcount, and the
-    // categories most likely to be priced that way are pickable here.
-    if (needed.some((c) => PER_HEAD_CATEGORIES.includes(c)) && !(Number(guests) > 0)) {
-      setError(
-        "Add a guest count — catering and bar are usually priced per person, so their totals need one.",
-      );
       return;
     }
     setBusy(true);
