@@ -9,13 +9,20 @@
 //
 // The backend has no address columns, so the caller composes these into the one
 // `location` string it does have — see lib/address.
+//
+// Four of the five fields are facts about the fifth: a ZIP determines its city
+// and state. lib/zips ships that table, so typing a ZIP fills them in and a ZIP
+// that contradicts them says so — which is where the real mistakes are. The
+// street line is the part people know by heart, and stays typed.
 
+import { useRef, useState } from "react";
 import {
   addressGaps,
   isValidZip,
   US_STATES,
   type Address,
 } from "@/lib/address";
+import { loadZipIndex, zipDisagrees, type ZipIndex } from "@/lib/zips";
 
 const LABELS: Record<keyof Address, string> = {
   line1: "Street address",
@@ -41,6 +48,29 @@ export function AddressFields({
   const gaps = showGaps ? addressGaps(value) : [];
   const bad = (field: keyof Address) => gaps.includes(field);
 
+  // The ZIP table, fetched the first time somebody touches these fields —
+  // never on page load, and never at all for a visitor who doesn't get here.
+  const [zips, setZips] = useState<ZipIndex | null>(null);
+  const asked = useRef(false);
+
+  function warm() {
+    if (asked.current) return;
+    asked.current = true;
+    void loadZipIndex().then(setZips);
+  }
+
+  // Once a whole ZIP is typed, the city and state are facts rather than
+  // questions — fill them, but only into blanks. Overwriting what somebody
+  // deliberately typed is how a form argues with you; the mismatch note below
+  // handles that case instead, by offering rather than taking.
+  function setZip(zip: string) {
+    const place = zips?.place(zip);
+    const fillable = place && !value.city.trim() && !value.state.trim();
+    onChange(fillable ? { ...value, zip, city: place.city, state: place.state } : { ...value, zip });
+  }
+
+  const conflict = zipDisagrees(zips, value.zip, value.city, value.state);
+
   const field = (
     key: keyof Address,
     extra: React.InputHTMLAttributes<HTMLInputElement> = {},
@@ -55,7 +85,10 @@ export function AddressFields({
       <input
         {...extra}
         value={value[key]}
-        onChange={(e) => onChange({ ...value, [key]: e.target.value })}
+        onFocus={warm}
+        onChange={(e) =>
+          key === "zip" ? setZip(e.target.value) : onChange({ ...value, [key]: e.target.value })
+        }
         aria-invalid={bad(key) || undefined}
         className={`w-full rounded-xl border bg-ground-2 px-3.5 py-2.5 text-ink outline-none transition focus:border-gold focus:ring-2 focus:ring-gold/30 ${
           bad(key) ? "border-maroon dark:border-gold" : "border-card-edge"
@@ -109,10 +142,50 @@ export function AddressFields({
         </div>
       </div>
 
+      {/* The ZIP says one place and the fields say another. Which is the typo
+          isn't knowable from here, so this offers rather than corrects — but it
+          catches "60201, Chicago, IL" before a vendor drives to it. */}
+      {conflict ? (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-gold/10 px-3 py-2 text-sm text-ink-soft">
+          <span>
+            {value.zip.trim().slice(0, 5)} is{" "}
+            <strong className="font-semibold text-ink">
+              {conflict.city}, {conflict.state}
+            </strong>
+            .
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange({ ...value, city: conflict.city, state: conflict.state })}
+            className="font-semibold text-gold hover:underline"
+          >
+            Use that
+          </button>
+        </div>
+      ) : null}
+
       {gaps.length > 0 ? (
         <p className="rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
           Vendors travel to this address — it needs a street, a city, a state and a
           valid ZIP before anyone can be sent to it.
+        </p>
+      ) : null}
+
+      {/* The ZIP table is GeoNames' work under CC BY 4.0, and a link is the
+          attribution that licence asks for. Shown only once the data has
+          actually been used. */}
+      {zips ? (
+        <p className="text-xs text-ink-faint">
+          ZIP lookup by{" "}
+          <a
+            href="https://www.geonames.org"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-ink-soft"
+          >
+            GeoNames
+          </a>
+          .
         </p>
       ) : null}
     </div>

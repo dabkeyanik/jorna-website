@@ -21,6 +21,7 @@ import {
   type TaxonomyCategory,
   type VendorDetail,
 } from "@/lib/types";
+import { geocodeUsAddress } from "@/lib/geocode";
 import { Button, Card, Field, LinkButton } from "@/components/ui";
 import { VendorNav } from "@/components/VendorNav";
 
@@ -60,6 +61,9 @@ export default function MyServicesPage() {
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [locating, setLocating] = useState(false);
+  /** The address as the Census matched it, shown back after a successful pin. */
+  const [matched, setMatched] = useState<string | null>(null);
 
   const [editing, setEditing] = useState<string | "new" | null>(null);
   const [form, setForm] = useState<ServiceInput>(blank);
@@ -132,6 +136,43 @@ export default function MyServicesPage() {
     setNewPhotos([]);
     setEditing(s.service_id);
     setError(null);
+  }
+
+  /**
+   * Find the pin from the address that's already typed.
+   *
+   * The better of the two buttons for the usual case: a vendor listing a hall
+   * is at a desk, not at the hall, so "use my current location" would pin the
+   * desk. Nobody knows a venue's latitude, and check-in is measured against it.
+   */
+  async function locateFromAddress() {
+    const address = (form.location ?? "").trim();
+    if (!address) {
+      setError("Type the venue's address first, then look it up.");
+      return;
+    }
+    setLocating(true);
+    setError(null);
+    setMatched(null);
+    try {
+      const hit = await geocodeUsAddress(address);
+      if (!hit) {
+        setError(
+          "No match for that address. Check it, or drop the pin with the coordinates below.",
+        );
+        return;
+      }
+      setForm((f) => ({
+        ...f,
+        venue_latitude: Number(hit.lat.toFixed(6)),
+        venue_longitude: Number(hit.lng.toFixed(6)),
+      }));
+      setMatched(hit.matched);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The address lookup failed.");
+    } finally {
+      setLocating(false);
+    }
   }
 
   function useMyLocation() {
@@ -440,9 +481,37 @@ export default function MyServicesPage() {
                       }
                     />
                   </div>
-                  <Button type="button" variant="ghost" size="md" onClick={useMyLocation}>
-                    Use my current location
-                  </Button>
+                  {matched ? (
+                    <p className="rounded-lg bg-green/10 px-3 py-2 text-xs text-ink-soft">
+                      Pinned to <strong className="font-semibold text-ink">{matched}</strong>. If
+                      that isn&apos;t the right door, adjust the coordinates above.
+                    </p>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="md"
+                      disabled={locating}
+                      onClick={locateFromAddress}
+                    >
+                      {locating ? "Looking up…" : "Find it from the address"}
+                    </Button>
+                    <Button type="button" variant="ghost" size="md" onClick={useMyLocation}>
+                      I&apos;m standing there now
+                    </Button>
+                  </div>
+                  <p className="text-xs text-ink-faint">
+                    Address lookup by the{" "}
+                    <a
+                      href="https://geocoding.geo.census.gov"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-ink-soft"
+                    >
+                      US Census Bureau
+                    </a>
+                    . US addresses only.
+                  </p>
                 </div>
               </div>
             ) : null}
