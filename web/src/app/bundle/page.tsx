@@ -31,7 +31,7 @@ import {
   PAYMENT_STATUS_LABELS,
   categoryLabel,
   eventHasPassed,
-  priceUnitLabel,
+  priceLine,
   withinRefundWindow,
   type BundleBooking,
   type BundleDetail,
@@ -150,7 +150,7 @@ function BookingRow({
   const [reason, setReason] = useState("");
   const [showNeg, setShowNeg] = useState(false);
   const pay = booking.payment_status ?? "unpaid";
-  const unit = priceUnitLabel(booking.price_unit);
+  const price = priceLine(booking);
   const status = statusLine(booking, draft);
   const busy = busyId === booking.booking_id;
   const openPanel = panel?.bookingId === booking.booking_id ? panel.kind : null;
@@ -190,8 +190,8 @@ function BookingRow({
           </div>
         </div>
         <div className="text-right">
-          <p className="serif text-lg text-ink">{money(booking.price)}</p>
-          {unit ? <p className="text-xs text-ink-faint">{unit}</p> : null}
+          <p className="serif text-lg text-ink">{money(price.amount)}</p>
+          {price.caption ? <p className="text-xs text-ink-faint">{price.caption}</p> : null}
         </div>
       </div>
 
@@ -209,7 +209,9 @@ function BookingRow({
       {/* Payment */}
       {blockedOnQuantity ? (
         <p className="mt-3 rounded-lg bg-gold/10 px-3 py-2 text-xs text-ink-soft">
-          This service is priced {unit || "per unit"}. Its total needs a guest count
+          {/* Reached only when the quantity is still pending, so the caption is
+              the rate label rather than a total. */}
+          This service is priced {price.caption || "per unit"}. Its total needs a guest count
           or date range before it can be paid — add those in the Jorna app.
         </p>
       ) : payable ? (

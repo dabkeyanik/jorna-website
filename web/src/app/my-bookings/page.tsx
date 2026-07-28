@@ -17,7 +17,7 @@ import {
   categoryLabel,
   eventHasPassed,
   formatCheckInTime,
-  priceUnitLabel,
+  priceLine,
   type VendorBooking,
   type VendorDetail,
 } from "@/lib/types";
@@ -234,7 +234,7 @@ export default function MyBookingsPage() {
                 : (BOOKING_STATUS_LABELS[b.status] ?? b.status);
             const decidable =
               b.status === "pending" || b.status === "negotiation_ongoing";
-            const unit = priceUnitLabel(b.price_unit);
+            const price = priceLine(b);
             const dates =
               b.date_end && b.date_end !== b.date_iso
                 ? `${b.date_iso} → ${b.date_end}`
@@ -269,8 +269,10 @@ export default function MyBookingsPage() {
                     <p className="mt-1.5 text-sm font-medium text-ink-soft">{state}</p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="serif text-lg text-ink">{money(b.price)}</p>
-                    {unit ? <p className="text-xs text-ink-faint">{unit}</p> : null}
+                    <p className="serif text-lg text-ink">{money(price.amount)}</p>
+                    {price.caption ? (
+                      <p className="text-xs text-ink-faint">{price.caption}</p>
+                    ) : null}
                     {b.price_pending_quantity ? (
                       <p className="mt-1 max-w-[12rem] text-xs text-gold">
                         Client still needs to add a quantity before paying.

@@ -59,7 +59,7 @@ import {
 } from "@/lib/vendorPlan";
 import {
   categoryLabel,
-  priceUnitLabel,
+  priceLine,
   WEEKDAYS,
   type AvailabilitySlot,
   type Earnings,
@@ -527,7 +527,9 @@ export default function VendorDashboardPage() {
             </span>
           </div>
           <div className="grid gap-2.5">
-            {requests.map((r) => (
+            {requests.map((r) => {
+              const price = priceLine(r);
+              return (
               <Card key={r.booking_id} className="p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -538,12 +540,10 @@ export default function VendorDashboardPage() {
                   </div>
                   <div className="text-right">
                     <p className="font-bold tabular-nums text-maroon dark:text-gold">
-                      {money(r.price)}
+                      {money(price.amount)}
                     </p>
-                    {priceUnitLabel(r.price_unit) ? (
-                      <p className="text-xs text-ink-faint">
-                        {priceUnitLabel(r.price_unit)}
-                      </p>
+                    {price.caption ? (
+                      <p className="text-xs text-ink-faint">{price.caption}</p>
                     ) : null}
                   </div>
                 </div>
@@ -574,7 +574,8 @@ export default function VendorDashboardPage() {
                   </Button>
                 </div>
               </Card>
-            ))}
+              );
+            })}
           </div>
         </section>
       ) : null}

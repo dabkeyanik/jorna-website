@@ -587,3 +587,103 @@ export function priceUnitLabel(unit?: string | null): string {
   if (u === "event" || u === "flat") return "";
   return `per ${u}`;
 }
+
+// ── What a booking's price figure actually is ────────────────────────
+//
+// `price` on a booking holds two different things over its life. While the
+// quantity is unknown it's the rate — $38, captioned "per person". Once the
+// guest count arrives the backend resolves the same field to the total, and
+// $7,600 kept the caption "per person": a head price read as forty times too
+// large, on the screen where you decide whether to pay it.
+//
+// The caption has to follow the figure, so it's derived from the same data
+// rather than from the unit alone.
+
+/** Fields any priced booking carries — bundle-side and vendor-side alike. */
+export interface PricedBooking {
+  price: number;
+  price_unit?: string | null;
+  price_pending_quantity?: boolean;
+  guest_count?: number | null;
+  date_iso?: string | null;
+  date_end?: string | null;
+  time_start?: string | null;
+  time_end?: string | null;
+}
+
+/** Nights are counted inclusively, matching the backend's day arithmetic. */
+function dayCount(startIso?: string | null, endIso?: string | null): number | null {
+  if (!startIso || startIso === "TBD") return null;
+  const last = endIso && endIso !== "TBD" ? endIso : startIso;
+  const start = Date.parse(`${startIso}T00:00:00Z`);
+  const end = Date.parse(`${last}T00:00:00Z`);
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
+  return Math.round((end - start) / 86400000) + 1;
+}
+
+/** A window that ends before it starts has crossed midnight, not gone backwards. */
+function hourCount(start?: string | null, end?: string | null): number | null {
+  if (!start || !end) return null;
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  if ([sh, sm, eh, em].some((n) => !Number.isFinite(n))) return null;
+  let hours = eh + em / 60 - (sh + sm / 60);
+  if (hours <= 0) hours += 24;
+  return hours > 0 && hours <= 24 ? Math.round(hours * 100) / 100 : null;
+}
+
+/** The quantity a rate was multiplied by, or null when it can't be read. */
+export function priceQuantity(b: PricedBooking): { count: number; noun: string } | null {
+  const one = (n: number, noun: string) => ({ count: n, noun: n === 1 ? noun : `${noun}s` });
+  switch (priceUnitKind(b.price_unit)) {
+    case "person": {
+      const guests = b.guest_count ?? 0;
+      return guests > 0 ? one(guests, "guest") : null;
+    }
+    case "day": {
+      const days = dayCount(b.date_iso, b.date_end);
+      return days ? one(days, "day") : null;
+    }
+    case "hour": {
+      const hours = hourCount(b.time_start, b.time_end);
+      return hours ? one(hours, "hour") : null;
+    }
+    default:
+      return null;
+  }
+}
+
+export interface PriceLine {
+  /** The figure to show. */
+  amount: number;
+  /** What it is: "per person", "Total · 200 guests", or "" for flat pricing. */
+  caption: string;
+  /** True when `amount` is a resolved total rather than a rate. */
+  isTotal: boolean;
+}
+
+/**
+ * The figure and its caption, kept in agreement.
+ *
+ * The rate is deliberately not recovered by dividing the total: money() rounds
+ * to whole dollars, so a $37.50 head price would print "$38 × 200" beside a
+ * total of $7,500 and the two wouldn't reconcile. A sum that doesn't add up is
+ * worse than one that isn't shown, so the quantity is named instead — which is
+ * the part worth checking anyway, and the part the app can state exactly.
+ *
+ * When `price_pending_quantity` is absent the quantity stands in for it: a rate
+ * unit with nothing to multiply by hasn't been resolved.
+ */
+export function priceLine(b: PricedBooking): PriceLine {
+  if (priceUnitKind(b.price_unit) === "event") {
+    return { amount: b.price, caption: "", isTotal: true };
+  }
+  const quantity = priceQuantity(b);
+  if (b.price_pending_quantity ?? quantity == null) {
+    return { amount: b.price, caption: priceUnitLabel(b.price_unit), isTotal: false };
+  }
+  const count = quantity
+    ? `${Number.isInteger(quantity.count) ? quantity.count.toLocaleString() : quantity.count} ${quantity.noun}`
+    : null;
+  return { amount: b.price, caption: count ? `Total · ${count}` : "Total", isTotal: true };
+}
