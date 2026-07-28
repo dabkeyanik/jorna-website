@@ -59,6 +59,7 @@ import {
   type Address,
 } from "@/lib/address";
 import { AddressFields } from "@/components/AddressFields";
+import { DraftDetails } from "@/components/DraftDetails";
 import { Avatar, Button, Card, Field, LinkButton } from "@/components/ui";
 
 function money(n: number) {
@@ -989,6 +990,11 @@ function BundleInner() {
               {bundleBusy ? "Sending…" : "Send to vendors"}
             </Button>
           </div>
+
+          {/* The event editor below writes to the event, and a draft from the
+              builder may not have one — so the details live here, on the
+              bookings, where they're always writable. */}
+          <DraftDetails bundle={bundle} onSaved={load} />
         </section>
       ) : null}
 

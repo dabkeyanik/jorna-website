@@ -158,6 +158,29 @@ export function deleteBundle(bundleId: string): Promise<void> {
   return apiFetch<void>(`/bundles/${bundleId}`, { method: "DELETE" });
 }
 
+/**
+ * Set the details a booking is missing before it can be sent.
+ *
+ * These are the same fields lib/planning's bookingGaps checks, and this is the
+ * only place they can be written — a draft's bundle may have no event to hang
+ * them on, so the booking is the durable home for them.
+ */
+export interface BookingUpdateInput {
+  date_iso?: string | null;
+  date_end?: string | null;
+  guest_count?: number | null;
+  time_start?: string | null;
+  time_end?: string | null;
+  location?: string | null;
+}
+
+export function updateBooking(
+  bookingId: string,
+  updates: BookingUpdateInput,
+): Promise<unknown> {
+  return apiFetch(`/bookings/${bookingId}`, { method: "PATCH", body: updates });
+}
+
 /** Take a booking out of a bundle. Returns the refreshed bundle. */
 export function removeBookingFromBundle(
   bundleId: string,
