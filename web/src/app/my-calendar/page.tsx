@@ -22,7 +22,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { ApiError } from "@/lib/api";
 import {
+  getGoogleAuthUrl,
   getMyAvailability,
   getMyVendor,
   getVendorAvailability,
@@ -98,6 +100,77 @@ function Legend({ google }: { google: boolean }) {
         </span>
       ))}
     </div>
+  );
+}
+
+/**
+ * Link a Google Calendar, or say that one is linked.
+ *
+ * The reading half of this has worked for a long time — busy days already
+ * arrive with the availability and already have their own tint — but nothing
+ * ever offered to connect one, so the feature was only reachable from the
+ * phone. This is the missing button.
+ *
+ * It's a whole-page redirect, not a popup: Google's consent screen is its own
+ * page, and a popup is the version that gets blocked on a phone. The vendor
+ * comes back to /calendar-connected.
+ */
+function GoogleCalendarCard({
+  vendorId,
+  connected,
+}: {
+  vendorId: string;
+  connected: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function connect() {
+    setBusy(true);
+    setError(null);
+    try {
+      const { auth_url } = await getGoogleAuthUrl(vendorId);
+      window.location.href = auth_url;
+      // Deliberately stays busy: the navigation is the success case, and
+      // re-enabling the button would invite a second click during it.
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Couldn't start the Google connection.",
+      );
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="mt-4 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="serif text-lg text-ink">
+            {connected ? "Google Calendar is connected" : "Connect Google Calendar"}
+          </h2>
+          <p className="mt-1 max-w-[52ch] text-sm text-ink-soft">
+            {connected
+              ? "Days you're busy in Google show here too, so a client can't book you into a gap that isn't one."
+              : "Your Google events become busy days here, so nobody books you into a gap that isn't one. Jorna reads the times only — never what the events are — and never writes to your calendar."}
+          </p>
+        </div>
+        {connected ? (
+          <span className="shrink-0 rounded-full bg-green/15 px-3 py-1 text-xs font-semibold text-green">
+            Connected
+          </span>
+        ) : (
+          <Button disabled={busy} onClick={connect}>
+            {busy ? "Opening Google…" : "Connect"}
+          </Button>
+        )}
+      </div>
+
+      {error ? (
+        <p className="mt-3 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
+          {error}
+        </p>
+      ) : null}
+    </Card>
   );
 }
 
@@ -457,6 +530,8 @@ export default function VendorCalendarPage() {
 
         <Legend google={googleConnected} />
       </Card>
+
+      {vendorId ? <GoogleCalendarCard vendorId={vendorId} connected={googleConnected} /> : null}
 
       <section className="mt-8">
         <h2 className="eyebrow mb-3">Upcoming</h2>

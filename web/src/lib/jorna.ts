@@ -546,6 +546,28 @@ export function getVendorAvailability(
   );
 }
 
+// ── Google Calendar ──────────────────────────────────────────────────
+//
+// Reading a vendor's Google-busy days has worked for a while — the days and the
+// connected flag both arrive on getVendorAvailability above, which is why
+// there's no wrapper here for /calendar-status: it would answer a question the
+// calendar has already asked.
+//
+// This is the half that was missing: starting the link at all.
+
+/**
+ * The Google consent URL to send the vendor to. Their own vendor only — the
+ * backend returns 403 otherwise, since completing this flow writes tokens onto
+ * whichever vendor the URL names.
+ *
+ * `client=web` is what makes the return trip land back here. Without it the
+ * backend finishes on its own bridge page, which exists to bounce the iOS app
+ * open and is a dead end in a browser. Same convention as Stripe onboarding.
+ */
+export function getGoogleAuthUrl(vendorId: string): Promise<{ auth_url: string }> {
+  return apiFetch(`/vendors/${vendorId}/google-auth${query({ client: "web" })}`);
+}
+
 /** Replace all weekly availability slots. Send [] to clear. */
 export function setMyAvailability(slots: AvailabilitySlot[]): Promise<unknown> {
   const clean = slots.map((s) => ({
