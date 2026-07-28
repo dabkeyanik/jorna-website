@@ -593,9 +593,38 @@ export function describeGaps(gaps: BookingGap[]): string {
 // draft is a plan nobody outside this account knows about yet, and selecting is
 // the act of sending it.
 
-/** Whether this bundle is still private to the client. */
+/**
+ * Evidence that a vendor has already seen this booking.
+ *
+ * A vendor can't accept, decline, or be paid for a request that was never sent
+ * to them, so any of those settles the question by itself.
+ */
+function showsVendorContact(b: BundleBooking): boolean {
+  if (["approved", "rejected", "payment_confirmed"].includes(b.status)) return true;
+  return (b.payment_status ?? "unpaid").toLowerCase() !== "unpaid";
+}
+
+/**
+ * Whether this bundle is still private to the client.
+ *
+ * The status is the answer when it's trustworthy. It wasn't, for a long time:
+ * nothing on the backend ever moved a bundle off "draft", so every bundle ever
+ * created still says draft — including ones whose vendors have already
+ * accepted. That made a permanent draft of every plan, which is why the page
+ * went on offering to send one that had plainly been sent.
+ *
+ * Sending sets the status now, so new plans answer for themselves. Older ones
+ * can't, so their bookings answer for them: one vendor having replied is proof
+ * the plan left the building.
+ *
+ * What that can't recover is a plan sent before the fix that no vendor has
+ * answered yet — nothing distinguishes it from one never sent. It keeps its
+ * Send button, and pressing it is harmless: sending is idempotent and only
+ * notifies vendors who haven't replied.
+ */
 export function isDraftBundle(bundle: BundleDetail): boolean {
-  return (bundle.status ?? "").trim().toLowerCase() === "draft";
+  if ((bundle.status ?? "").trim().toLowerCase() !== "draft") return false;
+  return !(bundle.bookings ?? []).some(showsVendorContact);
 }
 
 export interface SendReadiness {
