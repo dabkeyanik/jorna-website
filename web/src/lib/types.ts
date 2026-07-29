@@ -783,3 +783,112 @@ export function priceLine(b: PricedBooking): PriceLine {
     : null;
   return { amount: b.price, caption: count ? `Total · ${count}` : "Total", isTotal: true };
 }
+
+// ── Guest lists ──────────────────────────────────────────────────────
+//
+// A celebration here is usually several gatherings with different guest lists,
+// and the number that matters is per gathering: a caterer bills against the
+// headcount for the function they're working, not for the week.
+
+/** One gathering within a celebration — a mehndi, a sangeet, a reception. */
+export interface EventFunction {
+  function_id: string;
+  event_id: string;
+  name: string;
+  /** Its own day and hours. Null falls back to the celebration's. */
+  date_iso?: string | null;
+  time_start?: string | null;
+  time_end?: string | null;
+  location?: string | null;
+  sort_order: number;
+}
+
+/** What a guest said about one function. */
+export interface GuestInvite {
+  function_id: string;
+  status: "no_reply" | "attending" | "declined";
+  /** What they actually committed to, which isn't always what was expected. */
+  attending_count?: number | null;
+  responded_at?: string | null;
+}
+
+/**
+ * Somebody invited — a person or a household. One row per invitation rather
+ * than per body: "the Kapoor family, 4" is how a list is kept.
+ */
+export interface Guest {
+  guest_id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  /** How many the host expects under this name. */
+  party_size: number;
+  note?: string | null;
+  /** Arrived through the shared link rather than being added by the host. */
+  self_added: boolean;
+  /** Their own link. Sending it is how they get to reply. */
+  token: string;
+  invites: GuestInvite[];
+}
+
+/** What the replies add up to, per function. */
+export interface FunctionHeadcount {
+  function_id: string;
+  name: string;
+  date_iso?: string | null;
+  /** Invitations, not people. */
+  invited: number;
+  /** People. An attending_count where given, otherwise the party size. */
+  attending: number;
+  declined: number;
+  no_reply: number;
+  /** What the host put down — the figure a plan is usually built against. */
+  expected: number;
+}
+
+export interface GuestList {
+  functions: EventFunction[];
+  guests: Guest[];
+  headcount: FunctionHeadcount[];
+  /** The shared link's token, or null when there isn't one out there. */
+  invite_link: string | null;
+}
+
+/** The invitation a link opens. Bounded by what an invitation should say. */
+export interface Invitation {
+  event_name: string;
+  functions: EventFunction[];
+  location?: string | null;
+  date_iso?: string | null;
+  /** Null when the link is the shared one and the reader is nobody yet. */
+  guest: {
+    name: string;
+    party_size: number;
+    replies: { function_id: string; status: string; attending_count?: number | null }[];
+  } | null;
+}
+
+export interface RsvpReply {
+  function_id: string;
+  status: "attending" | "declined";
+  attending_count?: number | null;
+}
+
+/**
+ * The gap between what a function is planned for and what people have said.
+ *
+ * Deliberately reports rather than decides. A vendor booked for two hundred is
+ * holding a promise, not a variable — so this is the difference the host looks
+ * at, not a number anything changes on its own.
+ */
+export function headcountGap(
+  counts: FunctionHeadcount,
+  plannedFor?: number | null,
+): { delta: number; settled: boolean } | null {
+  if (plannedFor == null || plannedFor <= 0) return null;
+  return {
+    delta: counts.attending - plannedFor,
+    // Everyone has answered, so the number won't move on its own.
+    settled: counts.no_reply === 0 && counts.invited > 0,
+  };
+}
