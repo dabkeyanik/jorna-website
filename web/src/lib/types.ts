@@ -251,6 +251,16 @@ export interface BundleBooking {
   resend_checkin_reason?: string | null;
   /** When this vendor was last emailed about checking in, scheduled or asked for. */
   checkin_reminded_at?: string | null;
+  /**
+   * Booking fields the vendor has already been told, and which the server will
+   * now refuse to change — `date_iso`, `location`, `guest_count`, `time_start`,
+   * `time_end`, `date_end`. Empty while the plan is a draft.
+   *
+   * A field that is still blank is never listed: filling it completes the
+   * request rather than altering it, which is the only way a booking that went
+   * out short of a headcount ever becomes payable.
+   */
+  locked_fields?: string[];
 }
 
 /** How long after paying a full refund is still available. */

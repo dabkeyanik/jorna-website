@@ -19,6 +19,7 @@ import {
   removeBookingFromBundle,
   renameBundle,
   selectBundle,
+  updateBooking,
   updateEvent,
   CARD_RETURN_KEY,
   getSavedCard,
@@ -54,6 +55,7 @@ import {
   isDeadBooking,
   isDraftBundle,
   moneyForBundle,
+  planIsCommitted,
   planForBundle,
   sendReadiness,
   taskDetail,
@@ -619,27 +621,52 @@ function CelebrationPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // The date, address and headcount stop being editable here once a vendor has
+  // been asked to hold them. Budget stays: no vendor is ever shown it.
+  const live = bookings.filter((b) => !isDeadBooking(b));
+  const committed = planIsCommitted(live);
+
   async function save() {
     setBusy(true);
     setError(null);
-    // A half-written address is worse than none: vendors are sent to it.
-    if (!isCompleteAddress(addr)) {
+    // A half-written address is worse than none: vendors are sent to it. Only
+    // asked for while the address is still this client's to set.
+    if (!committed && !isCompleteAddress(addr)) {
       setShowGaps(true);
       setBusy(false);
       setError("Add the full address before saving — vendors travel to it.");
       return;
     }
     const updates: Partial<EventCreateInput> = {};
-    if (date) updates.date_iso = date;
-    updates.location = formatAddress(addr);
-    if (guests) updates.guest_count = Number(guests);
     if (spend) updates.budget = Number(spend);
-    // The address as a point, so a plan held somewhere the client arranged
-    // themselves can still be checked into. Silent when it can't be resolved —
-    // the address is what was asked for, and the pin is the app's problem.
-    Object.assign(updates, await addressPin(addr));
+    if (!committed) {
+      if (date) updates.date_iso = date;
+      updates.location = formatAddress(addr);
+      if (guests) updates.guest_count = Number(guests);
+      // The address as a point, so a plan held somewhere the client arranged
+      // themselves can still be checked into. Silent when it can't be resolved —
+      // the address is what was asked for, and the pin is the app's problem.
+      Object.assign(updates, await addressPin(addr));
+    }
     try {
       if (Object.keys(updates).length > 0) await updateEvent(summary.event_id, updates);
+      // The same values onto the bookings, because those are what a vendor is
+      // sent and what the send check reads. Without this the two cards
+      // disagreed: a headcount typed here updated the event and left every
+      // booking as it was, so the card above went on asking for a number the
+      // client had just supplied. Only while nothing is committed — past that
+      // these fields aren't shown at all.
+      if (!committed) {
+        await Promise.all(
+          live.map((b) =>
+            updateBooking(b.booking_id, {
+              ...(date ? { date_iso: date } : {}),
+              location: formatAddress(addr),
+              ...(guests ? { guest_count: Number(guests) } : {}),
+            }),
+          ),
+        );
+      }
       setEditing(false);
       await onSaved();
     } catch (err) {
@@ -654,15 +681,24 @@ function CelebrationPanel({
       <div className="mt-4 rounded-2xl border border-card-edge bg-card p-4">
         <p className="mb-3 text-sm font-medium text-ink-soft">Event details</p>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          <Field
-            label="Guests"
-            type="number"
-            min={1}
-            placeholder="200"
-            value={guests}
-            onChange={(e) => setGuests(e.target.value)}
-          />
+          {!committed ? (
+            <>
+              <Field
+                label="Date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+              <Field
+                label="Guests"
+                type="number"
+                min={1}
+                placeholder="200"
+                value={guests}
+                onChange={(e) => setGuests(e.target.value)}
+              />
+            </>
+          ) : null}
           <Field
             label="Budget"
             type="number"
@@ -674,15 +710,27 @@ function CelebrationPanel({
           />
         </div>
 
-        <div className="mt-4 border-t border-line-soft pt-4">
-          <p className="mb-3 text-sm font-medium text-ink-soft">Where it&apos;s happening</p>
-          <AddressFields
-            value={addr}
-            onChange={setAddr}
-            showGaps={showGaps}
-            zipHint={venueZip && venueZip === addr.zip ? venueZip : null}
-          />
-        </div>
+        {!committed ? (
+          <div className="mt-4 border-t border-line-soft pt-4">
+            <p className="mb-3 text-sm font-medium text-ink-soft">Where it&apos;s happening</p>
+            <AddressFields
+              value={addr}
+              onChange={setAddr}
+              showGaps={showGaps}
+              zipHint={venueZip && venueZip === addr.zip ? venueZip : null}
+            />
+          </div>
+        ) : (
+          // Said plainly rather than by disabling four inputs nobody can use.
+          // The date and address are what the vendors agreed to hold; changing
+          // them is cancelling a request and making a new one, which is a
+          // decision rather than an edit.
+          <p className="mt-4 border-t border-line-soft pt-4 text-sm text-ink-soft">
+            Your vendors have this plan&apos;s date, address and headcount, so those
+            are settled. To move any of them, cancel the requests affected and
+            book again.
+          </p>
+        )}
         {error ? (
           <p className="mt-3 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
             {error}
