@@ -133,6 +133,11 @@ function MarketplaceInner() {
 
   const [place, setPlace] = useState("");
   const [date, setDate] = useState("");
+  // Optional hours for the date. A vendor's day isn't a single booking, so
+  // without these the filter can only ask "busy at all that day" and drops
+  // someone whose morning ceremony has nothing to do with your evening.
+  const [timeStart, setTimeStart] = useState("");
+  const [timeEnd, setTimeEnd] = useState("");
   const [minRating, setMinRating] = useState(0);
   const [maxPrice, setMaxPrice] = useState("");
   const [sortBy, setSortBy] = useState("rating");
@@ -208,18 +213,22 @@ function MarketplaceInner() {
 
   // Availability for exactly the candidates, refetched when they or the date
   // change. Cancellation keeps a slow response from overwriting a newer one.
-  const availKey = date ? `${date}|${candidateIds}` : "";
+  // Only a whole window narrows anything — half of one says nothing an
+  // availability check can use.
+  const window = timeStart && timeEnd ? { start: timeStart, end: timeEnd } : null;
+  const availKey = date ? `${date}|${timeStart}|${timeEnd}|${candidateIds}` : "";
   useEffect(() => {
     if (!availKey) return;
     let cancelled = false;
     const ids = candidateIds ? candidateIds.split(",") : [];
-    freeVendorIds(ids, date).then((free) => {
+    const hours = timeStart && timeEnd ? { start: timeStart, end: timeEnd } : null;
+    freeVendorIds(ids, date, hours).then((free) => {
       if (!cancelled) setAvail({ key: availKey, ids: free });
     });
     return () => {
       cancelled = true;
     };
-  }, [availKey, candidateIds, date]);
+  }, [availKey, candidateIds, date, timeStart, timeEnd]);
 
   function pickCategory(tile: (typeof TILES)[number] | null) {
     setCategory(tile?.category ?? "");
@@ -229,6 +238,8 @@ function MarketplaceInner() {
   function clearFilters() {
     setPlace("");
     setDate("");
+    setTimeStart("");
+    setTimeEnd("");
     setMinRating(0);
     setMaxPrice("");
     setSortBy("rating");
@@ -332,11 +343,30 @@ function MarketplaceInner() {
               />
               {date ? (
                 <span className="mt-1 block text-xs text-ink-faint">
-                  Hides vendors already booked or closed that day.
+                  {window
+                    ? "Hides vendors booked over those hours, or closed that day."
+                    : "Hides vendors booked at all that day. Add hours to keep the ones who are only busy elsewhere in it."}
                 </span>
               ) : null}
             </div>
           </div>
+
+          {date ? (
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:max-w-[50%]">
+              <Field
+                label="From (optional)"
+                type="time"
+                value={timeStart}
+                onChange={(e) => setTimeStart(e.target.value)}
+              />
+              <Field
+                label="Until (optional)"
+                type="time"
+                value={timeEnd}
+                onChange={(e) => setTimeEnd(e.target.value)}
+              />
+            </div>
+          ) : null}
 
           <div className="mt-4 grid gap-4 border-t border-card-edge pt-4 sm:grid-cols-3">
             <div>

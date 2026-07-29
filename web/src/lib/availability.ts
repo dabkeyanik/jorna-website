@@ -58,12 +58,49 @@ function overlapsDay(range: unknown, bounds: { start: number; end: number }): bo
   return start < bounds.end && end > bounds.start;
 }
 
+/** An "HH:MM"–"HH:MM" window on a given day, as local instants. */
+export interface TimeWindow {
+  start: string;
+  end: string;
+}
+
+function windowBounds(
+  dateIso: string,
+  window: TimeWindow | null | undefined,
+): { start: number; end: number } | null {
+  const day = dayBounds(dateIso);
+  if (!day || !window?.start || !window?.end) return day;
+
+  const at = (hhmm: string): number | null => {
+    const [h, m] = hhmm.split(":").map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+    return day.start + (h * 60 + m) * 60_000;
+  };
+  const start = at(window.start);
+  let end = at(window.end);
+  if (start == null || end == null) return day;
+  // Ends at or before it starts — it runs past midnight, the same reading the
+  // backend's conflict check uses.
+  if (end <= start) end += 24 * 60 * 60 * 1000;
+  return { start, end };
+}
+
 /**
  * Whether `availability` shows a conflict on `dateIso` ("YYYY-MM-DD").
  * Returns false — free — whenever the answer can't be established.
+ *
+ * With a `window`, only busy blocks overlapping those hours count. A vendor's
+ * day isn't a single booking: one with a morning ceremony can take an evening
+ * reception, and asking whole-day questions dropped them from the results.
+ * Without one the question stays whole-day, because a search that hasn't said
+ * when can't be told that the afternoon would have done.
  */
-export function hasConflictOn(availability: VendorAvailability, dateIso: string): boolean {
-  const bounds = dayBounds(dateIso);
+export function hasConflictOn(
+  availability: VendorAvailability,
+  dateIso: string,
+  window?: TimeWindow | null,
+): boolean {
+  const bounds = windowBounds(dateIso, window);
   if (!bounds) return false;
 
   const busy = [
@@ -96,6 +133,7 @@ const CONCURRENCY = 8;
 export async function freeVendorIds(
   vendorIds: string[],
   dateIso: string,
+  window?: TimeWindow | null,
 ): Promise<Set<string>> {
   const free = new Set<string>(vendorIds);
   const queue = [...vendorIds];
@@ -104,7 +142,7 @@ export async function freeVendorIds(
     for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
       try {
         const availability = await getVendorAvailability(id, dateIso, dateIso);
-        if (hasConflictOn(availability, dateIso)) free.delete(id);
+        if (hasConflictOn(availability, dateIso, window)) free.delete(id);
       } catch {
         // Unreachable or erroring — leave the vendor visible.
       }
