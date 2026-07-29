@@ -184,9 +184,16 @@ export function DraftDetails({
 
   return (
     <Card className="mt-4 p-5">
-      <h2 className="serif text-lg text-ink">
-        {sent ? "Still needed" : readiness.canSend ? "Details" : "Before this can be sent"}
-      </h2>
+      {/* Saving is the first of the two things to do here, so it sits where the
+          eye starts. Sending is the last, and waits at the bottom. */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h2 className="serif text-lg text-ink">
+          {sent ? "Still needed" : readiness.canSend ? "Details" : "Before this can be sent"}
+        </h2>
+        <Button disabled={busy} onClick={save}>
+          {busy ? "Saving…" : "Save details"}
+        </Button>
+      </div>
       <p className="mt-1 text-sm text-ink-soft">
         {sent
           ? "Your vendors have this plan, but a total can't be worked out without these — and nothing can be paid until it can."
@@ -266,11 +273,6 @@ export function DraftDetails({
         </p>
       ) : null}
 
-      <div className="mt-4">
-        <Button disabled={busy} onClick={save}>
-          {busy ? "Saving…" : "Save details"}
-        </Button>
-      </div>
     </Card>
   );
 }

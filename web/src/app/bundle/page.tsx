@@ -1104,15 +1104,20 @@ function BundleInner() {
                 </p>
               ) : null}
             </div>
-            <Button disabled={!readiness.canSend || bundleBusy} onClick={send}>
-              {bundleBusy ? "Sending…" : "Send to vendors"}
-            </Button>
           </div>
 
           {/* The event editor below writes to the event, and a draft from the
               builder may not have one — so the details live here, on the
               bookings, where they're always writable. */}
           <DraftDetails key={venueKey} bundle={bundle} onSaved={load} />
+
+          {/* Last, after the fields it depends on. It used to sit above them,
+              inviting you to send a plan before filling in what sending needs. */}
+          <div className="mt-4 flex justify-end">
+            <Button disabled={!readiness.canSend || bundleBusy} onClick={send}>
+              {bundleBusy ? "Sending…" : "Send to vendors"}
+            </Button>
+          </div>
         </section>
       ) : (
         // Sent. These two are deliberately not a chain — a plan can be waiting
