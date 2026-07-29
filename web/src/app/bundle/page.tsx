@@ -19,6 +19,10 @@ import {
   renameBundle,
   selectBundle,
   updateEvent,
+  CARD_RETURN_KEY,
+  getSavedCard,
+  startCardSetup,
+  type SavedCard,
 } from "@/lib/jorna";
 import { ServiceSwapPanel } from "@/components/ServiceSwapPanel";
 import { NegotiationPanel } from "@/components/NegotiationPanel";
@@ -679,6 +683,10 @@ function BundleInner() {
   const [panel, setPanel] = useState<Panel>(null);
   // A message about the whole plan — sending, renaming, swapping.
   const [notice, setNotice] = useState<Note | null>(null);
+  // The card we'll charge as vendors accept. Fetched for a plan that can be
+  // sent, because that's the only screen where it changes what happens next.
+  const [card, setCard] = useState<SavedCard | null>(null);
+  const [addingCard, setAddingCard] = useState(false);
   // A message about one booking, shown on that booking's own card. Confirming,
   // paying, refunding and disputing all happen on a card that may be well down
   // a long page; putting their answers at the top meant pressing Confirm and
@@ -702,6 +710,12 @@ function BundleInner() {
     try {
       const detail = await getBundle(bundleId);
       setBundle(detail);
+
+      // Silent on failure: with no card the plan still sends, and each booking
+      // is payable by hand exactly as it was before.
+      void getSavedCard()
+        .then(setCard)
+        .catch(() => {});
 
       // There is no GET /events/{id}, so the list is the source of the event's
       // full record — budget, description, and what they said they needed, none
@@ -811,6 +825,30 @@ function BundleInner() {
    * other two options from the same generation, which is why it's right that
    * this happens once, deliberately, rather than at the moment of picking.
    */
+  async function addCard() {
+    setAddingCard(true);
+    setNotice(null);
+    try {
+      const { setup_url } = await startCardSetup();
+      // Left before leaving, because we don't come back through this code —
+      // Stripe returns to a fixed URL on its own terms. Coming back to this
+      // plan rather than the dashboard: they were in the middle of sending it.
+      try {
+        sessionStorage.setItem(CARD_RETURN_KEY, `/bundle?id=${bundleId}`);
+      } catch {
+        // Private browsing with storage disabled. The landing page falls back
+        // to the dashboard, which is a worse answer but not a broken one.
+      }
+      window.location.href = setup_url;
+    } catch (err) {
+      setNotice({
+        text: err instanceof ApiError ? err.message : "Couldn't open the card form.",
+        ok: false,
+      });
+      setAddingCard(false);
+    }
+  }
+
   async function send() {
     if (!bundleId || !bundle) return;
     setBundleBusy(true);
@@ -1110,6 +1148,34 @@ function BundleInner() {
               builder may not have one — so the details live here, on the
               bookings, where they're always writable. */}
           <DraftDetails key={venueKey} bundle={bundle} onSaved={load} />
+
+          {/* What happens to money, said before it happens. The card is charged
+              as each vendor accepts — nothing on send, and nothing at all for a
+              vendor who says no. Without one the plan still sends and each
+              booking is payable by hand, which is what it did before. */}
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-ground-2 px-4 py-3">
+            <p className="text-sm text-ink-soft">
+              {card?.has_card ? (
+                <>
+                  <span className="font-medium text-ink">
+                    {card.brand ? card.brand[0].toUpperCase() + card.brand.slice(1) : "Card"}
+                    {card.last4 ? ` ending ${card.last4}` : ""}
+                  </span>{" "}
+                  — charged as each vendor accepts, never for one who declines.
+                </>
+              ) : (
+                "Add a card and each vendor is paid as they accept. Without one you'll be asked to pay each booking yourself."
+              )}
+            </p>
+            <Button
+              variant="ghost"
+              size="md"
+              disabled={addingCard}
+              onClick={addCard}
+            >
+              {addingCard ? "Opening…" : card?.has_card ? "Change card" : "Add a card"}
+            </Button>
+          </div>
 
           {/* Last, after the fields it depends on. It used to sit above them,
               inviting you to send a plan before filling in what sending needs. */}

@@ -568,6 +568,51 @@ export function getGoogleAuthUrl(vendorId: string): Promise<{ auth_url: string }
   return apiFetch(`/vendors/${vendorId}/google-auth${query({ client: "web" })}`);
 }
 
+// ── Card on file ─────────────────────────────────────────────────────
+//
+// Saved once, when a plan is sent, and charged by the backend the moment a
+// vendor accepts. Nothing here charges anything.
+
+export interface SavedCard {
+  has_card: boolean;
+  brand?: string | null;
+  last4?: string | null;
+}
+
+/** What's on file. Brand and last four only — Stripe keeps the card. */
+export function getSavedCard(): Promise<SavedCard> {
+  return apiFetch<SavedCard>("/payments/card");
+}
+
+/**
+ * Where to return after saving a card.
+ *
+ * Stripe's return URL is fixed server-side, so it can't carry a destination.
+ * The page that sends you to Stripe leaves it here; the page you land on reads
+ * it. sessionStorage rather than a query param because the round trip goes
+ * through Stripe's domain and comes back on a URL we didn't write.
+ */
+export const CARD_RETURN_KEY = "jorna:card-return";
+
+/** A Stripe-hosted page for entering card details. No charge attached. */
+export function startCardSetup(): Promise<{ setup_url: string }> {
+  return apiFetch("/payments/card/setup-session", { method: "POST" });
+}
+
+/**
+ * Adopt whatever was just saved.
+ *
+ * Called on the way back from the hosted page. The backend reads Stripe rather
+ * than trusting the redirect, so this is safe to call twice.
+ */
+export function syncSavedCard(): Promise<SavedCard> {
+  return apiFetch("/payments/card/sync", { method: "POST" });
+}
+
+export function forgetSavedCard(): Promise<SavedCard> {
+  return apiFetch("/payments/card", { method: "DELETE" });
+}
+
 /** Replace all weekly availability slots. Send [] to clear. */
 export function setMyAvailability(slots: AvailabilitySlot[]): Promise<unknown> {
   const clean = slots.map((s) => ({
