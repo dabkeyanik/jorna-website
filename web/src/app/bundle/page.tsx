@@ -80,6 +80,26 @@ function prettyDate(iso?: string | null): string | null {
     : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
+/** A message with the one thing the old string didn't carry: whether it's
+    good news. Everything used to render maroon, so "your confirmation is
+    recorded" arrived looking like a failure. */
+interface Note {
+  text: string;
+  ok: boolean;
+}
+
+function NoteLine({ note, className = "" }: { note: Note; className?: string }) {
+  return (
+    <p
+      className={`rounded-lg px-3 py-2 text-sm ${
+        note.ok ? "bg-green/10 text-green" : "bg-maroon/10 text-maroon dark:text-gold"
+      } ${className}`}
+    >
+      {note.text}
+    </p>
+  );
+}
+
 type PanelKind = "refund" | "dispute" | "remove";
 type Panel = { bookingId: string; kind: PanelKind } | null;
 
@@ -148,6 +168,7 @@ function BookingRow({
   event,
   draft,
   busyId,
+  note,
   panel,
   onPay,
   onConfirm,
@@ -163,6 +184,8 @@ function BookingRow({
   event: BundleEventInfo | null | undefined;
   draft: boolean;
   busyId: string | null;
+  /** The result of the last action taken on this booking, if it was this one. */
+  note: Note | null;
   panel: Panel;
   onPay: (b: BundleBooking) => void;
   onConfirm: (b: BundleBooking) => void;
@@ -419,6 +442,9 @@ function BookingRow({
         </div>
       ) : null}
 
+      {/* What just happened, on the card it happened to. */}
+      {note ? <NoteLine note={note} className="mt-3" /> : null}
+
       {/* Review — once the client has paid (or funds released) they can rate it */}
       {booking.status === "payment_confirmed" ||
       booking.payment_status === "paid" ||
@@ -650,7 +676,14 @@ function BundleInner() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  // A message about the whole plan — sending, renaming, swapping.
+  const [notice, setNotice] = useState<Note | null>(null);
+  // A message about one booking, shown on that booking's own card. Confirming,
+  // paying, refunding and disputing all happen on a card that may be well down
+  // a long page; putting their answers at the top meant pressing Confirm and
+  // watching nothing happen, with the reply — success or failure — scrolled out
+  // of sight above.
+  const [rowNote, setRowNote] = useState<(Note & { bookingId: string }) | null>(null);
   const [swapping, setSwapping] = useState<BundleBooking | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState("");
@@ -705,13 +738,18 @@ function BundleInner() {
   ) {
     setBusyId(booking.booking_id);
     setNotice(null);
+    setRowNote(null);
     try {
       await action();
       setPanel(null);
-      setNotice(success);
+      setRowNote({ bookingId: booking.booking_id, text: success, ok: true });
       await load();
     } catch (err) {
-      setNotice(err instanceof ApiError ? err.message : failure);
+      setRowNote({
+        bookingId: booking.booking_id,
+        text: err instanceof ApiError ? err.message : failure,
+        ok: false,
+      });
     } finally {
       setBusyId(null);
     }
@@ -736,7 +774,7 @@ function BundleInner() {
       setRenaming(false);
       await load();
     } catch (err) {
-      setNotice(err instanceof ApiError ? err.message : "Couldn't rename this event.");
+      setNotice({ text: err instanceof ApiError ? err.message : "Couldn't rename this event.", ok: false });
     } finally {
       setBundleBusy(false);
     }
@@ -760,7 +798,7 @@ function BundleInner() {
       if (eventId) await deleteEvent(eventId).catch(() => {});
       router.push("/bundles");
     } catch (err) {
-      setNotice(err instanceof ApiError ? err.message : "Couldn't delete this event.");
+      setNotice({ text: err instanceof ApiError ? err.message : "Couldn't delete this event.", ok: false });
       setBundleBusy(false);
     }
   }
@@ -779,10 +817,10 @@ function BundleInner() {
     try {
       await selectBundle(bundleId);
       clearAttentionCache();
-      setNotice("Sent. Your vendors have been asked — you'll see their answers here.");
+      setNotice({ text: "Sent. Your vendors have been asked — you'll see their answers here.", ok: true });
       await load();
     } catch (err) {
-      setNotice(err instanceof ApiError ? err.message : "Couldn't send these requests. Try again.");
+      setNotice({ text: err instanceof ApiError ? err.message : "Couldn't send these requests. Try again.", ok: false });
     } finally {
       setBundleBusy(false);
     }
@@ -795,9 +833,10 @@ function BundleInner() {
       const { checkout_url } = await createCheckoutSession(booking.booking_id);
       window.location.href = checkout_url;
     } catch (err) {
-      setNotice(
-        err instanceof ApiError ? err.message : "Couldn't start checkout. Try again.",
-      );
+      setNotice({
+        text: err instanceof ApiError ? err.message : "Couldn't start checkout. Try again.",
+        ok: false,
+      });
       setBusyId(null);
       if (err instanceof ApiError && err.status === 409) void load();
     }
@@ -832,6 +871,7 @@ function BundleInner() {
       event={bundle.event}
       draft={draft}
       busyId={busyId}
+      note={rowNote?.bookingId === b.booking_id ? rowNote : null}
       panel={panel}
       onPay={pay}
       onOpenPanel={(bookingId, kind) => {
@@ -876,7 +916,7 @@ function BundleInner() {
         )
       }
       onNegotiated={() => {
-        setNotice("Price agreed — the booking is approved at the new price.");
+        setNotice({ text: "Price agreed — the booking is approved at the new price.", ok: true });
         void load();
       }}
     />
@@ -1129,11 +1169,7 @@ function BundleInner() {
         </div>
       ) : null}
 
-      {notice ? (
-        <p className="mt-6 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
-          {notice}
-        </p>
-      ) : null}
+      {notice ? <NoteLine note={notice} className="mt-6" /> : null}
 
       {/* What's outstanding, before the ledger of who's on the team. Same rules
           as the "Needs you" badge — see lib/planning. */}
@@ -1218,7 +1254,7 @@ function BundleInner() {
           onClose={() => setSwapping(null)}
           onSwapped={async () => {
             setSwapping(null);
-            setNotice("Service swapped — your date, time, and guest count carried over.");
+            setNotice({ text: "Service swapped — your date, time, and guest count carried over.", ok: true });
             await load();
           }}
         />
