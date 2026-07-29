@@ -67,6 +67,10 @@ export interface BundleRequest {
   latitude?: number | null;
   longitude?: number | null;
   guest_count?: number | null;
+  /** "HH:MM". Optional — without them every generated booking is TBD, and
+      availability falls back to whole days. */
+  time_start?: string | null;
+  time_end?: string | null;
   budget_tier?: string | null;
   budget_amount?: string | null;
   style?: string[];

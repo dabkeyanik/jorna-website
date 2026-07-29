@@ -36,6 +36,12 @@ const IconCalendar = (
     <path d="M3.5 9.5h17M8 3v4M16 3v4" />
   </svg>
 );
+const IconClock = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className={svg}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 1.8" />
+  </svg>
+);
 const IconUsers = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className={svg}>
     <circle cx="9" cy="8" r="3.2" />
@@ -104,6 +110,12 @@ function PlanInner() {
   const [coords, setCoords] = useState<Coords | null>(null);
   const [eventDate, setEventDate] = useState(params.get("date") ?? "");
   const [guests, setGuests] = useState(params.get("guests") ?? "");
+  // Optional, and worth asking: a vendor's day isn't one booking, so knowing
+  // the hours is what lets somebody with a morning ceremony be offered for an
+  // evening reception. Left blank, every generated booking says TBD and
+  // availability falls back to whole days — which turns those vendors away.
+  const [timeStart, setTimeStart] = useState("");
+  const [timeEnd, setTimeEnd] = useState("");
   const [budget, setBudget] = useState("mid-range");
   const [styles, setStyles] = useState<string[]>([]);
   // Seeded in the initializer rather than an effect, so an arriving celebration's
@@ -175,6 +187,11 @@ function PlanInner() {
         longitude: coords?.lng ?? null,
         event_date: eventDate || null,
         guest_count: guests ? Number(guests) : null,
+        // Only as a pair. One half of a window says nothing an availability
+        // check can use, and would be written onto the bookings as a start with
+        // no end — which the send check then treats as a missing answer.
+        time_start: timeStart && timeEnd ? timeStart : null,
+        time_end: timeStart && timeEnd ? timeEnd : null,
         budget_tier: budget,
         style: styles,
       });
@@ -236,6 +253,34 @@ function PlanInner() {
             value={guests}
             onChange={(e) => setGuests(e.target.value)}
           />
+        </div>
+
+        <div className="mt-7">
+          <div className="mb-2.5 flex flex-wrap items-baseline gap-x-2">
+            <p className="text-sm font-medium text-ink-soft">
+              Time <span className="text-ink-faint">(optional)</span>
+            </p>
+            <p className="text-xs text-ink-faint">
+              Vendors already booked earlier in the day can still take your
+              evening — tell us when and we&apos;ll find them.
+            </p>
+          </div>
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <Field
+              label="Starts"
+              type="time"
+              icon={IconClock}
+              value={timeStart}
+              onChange={(e) => setTimeStart(e.target.value)}
+            />
+            <Field
+              label="Ends"
+              type="time"
+              icon={IconClock}
+              value={timeEnd}
+              onChange={(e) => setTimeEnd(e.target.value)}
+            />
+          </div>
         </div>
 
         <div className="mt-7">
