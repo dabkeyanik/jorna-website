@@ -45,7 +45,6 @@ import {
 import {
   bookingGaps,
   describeGaps,
-  GAP_LABELS,
   isDeadBooking,
   isDraftBundle,
   moneyForBundle,
@@ -1087,18 +1086,23 @@ function BundleInner() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 className="serif text-lg text-ink">
-                {readiness.canSend ? "Ready to send" : "Draft — nobody has been asked yet"}
+                {readiness.canSend ? "Ready to send" : "Required Info"}
               </h2>
-              <p className="mt-1 max-w-[60ch] text-sm text-ink-soft">
-                {readiness.canSend
-                  ? "Sending asks each vendor to hold your date. Once it's out, a request is theirs to answer — you can still cancel it, but not change it."
-                  : bundle.bookings.length === 0
-                    ? "There's nothing in this plan yet."
-                    : `Vendors are asked to be somewhere, at a time, for a price. This plan still needs ${readiness.missing
-                        .map((f) => GAP_LABELS[f])
-                        .join(", ")
-                        .replace(/, ([^,]*)$/, " and $1")}.`}
-              </p>
+              {/* What's missing is named by the fields below, which is where it
+                  gets fixed — so the heading doesn't list it as well. An empty
+                  plan is the exception: nothing below says anything, because
+                  there's nothing to say it about. */}
+              {readiness.canSend ? (
+                <p className="mt-1 max-w-[60ch] text-sm text-ink-soft">
+                  Sending asks each vendor to hold your date. Once it&apos;s out, a
+                  request is theirs to answer — you can still cancel it, but not
+                  change it.
+                </p>
+              ) : bundle.bookings.length === 0 ? (
+                <p className="mt-1 max-w-[60ch] text-sm text-ink-soft">
+                  There&apos;s nothing in this plan yet.
+                </p>
+              ) : null}
             </div>
             <Button disabled={!readiness.canSend || bundleBusy} onClick={send}>
               {bundleBusy ? "Sending…" : "Send to vendors"}
