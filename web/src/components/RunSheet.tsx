@@ -11,13 +11,17 @@
 // recorded (the vendor's GPS check-in) and was likewise invisible to the person
 // who most wants it — the host standing in a hall wondering who's turned up.
 //
+// It appears in the week before the first day and not until then. Both of those
+// jobs are same-week jobs; months out it was a second copy of the vendor list,
+// above the parts of the page a host can still do something about.
+//
 // Times are shown only when the day's look real. Bookings can't be created
 // without a time, so an unset one arrives as a default rather than as nothing —
 // see ScheduleDay.timesKnown. When they don't, the vendors still list, without
 // invented clock times.
 
 import { categoryLabel, formatCheckInTime, type BundleBooking } from "@/lib/types";
-import { daysUntil, scheduleFor, type ScheduleDay } from "@/lib/planning";
+import { daysUntil, runSheetIsDue, scheduleFor, type ScheduleDay } from "@/lib/planning";
 import type { BundleDetail } from "@/lib/types";
 import { Avatar } from "@/components/ui";
 
@@ -119,7 +123,9 @@ function Entry({
 
 export function RunSheet({ bundle }: { bundle: BundleDetail }) {
   const days = scheduleFor(bundle);
-  if (days.length === 0) return null;
+  // Held back until the week of — see runSheetIsDue. Nothing here helps a host
+  // whose celebration is months away, and it was pushing what does further down.
+  if (!runSheetIsDue(days)) return null;
 
   return (
     <section className="mt-8">
