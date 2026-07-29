@@ -865,3 +865,35 @@ export function joinViaInviteLink(
     auth: false,
   });
 }
+
+// ── Checking in from the emailed link ────────────────────────────────
+//
+// No account: the token in the link is the credential, so these go out with
+// auth off. It isn't sufficient on its own — the backend still measures the
+// GPS fix against the venue, exactly as it does for the in-app button.
+
+export interface CheckInInvite {
+  booking_id: string;
+  location?: string | null;
+  date_iso?: string | null;
+  time_start?: string | null;
+  /** The real moment it starts, in the venue's own timezone. */
+  starts_at?: string | null;
+  already_checked_in: boolean;
+}
+
+export function getCheckInInvite(token: string): Promise<CheckInInvite> {
+  return apiFetch<CheckInInvite>(`/checkin/${encodeURIComponent(token)}`, { auth: false });
+}
+
+export function checkInWithToken(
+  token: string,
+  latitude: number,
+  longitude: number,
+): Promise<{ message?: string; distance_miles?: number; funds_released?: boolean }> {
+  return apiFetch(`/checkin/${encodeURIComponent(token)}`, {
+    method: "POST",
+    body: { latitude, longitude },
+    auth: false,
+  });
+}
