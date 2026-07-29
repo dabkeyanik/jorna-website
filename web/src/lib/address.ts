@@ -131,11 +131,16 @@ export function parseAddress(raw?: string | null): Address {
   if (parts.length > 0) out.line1 = parts.shift() as string;
   if (parts.length > 0) out.line2 = parts.join(", ");
 
-  // A lone token is a street more often than a city, but with a state or zip
-  // beside it the city reading is the right one — which is the case above.
+  // A lone token with no state or zip beside it could be either half-finished
+  // thought: a street somebody has started typing, or a city the bundle builder
+  // was given as a location. A street number tells them apart — "12 Maple Ave"
+  // is an address in progress, "Chicago" is a place — and getting it wrong puts
+  // a city on the line vendors read as the street they're driving to.
   if (!out.line1 && !out.state && !out.zip && out.city && !text.includes(",")) {
-    out.line1 = out.city;
-    out.city = "";
+    if (/^\d/.test(out.city)) {
+      out.line1 = out.city;
+      out.city = "";
+    }
   }
   return out;
 }

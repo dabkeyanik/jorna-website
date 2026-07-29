@@ -81,9 +81,15 @@ export function DraftDetails({
     const parsed = parseAddress(seedLocation);
     return parsed.zip || !venueZip ? parsed : { ...parsed, zip: venueZip };
   });
-  const [guests, setGuests] = useState(
-    bundle.event?.guest_count != null ? String(bundle.event.guest_count) : "",
-  );
+  // The event first, then the bookings — the same order as the date and the
+  // address above, and for the same reason. A plan straight out of the builder
+  // has no event yet, so reading only the event threw away the headcount the
+  // builder had just been given and asked for it again. Worse than asking: the
+  // bookings already had it, so nothing was flagged as missing and the field
+  // never appeared at all.
+  const seedGuests =
+    bundle.event?.guest_count ?? live.find((b) => b.guest_count != null)?.guest_count ?? null;
+  const [guests, setGuests] = useState(seedGuests != null ? String(seedGuests) : "");
   // Every booking charged by the hour, not merely the ones still missing times:
   // keyed off the gap, a field vanished as soon as it was filled, so a wrong
   // time couldn't be corrected. Once the plan is sent that freedom is the wrong
