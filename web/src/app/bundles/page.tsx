@@ -201,9 +201,15 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
   const urgent = tasks.filter((t) => t.tone === "urgent").length;
   const when = countdown(dateIso);
   const total = money(spend);
-  // Every bundle still a draft means nobody has been asked yet, which is a
-  // truer headline than a task count.
+  // Two stages, and the card should say which at a glance. A plan whose vendors
+  // have been asked is a different kind of thing from one still being written,
+  // and the difference decides what you can do to it — a draft is yours to
+  // change, a sent one is a set of promises other people are holding.
+  //
+  // Gold and green, matching the banners on the plan itself, so the colour
+  // means the same thing on both screens.
   const allDraft = bundles.length > 0 && bundles.every(isDraftBundle);
+  const stage = bundles.length === 0 ? null : allDraft ? "draft" : "plan";
   const overBudget = budget != null && celebration.money.committed > budget;
   // Scale against the budget when there is one, so the bar shows how much of it
   // is spoken for; against the committed total otherwise, and never past 100%.
@@ -213,7 +219,15 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
   );
 
   return (
-    <Card className="p-5 sm:p-6">
+    <Card
+      className={`p-5 sm:p-6 ${
+        stage === "draft"
+          ? "border-gold/50 bg-gold/[0.05]"
+          : stage === "plan"
+            ? "border-green/40 bg-green/[0.04]"
+            : ""
+      }`}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="serif text-2xl text-ink">{name}</h2>
@@ -224,25 +238,31 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
             </p>
           ) : null}
         </div>
-        {allDraft ? (
-          <span className="shrink-0 rounded-full bg-gold/15 px-3 py-1 text-xs font-semibold text-gold">
-            Draft
-          </span>
-        ) : tasks.length > 0 ? (
-          <span
-            className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
-              urgent > 0
-                ? "bg-maroon text-ground dark:bg-gold dark:text-ground"
-                : "bg-gold/15 text-maroon dark:text-gold"
-            }`}
-          >
-            {tasks.length} {tasks.length === 1 ? "thing needs you" : "things need you"}
-          </span>
-        ) : bundles.length > 0 ? (
-          <span className="shrink-0 rounded-full bg-green/12 px-3 py-1 text-xs font-semibold text-green">
-            On track
-          </span>
-        ) : null}
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          {stage ? (
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+                stage === "draft"
+                  ? "bg-gold/15 text-gold"
+                  : "bg-green/12 text-green"
+              }`}
+            >
+              <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
+              {stage === "draft" ? "Draft — not sent" : "Sent to vendors"}
+            </span>
+          ) : null}
+          {tasks.length > 0 ? (
+            <span
+              className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                urgent > 0
+                  ? "bg-maroon text-ground dark:bg-gold dark:text-ground"
+                  : "bg-ground-2 text-ink-soft"
+              }`}
+            >
+              {tasks.length} {tasks.length === 1 ? "thing needs you" : "things need you"}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-sm">
