@@ -32,6 +32,13 @@ interface Packed {
 export interface Place {
   city: string;
   state: string;
+  /**
+   * Which distinct city+state this is, counting in ascending ZIP order — the
+   * ordering the coordinates file is written in, and the only thing joining the
+   * two. Keyed on the pair rather than the name because names repeat: there is
+   * an Evanston in Illinois and one in Wyoming.
+   */
+  placeIndex: number;
 }
 
 export interface ZipIndex {
@@ -55,6 +62,9 @@ function build(packed: Packed): ZipIndex {
 
   const byZip = new Map<string, Place>();
   const byCity = new Map<string, string[]>();
+  // Assigned in the order they first appear, which is ascending ZIP order —
+  // matching how scripts/build-zips.mjs writes the coordinates.
+  const placeIndex = new Map<string, number>();
 
   // Zips are stored as the gap from the previous one — they're sorted, so
   // almost every gap is one or two digits rather than five.
@@ -66,7 +76,14 @@ function build(packed: Packed): ZipIndex {
     const state = packed.states[Number(stateIx[i])];
     if (!city || !state) continue;
 
-    byZip.set(zip, { city, state });
+    const pair = `${city}|${state}`;
+    let place = placeIndex.get(pair);
+    if (place === undefined) {
+      place = placeIndex.size;
+      placeIndex.set(pair, place);
+    }
+    byZip.set(zip, { city, state, placeIndex: place });
+
     const key = `${city.toLowerCase()}|${state.toLowerCase()}`;
     const list = byCity.get(key);
     if (list) list.push(zip);
@@ -121,4 +138,91 @@ export function zipDisagrees(
   const cityWrong = city.trim() !== "" && city.trim().toLowerCase() !== place.city.toLowerCase();
   const stateWrong = state.trim() !== "" && state.trim().toUpperCase() !== place.state;
   return cityWrong || stateWrong ? place : null;
+}
+
+// ── Coordinates ──────────────────────────────────────────────────────
+//
+// A second file, fetched only by the one caller that needs a point on the
+// earth: the builder's ZIP field, which uses it to match vendors by travel
+// radius. The address form above wants a city and a state and nothing more, and
+// making everyone download coordinates to type an address would charge the many
+// for the few. 72 KB over the wire, once, and only if you use it.
+
+interface PackedCoords {
+  lat: string;
+  lng: string;
+}
+
+export interface Point {
+  lat: number;
+  lng: number;
+}
+
+const COORDS_URL = "/app/data/us-zip-coords.json";
+
+let coordCache: Map<number, Point> | null = null;
+let coordInflight: Promise<Map<number, Point> | null> | null = null;
+
+/**
+ * One centroid per distinct city+state, in the order they first appear walking
+ * ZIPs upward — no key is stored, the ordering is the join. The two files are
+ * built together and have to be deployed together.
+ *
+ * Per place rather than per ZIP, at two decimal places. A travel-radius match is
+ * really a question about which metro you're in, and a kilometre of slack
+ * against a radius measured in tens of miles costs nothing — the two choices
+ * together are worth about 175 KB.
+ */
+function loadCoords(): Promise<Map<number, Point> | null> {
+  if (coordCache) return Promise.resolve(coordCache);
+  if (coordInflight) return coordInflight;
+
+  coordInflight = fetch(COORDS_URL)
+    .then((res) => (res.ok ? (res.json() as Promise<PackedCoords>) : null))
+    .then((packed) => {
+      if (!packed?.lat || !packed?.lng) return null;
+      const lats = packed.lat.split(",");
+      const lngs = packed.lng.split(",");
+      const out = new Map<number, Point>();
+      let lat = 0;
+      let lng = 0;
+      for (let i = 0; i < lats.length; i++) {
+        lat += Number(lats[i]);
+        lng += Number(lngs[i]);
+        // A city the dump had no coordinates for lands on 0,0 — the Atlantic.
+        // Omitted rather than offered, so a caller gets nothing instead of
+        // somewhere wrong.
+        if (lat !== 0 || lng !== 0) out.set(i, { lat: lat / 100, lng: lng / 100 });
+      }
+      coordCache = out;
+      return coordCache;
+    })
+    .catch(() => null)
+    .finally(() => {
+      coordInflight = null;
+    });
+
+  return coordInflight;
+}
+
+export interface ZipPlace extends Place {
+  /** Null when the ZIP is unknown, or its city has no usable centroid. */
+  point: Point | null;
+}
+
+/**
+ * Everything known about a ZIP: its city, its state, and roughly where it is.
+ *
+ * Resolves null for anything that isn't a ZIP in the table. Both files are
+ * fetched on the first call and shared after that; a failure of either resolves
+ * to null rather than throwing, because nothing here is required to use the
+ * form that asks.
+ */
+export async function locateZip(zip: string): Promise<ZipPlace | null> {
+  const index = await loadZipIndex();
+  const place = index?.place(zip);
+  if (!place) return null;
+
+  const coords = await loadCoords();
+  return { ...place, point: coords?.get(place.placeIndex) ?? null };
 }

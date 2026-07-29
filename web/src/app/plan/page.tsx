@@ -12,6 +12,7 @@ import { Button, Card, Chip, Field, Rule } from "@/components/ui";
 import { BundleResults } from "@/components/BundleResults";
 import { ClientOnlyRoute } from "@/components/ClientOnlyRoute";
 import { CityCombobox, type Coords } from "@/components/CityCombobox";
+import { locateZip, type ZipPlace } from "@/lib/zips";
 
 const BUDGETS = [
   { value: "budget-friendly", label: "Budget-friendly", hint: "Smart value" },
@@ -116,6 +117,22 @@ function PlanInner() {
   // availability falls back to whole days — which turns those vendors away.
   const [timeStart, setTimeStart] = useState("");
   const [timeEnd, setTimeEnd] = useState("");
+  // A ZIP is a location somebody knows by heart, and it stands in for the city
+  // when they'd rather not pick one. Resolved through the same table the address
+  // form uses, to a city, a state, and roughly where that is — matching vendors
+  // is a question about travel radius, so a point is what the backend wants.
+  const [zip, setZip] = useState("");
+  // The answer is stored with the question it answers. Lookups are async, so
+  // without the pairing a resolved place outlives the ZIP that produced it and
+  // the hint reads "Evanston" for a moment after you've typed a Houston ZIP.
+  const [resolved, setResolved] = useState<{ zip: string; place: ZipPlace | null } | null>(null);
+
+  // What the ZIP is actually contributing: nothing while a city is chosen, and
+  // nothing for an answer that belongs to a different ZIP. Derived rather than
+  // cleared, so the effect below never has to write state synchronously.
+  const zipPlace =
+    !location.trim() && resolved?.zip === zip.trim() ? resolved.place : null;
+  const zipPlaceLabel = zipPlace ? `${zipPlace.city}, ${zipPlace.state}` : "";
   const [budget, setBudget] = useState("mid-range");
   const [styles, setStyles] = useState<string[]>([]);
   // Seeded in the initializer rather than an effect, so an arriving celebration's
@@ -126,6 +143,20 @@ function PlanInner() {
   const [error, setError] = useState<string | null>(null);
   const [options, setOptions] = useState<BundleOption[] | null>(null);
   const [choosingLabel, setChoosingLabel] = useState<string | null>(null);
+
+  // Resolve a whole ZIP to its place. Only when there's no city, since a picked
+  // city already carries its own coordinates and is the more precise answer.
+  useEffect(() => {
+    const clean = zip.trim();
+    if (!/^\d{5}$/.test(clean)) return;
+    let cancelled = false;
+    void locateZip(clean).then(
+      (place) => !cancelled && setResolved({ zip: clean, place }),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [zip]);
 
   /**
    * Open one of the three options. It stays a draft.
@@ -182,9 +213,12 @@ function PlanInner() {
       const res = await generateBundles({
         needed_categories: needed,
         booked_categories: [],
-        location: location.trim() || null,
-        latitude: coords?.lat ?? null,
-        longitude: coords?.lng ?? null,
+        // A picked city wins — it's what the person actually chose. The ZIP
+        // stands in only when they left the city blank, and it resolves to the
+        // same shape: a name for the booking, a point for the matching.
+        location: location.trim() || zipPlaceLabel || null,
+        latitude: coords?.lat ?? zipPlace?.point?.lat ?? null,
+        longitude: coords?.lng ?? zipPlace?.point?.lng ?? null,
         event_date: eventDate || null,
         guest_count: guests ? Number(guests) : null,
         // Only as a pair. One half of a window says nothing an availability
@@ -255,16 +289,30 @@ function PlanInner() {
           />
         </div>
 
-        <div className="mt-7">
-          <div className="mb-2.5 flex flex-wrap items-baseline gap-x-2">
-            <p className="text-sm font-medium text-ink-soft">
-              Time <span className="text-ink-faint">(optional)</span>
-            </p>
-            <p className="text-xs text-ink-faint">
-              Vendors already booked earlier in the day can still take your
-              evening — tell us when and we&apos;ll find them.
+        {/* Under the city, because it answers the same question. Hidden once a
+            city is chosen — two ways to say where you are, both filled in and
+            disagreeing, is a question nobody should have to arbitrate. */}
+        {location.trim() ? null : (
+          <div className="mt-4 sm:max-w-[calc(33%-0.5rem)]">
+            <Field
+              label="ZIP code"
+              inputMode="numeric"
+              maxLength={5}
+              placeholder="60201"
+              icon={IconPin}
+              value={zip}
+              onChange={(e) => setZip(e.target.value.replace(/[^\d]/g, ""))}
+            />
+            <p className="mt-1 text-xs text-ink-faint">
+              {zipPlaceLabel
+                ? `Looking near ${zipPlaceLabel}.`
+                : "Or give us a ZIP and we'll work out where that is."}
             </p>
           </div>
+        )}
+
+        <div className="mt-7">
+          <p className="mb-2.5 text-sm font-medium text-ink-soft">Time</p>
           <div className="grid gap-2.5 sm:grid-cols-2">
             <Field
               label="Starts"
