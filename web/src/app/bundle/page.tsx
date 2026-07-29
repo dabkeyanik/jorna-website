@@ -587,7 +587,6 @@ function CelebrationPanel({
             onChange={setAddr}
             showGaps={showGaps}
             zipHint={venueZip && venueZip === addr.zip ? venueZip : null}
-            fromVenue={Boolean(venueAddress)}
           />
         </div>
         {error ? (

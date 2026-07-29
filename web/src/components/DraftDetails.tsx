@@ -223,7 +223,6 @@ export function DraftDetails({
               onChange={setAddr}
               showGaps={false}
               zipHint={venueZip && venueZip === addr.zip ? venueZip : null}
-              fromVenue={Boolean(venueAddress)}
             />
           </div>
         ) : null}
