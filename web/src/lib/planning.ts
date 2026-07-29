@@ -469,6 +469,34 @@ export function scheduleFor(bundle: BundleDetail): ScheduleDay[] {
     .sort((a, b) => a.dateIso.localeCompare(b.dateIso));
 }
 
+/** How far ahead the run sheet starts appearing. */
+export const RUN_SHEET_DAYS = 7;
+
+/**
+ * Whether the run sheet is worth showing yet.
+ *
+ * It's an order of the day and an arrivals board, and neither answers anything
+ * in April about a wedding in September — there it's a second copy of the
+ * vendor list already above it, sitting between the host and the things they
+ * can act on now. A week out is when it starts being the thing you check.
+ *
+ * Anchored on the first day rather than the nearest one: a three-day
+ * celebration becomes relevant as a whole once its opening is a week away, so
+ * the mehndi doesn't appear while the reception two days later stays hidden.
+ * That first day is the celebration's real start — an early mehndi can precede
+ * whatever date the event record carries, and it's the day people travel for.
+ *
+ * Days already past keep it. Somebody working out who turned up, the morning
+ * after, is asking exactly what it was built to answer.
+ */
+export function runSheetIsDue(days: ScheduleDay[], within = RUN_SHEET_DAYS): boolean {
+  if (days.length === 0) return false;
+  const n = daysUntil(days[0].dateIso);
+  // An undated day can't be shown to be close, and scheduleFor drops those
+  // anyway — so this only fires on a date that won't parse.
+  return n != null && n <= within;
+}
+
 /** Inclusive list of ISO days from `start` to `end`, capped so a bad range can't run away. */
 function daysBetween(start: string, end?: string | null): string[] {
   if (!end || end === "TBD" || end === start) return [start];
