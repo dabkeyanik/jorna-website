@@ -245,6 +245,28 @@ export interface BundleBooking {
 export const REFUND_WINDOW_HOURS = 24;
 
 /**
+ * How long after the event escrow releases on its own.
+ *
+ * Mirrors the backend's AUTO_RELEASE_DAYS. Confirming needs both parties, so a
+ * client who never gets round to it used to hold their vendor's payment
+ * indefinitely; after this long, not answering is taken as no objection.
+ */
+export const AUTO_RELEASE_DAYS = 7;
+
+/** The date escrow releases itself, or null when there's no date to count from. */
+export function autoReleaseOn(b: {
+  date_iso?: string | null;
+  date_end?: string | null;
+}): string | null {
+  const last = lastDay(b);
+  if (!last || last === "TBD") return null;
+  const d = new Date(`${last}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setDate(d.getDate() + AUTO_RELEASE_DAYS);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
  * Parse a timestamp from the API to epoch ms, or null if unusable.
  *
  * These come from Python's `datetime.isoformat()`. The values are written as

@@ -30,6 +30,7 @@ import {
   BOOKING_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
   categoryLabel,
+  autoReleaseOn,
   eventIsOver,
   lastDay,
   priceLine,
@@ -333,7 +334,18 @@ function BookingRow({
               {prettyDate(lastDay(booking)) ? ` (${prettyDate(lastDay(booking))})` : ""}.
               Funds are never released before then.
             </p>
-          ) : null}
+          ) : (
+            // Said before it happens, not after. The money moves on its own a
+            // week past the event, and a client who finds that out from a
+            // receipt has been surprised by their own payment — so the date is
+            // on the screen, next to the button that would settle it sooner,
+            // together with the one thing that stops it.
+            <p className="text-xs text-ink-soft">
+              {prettyDate(autoReleaseOn(booking))
+                ? `Confirming pays ${booking.vendor_name || "your vendor"} now. If you do nothing, this releases on its own on ${prettyDate(autoReleaseOn(booking))} — raise an issue before then if something went wrong.`
+                : `Confirming pays ${booking.vendor_name || "your vendor"} now.`}
+            </p>
+          )}
 
           {openPanel === "refund" ? (
             <div className="rounded-lg bg-panel p-3">
