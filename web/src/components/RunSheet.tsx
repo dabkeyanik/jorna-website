@@ -20,6 +20,9 @@
 // see ScheduleDay.timesKnown. When they don't, the vendors still list, without
 // invented clock times.
 
+import { useState } from "react";
+import { ApiError } from "@/lib/api";
+import { resendCheckInEmail } from "@/lib/jorna";
 import { categoryLabel, formatCheckInTime, type BundleBooking } from "@/lib/types";
 import { daysUntil, runSheetIsDue, scheduleFor, type ScheduleDay } from "@/lib/planning";
 import type { BundleDetail } from "@/lib/types";
@@ -69,6 +72,62 @@ function Arrivals({ day }: { day: ScheduleDay }) {
   );
 }
 
+/**
+ * Nudge one vendor who hasn't checked in.
+ *
+ * Per booking, because that's the shape of the problem on the day: four vendors
+ * are here and the fifth isn't. It lives on the run sheet rather than with the
+ * plan's other buttons because this is where their absence is visible — a row
+ * with no "Here" against it.
+ *
+ * Offered strictly on the backend's own answer. can_resend_checkin already
+ * accounts for the cooldown, whether they've arrived, whether there's anywhere
+ * to check in against, and how close the day is; second-guessing any of that
+ * here would only produce a button that gets refused.
+ */
+function Nudge({ booking }: { booking: BundleBooking }) {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  if (booking.vendor_checked_in_at) return null;
+  if (!booking.can_resend_checkin) {
+    // Nothing to press, but "sent four minutes ago" is worth saying — a button
+    // that quietly disappears into its cooldown reads as one that didn't work.
+    if (note) return <p className="mt-1 text-xs text-green">{note}</p>;
+    const cooling = booking.resend_checkin_reason?.startsWith("Just sent");
+    return cooling ? (
+      <p className="mt-1 text-xs text-ink-faint">{booking.resend_checkin_reason}</p>
+    ) : null;
+  }
+
+  async function send() {
+    setBusy(true);
+    try {
+      const result = await resendCheckInEmail(booking.booking_id);
+      setNote(result.message);
+    } catch (err) {
+      setNote(
+        err instanceof ApiError ? err.message : "Couldn't send it. Try again in a moment.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (note) return <p className="mt-1 text-xs text-green">{note}</p>;
+
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={send}
+      className="mt-1 text-xs font-semibold text-gold transition hover:underline disabled:opacity-50"
+    >
+      {busy ? "Sending…" : "Resend check-in email"}
+    </button>
+  );
+}
+
 function Entry({
   booking,
   start,
@@ -103,6 +162,7 @@ function Entry({
         {booking.location ? (
           <p className="mt-0.5 text-xs text-ink-faint">{booking.location}</p>
         ) : null}
+        <Nudge booking={booking} />
       </div>
 
       {here ? (

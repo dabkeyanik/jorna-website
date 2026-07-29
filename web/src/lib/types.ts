@@ -243,6 +243,14 @@ export interface BundleBooking {
   // customer_confirmed_at / vendor_confirmed_at.
   vendor_checked_in_at?: string | null;
   client_checked_in_at?: string | null;
+  // Whether the client may send this vendor their check-in email again, decided
+  // by the same backend function the endpoint enforces — so the button is never
+  // offered for a call that has to be refused. The reason is what to say when
+  // it isn't offered.
+  can_resend_checkin?: boolean;
+  resend_checkin_reason?: string | null;
+  /** When this vendor was last emailed about checking in, scheduled or asked for. */
+  checkin_reminded_at?: string | null;
 }
 
 /** How long after paying a full refund is still available. */
