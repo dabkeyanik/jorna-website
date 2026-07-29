@@ -37,12 +37,15 @@ export function AddressFields({
   onChange,
   /** Shown under the zip when a booked venue supplied it. */
   zipHint,
+  /** The whole address came from a booked venue, not from typing. */
+  fromVenue = false,
   /** Fields to mark in red — pass the gaps only after a save is attempted. */
   showGaps = false,
 }: {
   value: Address;
   onChange: (next: Address) => void;
   zipHint?: string | null;
+  fromVenue?: boolean;
   showGaps?: boolean;
 }) {
   const gaps = showGaps ? addressGaps(value) : [];
@@ -99,6 +102,15 @@ export function AddressFields({
 
   return (
     <div className="grid gap-3">
+      {/* Where it came from, so nobody wonders why it filled itself in — and so
+          it's clear what a swap will change. Still editable: a venue's listing
+          rarely mentions which door, and that's the client's to add. */}
+      {fromVenue ? (
+        <p className="rounded-lg bg-gold/10 px-3 py-2 text-xs text-ink-soft">
+          Taken from the venue you&apos;ve booked. Change the venue and this
+          follows it.
+        </p>
+      ) : null}
       {field("line1", { placeholder: "12 Maple Ave", autoComplete: "address-line1" })}
       {field("line2", { placeholder: "Suite 4", autoComplete: "address-line2" })}
 

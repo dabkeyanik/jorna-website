@@ -58,6 +58,7 @@ import {
   formatAddress,
   isCompleteAddress,
   parseAddress,
+  addressFromVenue,
   zipFromVenue,
   type Address,
 } from "@/lib/address";
@@ -495,13 +496,13 @@ function CelebrationPanel({
   bookings: BundleBooking[];
   onSaved: () => void | Promise<void>;
 }) {
-  // A booked venue already knows the postcode; asking for it twice is asking
-  // the client to look up something the plan contains.
-  const venueZip = zipFromVenue(
-    bookings
-      .filter((b) => b.service_category === "venue" && !isDeadBooking(b))
-      .map((b) => b.location),
-  );
+  // A booked venue is where the event is, and it knows its own address; asking
+  // for it again is asking the client to copy out something the plan contains.
+  const venueLocations = bookings
+    .filter((b) => b.service_category === "venue" && !isDeadBooking(b))
+    .map((b) => b.location);
+  const venueAddress = addressFromVenue(venueLocations);
+  const venueZip = zipFromVenue(venueLocations);
   const dateIso = full?.date_iso ?? summary.date_iso;
   const hasDate = Boolean(dateIso && dateIso !== "TBD");
   const location = full?.location ?? summary.location;
@@ -510,10 +511,11 @@ function CelebrationPanel({
 
   const [editing, setEditing] = useState(false);
   const [date, setDate] = useState(hasDate ? (dateIso as string) : "");
-  // The venue's postcode fills the field rather than merely suggesting it — a
-  // hint you still have to retype isn't autofill. It only ever fills a blank:
-  // an address already carrying a zip keeps its own.
+  // Filled in, not merely suggested — a hint you still have to retype isn't
+  // autofill. The venue's whole address where there is one; otherwise whatever
+  // was saved before, with the venue's postcode filling a blank.
   const [addr, setAddr] = useState<Address>(() => {
+    if (venueAddress) return venueAddress;
     const parsed = parseAddress(location);
     return parsed.zip || !venueZip ? parsed : { ...parsed, zip: venueZip };
   });
@@ -585,6 +587,7 @@ function CelebrationPanel({
             onChange={setAddr}
             showGaps={showGaps}
             zipHint={venueZip && venueZip === addr.zip ? venueZip : null}
+            fromVenue={Boolean(venueAddress)}
           />
         </div>
         {error ? (
@@ -860,6 +863,16 @@ function BundleInner() {
   const plan = planForBundle(bundle);
   const cash = moneyForBundle(bundle);
   const draft = isDraftBundle(bundle);
+  // The address forms seed themselves once, from the venue when there is one.
+  // Swapping the venue changes the answer but not the state React is already
+  // holding, so the old address stayed on screen — and would have been saved
+  // over the new one. Keying on the venue remounts them with fresh seeds, which
+  // is the whole of "the location follows the venue".
+  const venueKey =
+    (bundle.bookings ?? [])
+      .filter((b) => b.service_category === "venue" && !isDeadBooking(b))
+      .map((b) => b.location ?? "")
+      .join("|") || "no-venue";
   const readiness = sendReadiness(bundle);
 
   // The same row wherever a booking appears — the sections below differ only in
@@ -1096,7 +1109,7 @@ function BundleInner() {
           {/* The event editor below writes to the event, and a draft from the
               builder may not have one — so the details live here, on the
               bookings, where they're always writable. */}
-          <DraftDetails bundle={bundle} onSaved={load} />
+          <DraftDetails key={venueKey} bundle={bundle} onSaved={load} />
         </section>
       ) : (
         // Sent. These two are deliberately not a chain — a plan can be waiting
@@ -1134,7 +1147,7 @@ function BundleInner() {
               id="still-needed"
               className="mt-6 scroll-mt-20 rounded-2xl border border-gold/50 bg-gold/[0.07] p-5"
             >
-              <DraftDetails bundle={bundle} onSaved={load} sent />
+              <DraftDetails key={venueKey} bundle={bundle} onSaved={load} sent />
             </section>
           ) : null}
         </>
@@ -1142,6 +1155,7 @@ function BundleInner() {
 
       {bundle.event ? (
         <CelebrationPanel
+          key={venueKey}
           summary={bundle.event}
           full={event}
           bookings={bundle.bookings}

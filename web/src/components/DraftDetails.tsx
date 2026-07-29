@@ -28,6 +28,7 @@ import {
   formatAddress,
   isValidZip,
   parseAddress,
+  addressFromVenue,
   zipFromVenue,
   type Address,
 } from "@/lib/address";
@@ -70,14 +71,25 @@ export function DraftDetails({
     bundle.event?.date_iso && bundle.event.date_iso !== "TBD"
       ? bundle.event.date_iso
       : (live.find((b) => b.date_iso && b.date_iso !== "TBD")?.date_iso ?? "");
+  // A booked venue decides where the event is. That's the whole address, not
+  // just its postcode: the venue is a place with a street and a city, and
+  // asking the client to copy them across from a booking they can see on the
+  // same page is asking them to do the app's typing.
+  const venueLocations = live
+    .filter((b) => b.service_category === "venue")
+    .map((b) => b.location);
+  const venueAddress = addressFromVenue(venueLocations);
+  const venueZip = zipFromVenue(venueLocations);
+
   const seedLocation =
     bundle.event?.location || live.find((b) => b.location)?.location || "";
-  const venueZip = zipFromVenue(
-    live.filter((b) => b.service_category === "venue").map((b) => b.location),
-  );
 
   const [date, setDate] = useState(seedDate);
   const [addr, setAddr] = useState<Address>(() => {
+    // The venue wins where there is one. Below it, whatever was typed before —
+    // and the venue's postcode still fills a blank, for a plan whose address
+    // was written by hand before the venue was booked.
+    if (venueAddress) return venueAddress;
     const parsed = parseAddress(seedLocation);
     return parsed.zip || !venueZip ? parsed : { ...parsed, zip: venueZip };
   });
@@ -211,6 +223,7 @@ export function DraftDetails({
               onChange={setAddr}
               showGaps={false}
               zipHint={venueZip && venueZip === addr.zip ? venueZip : null}
+              fromVenue={Boolean(venueAddress)}
             />
           </div>
         ) : null}
