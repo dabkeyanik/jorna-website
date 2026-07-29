@@ -9,8 +9,13 @@ import type {
   ConversationSummary,
   Earnings,
   EventCreateInput,
+  EventFunction,
   EventItem,
   GroupMessage,
+  Guest,
+  GuestList,
+  Invitation,
+  RsvpReply,
   Negotiation,
   ReportTargetType,
   StripeStatus,
@@ -723,5 +728,140 @@ export function disputeBooking(bookingId: string, reason?: string): Promise<unkn
   return apiFetch(`/payments/bookings/${bookingId}/dispute`, {
     method: "POST",
     body: { reason: reason || null },
+  });
+}
+
+// ── Guest lists ──────────────────────────────────────────────────────
+
+/** The list, its functions, and what the replies add up to. Host only. */
+export function getGuestList(eventId: string): Promise<GuestList> {
+  return apiFetch<GuestList>(`/events/${eventId}/guests`);
+}
+
+export function addGuest(
+  eventId: string,
+  guest: {
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    party_size?: number;
+    /** Omit for every function — what adding somebody without saying which parts means. */
+    function_ids?: string[];
+    note?: string | null;
+  },
+): Promise<Guest> {
+  return apiFetch<Guest>(`/events/${eventId}/guests`, { method: "POST", body: guest });
+}
+
+/**
+ * Add many from pasted lines — "Anita Sharma, anita@example.com, 3". Name is
+ * the only part required; blank lines are skipped rather than becoming guests.
+ */
+export function addGuestsBulk(
+  eventId: string,
+  lines: string[],
+  functionIds: string[] = [],
+): Promise<{ added: number; guests: Guest[] }> {
+  return apiFetch(`/events/${eventId}/guests/bulk`, {
+    method: "POST",
+    body: { lines, function_ids: functionIds },
+  });
+}
+
+export function updateGuest(
+  guestId: string,
+  updates: Partial<{
+    name: string;
+    email: string | null;
+    phone: string | null;
+    party_size: number;
+    function_ids: string[];
+    note: string | null;
+  }>,
+): Promise<Guest> {
+  return apiFetch<Guest>(`/guests/${guestId}`, { method: "PATCH", body: updates });
+}
+
+export function removeGuest(guestId: string): Promise<void> {
+  return apiFetch<void>(`/guests/${guestId}`, { method: "DELETE" });
+}
+
+export function addFunction(
+  eventId: string,
+  fn: {
+    name: string;
+    date_iso?: string | null;
+    time_start?: string | null;
+    time_end?: string | null;
+    location?: string | null;
+  },
+): Promise<EventFunction> {
+  return apiFetch<EventFunction>(`/events/${eventId}/functions`, {
+    method: "POST",
+    body: fn,
+  });
+}
+
+export function updateFunction(
+  functionId: string,
+  updates: Partial<{
+    name: string;
+    date_iso: string | null;
+    time_start: string | null;
+    time_end: string | null;
+    location: string | null;
+  }>,
+): Promise<EventFunction> {
+  return apiFetch<EventFunction>(`/functions/${functionId}`, {
+    method: "PATCH",
+    body: updates,
+  });
+}
+
+/** Guests stay — they're invited to the celebration, not only to one part of it. */
+export function removeFunction(functionId: string): Promise<void> {
+  return apiFetch<void>(`/functions/${functionId}`, { method: "DELETE" });
+}
+
+/**
+ * The celebration's shareable link, minted on first ask. One link for a family
+ * group chat, where whoever opens it adds themselves.
+ */
+export function getInviteLink(eventId: string): Promise<{ token: string }> {
+  return apiFetch(`/events/${eventId}/invite-link`, { method: "POST" });
+}
+
+/** Stop the shared link working. Guests it already brought keep their replies. */
+export function revokeInviteLink(eventId: string): Promise<{ token: null }> {
+  return apiFetch(`/events/${eventId}/invite-link`, { method: "DELETE" });
+}
+
+// ── What a guest sees ────────────────────────────────────────────────
+//
+// No login: the token in the link is the whole credential, so these are the
+// only calls made with auth off.
+
+/** Works for either kind of link — a guest can't tell which they were sent. */
+export function getInvitation(token: string): Promise<Invitation> {
+  return apiFetch<Invitation>(`/rsvp/${encodeURIComponent(token)}`, { auth: false });
+}
+
+export function sendRsvp(token: string, replies: RsvpReply[]): Promise<Invitation> {
+  return apiFetch<Invitation>(`/rsvp/${encodeURIComponent(token)}`, {
+    method: "POST",
+    body: { replies },
+    auth: false,
+  });
+}
+
+/** Add yourself from the shared link. Returns a token of your own. */
+export function joinViaInviteLink(
+  token: string,
+  who: { name: string; email?: string | null; party_size: number; replies: RsvpReply[] },
+): Promise<Invitation & { token: string }> {
+  return apiFetch(`/rsvp/${encodeURIComponent(token)}/join`, {
+    method: "POST",
+    body: who,
+    auth: false,
   });
 }

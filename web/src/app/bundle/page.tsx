@@ -12,6 +12,7 @@ import {
   deleteEvent,
   disputeBooking,
   getBundle,
+  getGuestList,
   refundBooking,
   listBundles,
   listEvents,
@@ -45,6 +46,7 @@ import {
   type BundleEventInfo,
   type EventCreateInput,
   type EventItem,
+  type GuestList,
 } from "@/lib/types";
 import {
   bookingGaps,
@@ -488,15 +490,104 @@ function Detail({ label, value, muted }: { label: string; value: string; muted?:
  * Only non-empty fields are sent (PATCH is exclude_unset), so saving never
  * blanks a value.
  */
+/**
+ * Who's coming, in one line, with the way through to the list.
+ *
+ * The guest list is its own page — it gets worked over months, in short bursts,
+ * and it isn't about vendors. What belongs here is the one number that changes
+ * a decision: how the replies sit against the count the vendors were booked
+ * against. Reports it; changes nothing. A caterer holding two hundred is
+ * holding a promise, and no RSVP arriving on a Tuesday should move it.
+ */
+function GuestsRow({
+  eventId,
+  bundleId,
+  plannedFor,
+}: {
+  eventId: string;
+  bundleId: string;
+  plannedFor?: number | null;
+}) {
+  const [list, setList] = useState<GuestList | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getGuestList(eventId)
+      .then((data) => !cancelled && setList(data))
+      .catch(() => {
+        /* The list is an extra, not the page. Silence beats an error here. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId]);
+
+  const href = `/guests?event=${eventId}&bundle=${bundleId}`;
+  const started = (list?.guests.length ?? 0) > 0;
+
+  // Across every function, because this is a summary — the per-function
+  // breakdown, which is the number a caterer actually bills against, is on the
+  // list itself.
+  const attending = list ? Math.max(0, ...list.headcount.map((h) => h.attending)) : 0;
+  const waiting = list ? list.headcount.reduce((n, h) => n + h.no_reply, 0) : 0;
+  const gap = plannedFor && plannedFor > 0 ? attending - plannedFor : null;
+
+  return (
+    <div className="mt-4 border-t border-line-soft pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-[0.64rem] uppercase tracking-[0.14em] text-ink-faint">
+            Guest list
+          </p>
+          {started ? (
+            <p className="text-ink">
+              <span className="tabular-nums">{attending}</span> coming
+              {waiting > 0 ? (
+                <span className="text-ink-soft">
+                  {" "}
+                  · <span className="tabular-nums">{waiting}</span> yet to reply
+                </span>
+              ) : null}
+              {gap != null && gap < 0 && waiting === 0 ? (
+                <span className="text-ink-soft">
+                  {" "}
+                  · <span className="tabular-nums">{Math.abs(gap)}</span> under the{" "}
+                  <span className="tabular-nums">{plannedFor}</span> you booked for
+                </span>
+              ) : null}
+              {gap != null && gap > 0 ? (
+                <span className="text-ink-soft">
+                  {" "}
+                  · <span className="tabular-nums">{gap}</span> over the{" "}
+                  <span className="tabular-nums">{plannedFor}</span> you booked for
+                </span>
+              ) : null}
+            </p>
+          ) : (
+            <p className="text-ink-faint">
+              Nobody invited yet — send a link and let people reply.
+            </p>
+          )}
+        </div>
+        <LinkButton href={href} variant="ghost" size="md">
+          {started ? "Open guest list" : "Start a guest list"}
+        </LinkButton>
+      </div>
+    </div>
+  );
+}
+
 function CelebrationPanel({
   summary,
   full,
   bookings,
+  bundleId,
   onSaved,
 }: {
   summary: BundleEventInfo;
   full: EventItem | null;
   bookings: BundleBooking[];
+  bundleId: string;
   onSaved: () => void | Promise<void>;
 }) {
   // A booked venue is where the event is, and it knows its own address; asking
@@ -644,6 +735,12 @@ function CelebrationPanel({
           {full.description}
         </p>
       ) : null}
+
+      <GuestsRow
+        eventId={summary.event_id}
+        bundleId={bundleId}
+        plannedFor={guestCount}
+      />
 
       {full?.services_needed?.length ? (
         <div className="mt-4 border-t border-line-soft pt-3">
@@ -1233,6 +1330,7 @@ function BundleInner() {
           summary={bundle.event}
           full={event}
           bookings={bundle.bookings}
+          bundleId={bundle.bundle_id}
           onSaved={load}
         />
       ) : null}
