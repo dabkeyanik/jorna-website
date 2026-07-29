@@ -715,6 +715,20 @@ export function checkInBooking(
   });
 }
 
+/**
+ * Send one vendor their check-in email again. Client only, one booking at a
+ * time — four vendors are here and the fifth hasn't checked in, and mailing all
+ * five to reach one is how a marketplace teaches its vendors to filter its post.
+ *
+ * The backend holds the cooldown and every other condition, and reports them on
+ * the booking as can_resend_checkin.
+ */
+export function resendCheckInEmail(
+  bookingId: string,
+): Promise<{ sent: boolean; message: string; resent_at: string }> {
+  return apiFetch(`/bookings/${bookingId}/resend-checkin`, { method: "POST" });
+}
+
 /** Full refund, available for 24 hours after payment. Customer only. */
 export function refundBooking(bookingId: string): Promise<unknown> {
   return apiFetch(`/payments/bookings/${bookingId}/refund`, { method: "POST" });
