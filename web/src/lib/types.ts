@@ -253,6 +253,39 @@ export const REFUND_WINDOW_HOURS = 24;
  */
 export const AUTO_RELEASE_DAYS = 7;
 
+/** Whether the event's first day has arrived. */
+export function eventHasStarted(b: { date_iso?: string | null }): boolean {
+  if (!b.date_iso || b.date_iso === "TBD") return false;
+  const start = Date.parse(`${b.date_iso}T00:00:00Z`);
+  return !Number.isNaN(start) && Date.now() >= start;
+}
+
+/**
+ * Whether this booking can be confirmed for escrow release yet.
+ *
+ * Mirrors the backend's event_confirmable_date, which has two routes. The
+ * scheduled one: the booking's last day has passed. And the one that follows
+ * the work instead of the calendar — the event has started and the vendor has
+ * checked in at the venue.
+ *
+ * That second route exists because a booking runs to the time it was written
+ * down for and a job frequently doesn't. Waiting out a three-day window to
+ * settle up with someone who finished on the first afternoon is waiting on a
+ * date, not on anything happening. A GPS check-in is the vendor's own evidence
+ * they turned up, so it's what the day is allowed to turn on.
+ *
+ * Both halves of that route are needed: a vendor can check in early — dropping
+ * equipment off the night before — and that isn't the event taking place.
+ */
+export function canConfirmBooking(b: {
+  date_iso?: string | null;
+  date_end?: string | null;
+  vendor_checked_in_at?: string | null;
+}): boolean {
+  if (eventIsOver(b)) return true;
+  return Boolean(b.vendor_checked_in_at) && eventHasStarted(b);
+}
+
 /** The date escrow releases itself, or null when there's no date to count from. */
 export function autoReleaseOn(b: {
   date_iso?: string | null;

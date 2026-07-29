@@ -31,7 +31,8 @@ import {
   PAYMENT_STATUS_LABELS,
   categoryLabel,
   autoReleaseOn,
-  eventIsOver,
+  canConfirmBooking,
+  eventHasStarted,
   lastDay,
   priceLine,
   withinRefundWindow,
@@ -191,7 +192,7 @@ function BookingRow({
   // Escrow actions only exist while the money is held on the platform.
   const held = pay === "paid";
   const youConfirmed = Boolean(booking.customer_confirmed_at);
-  const canConfirm = held && !youConfirmed && eventIsOver(booking);
+  const canConfirm = held && !youConfirmed && canConfirmBooking(booking);
   const refundable = held && withinRefundWindow(booking.paid_at);
   const gaps = bookingGaps(booking, event);
 
@@ -330,9 +331,11 @@ function BookingRow({
             // booking that spans several. Quoting the start date told a client
             // with a Friday-to-Sunday booking they could confirm on the Friday.
             <p className="text-xs text-ink-soft">
-              You can confirm after the event
-              {prettyDate(lastDay(booking)) ? ` (${prettyDate(lastDay(booking))})` : ""}.
-              Funds are never released before then.
+              {eventHasStarted(booking)
+                ? `You can confirm as soon as ${booking.vendor_name || "your vendor"} checks in at the venue — you don't have to wait for the booking to run out.`
+                : `You can confirm after the event${
+                    prettyDate(lastDay(booking)) ? ` (${prettyDate(lastDay(booking))})` : ""
+                  }. Funds are never released before then.`}
             </p>
           ) : (
             // Said before it happens, not after. The money moves on its own a
