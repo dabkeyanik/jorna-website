@@ -158,19 +158,28 @@ export function DraftDetails({
     const count = Number(guests) > 0 ? Number(guests) : undefined;
 
     // Written onto every live booking, because that's what a vendor is sent
-    // and what the send check reads.
+    // and what the send check reads — minus anything that booking has already
+    // committed to.
+    //
+    // The subtraction matters on a sent plan with two per-person services where
+    // only one is missing a headcount: this card holds a single guest count, so
+    // filling the gap would post the same number to the booking that already
+    // has one, and the server would refuse the whole save. The client would see
+    // an error about a field it never showed them.
     await Promise.all(
-      live.map((b) =>
-        updateBooking(b.booking_id, {
-          ...(date ? { date_iso: date } : {}),
-          ...(location ? { location } : {}),
-          ...(count != null ? { guest_count: count } : {}),
-          ...(times[b.booking_id]?.start
-            ? { time_start: times[b.booking_id].start }
-            : {}),
-          ...(times[b.booking_id]?.end ? { time_end: times[b.booking_id].end } : {}),
-        }),
-      ),
+      live.map((b) => {
+        const locked = new Set(b.locked_fields ?? []);
+        const put = <T,>(field: string, value: T | undefined) =>
+          value !== undefined && !locked.has(field) ? { [field]: value } : {};
+
+        return updateBooking(b.booking_id, {
+          ...put("date_iso", date || undefined),
+          ...put("location", location),
+          ...put("guest_count", count),
+          ...put("time_start", times[b.booking_id]?.start || undefined),
+          ...put("time_end", times[b.booking_id]?.end || undefined),
+        });
+      }),
     );
 
     // And onto the event when there is one, so the dashboard and the run sheet

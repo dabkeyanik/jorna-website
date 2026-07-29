@@ -598,6 +598,28 @@ export function bookingGaps(
   return gaps;
 }
 
+// ── What a vendor has already been told ──────────────────────────────
+//
+// Once a request is out, the details it carried are the vendor's answer to a
+// question — so the client stops being able to change them, and the server
+// refuses. These read that decision rather than re-deriving it: a field the UI
+// leaves editable has to be one the server will still accept.
+
+/** Booking fields any live booking in this plan has already committed to. */
+export function lockedSharedFields(bookings: BundleBooking[]): Set<string> {
+  const locked = new Set<string>();
+  for (const b of bookings) {
+    if (isDeadBooking(b)) continue;
+    for (const f of b.locked_fields ?? []) locked.add(f);
+  }
+  return locked;
+}
+
+/** Whether this plan's shared facts are settled — anything has gone to a vendor. */
+export function planIsCommitted(bookings: BundleBooking[]): boolean {
+  return lockedSharedFields(bookings).size > 0;
+}
+
 /** Ready to be somebody's job. */
 export function isBookingSendable(
   b: BundleBooking,
