@@ -31,6 +31,12 @@ interface RegisterInput {
   l_name: string;
   age: number;
   location: string;
+  // Where that location is, when the city picker recognised it. A vendor with
+  // no coordinates can't be placed relative to an event, and an unplaceable
+  // vendor is left out of search results and of generated bundles — so this is
+  // the difference between being findable and not.
+  latitude?: number | null;
+  longitude?: number | null;
   gender: string;
   language: string;
   phone?: string;

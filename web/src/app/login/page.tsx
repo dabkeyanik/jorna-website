@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { supabase, startGoogleSignIn } from "@/lib/supabase";
 import { Button, Card, Field } from "@/components/ui";
-import { CityCombobox } from "@/components/CityCombobox";
+import { CityCombobox, type Coords } from "@/components/CityCombobox";
 
 function GoogleMark() {
   // Google "G", inline so nothing is fetched over the network (the site's ethos).
@@ -62,6 +62,7 @@ function LoginInner() {
   const [lName, setLName] = useState("");
   const [ageStr, setAgeStr] = useState("");
   const [location, setLocation] = useState("");
+  const [cityCoords, setCityCoords] = useState<Coords | null>(null);
   // Google-signup linkage (recovered from the persisted Supabase session)
   const [googleReady, setGoogleReady] = useState(!isGoogleSignup);
   const [googleUserId, setGoogleUserId] = useState<string | null>(null);
@@ -100,6 +101,8 @@ function LoginInner() {
           l_name: lName,
           age: Number(ageStr) || 25,
           location,
+          latitude: cityCoords?.lat ?? null,
+          longitude: cityCoords?.lng ?? null,
           gender: "unspecified",
           language: "English",
           ...(isGoogleSignup && googleUserId && googleToken
@@ -297,7 +300,15 @@ function LoginInner() {
                 label="City & state"
                 placeholder="Start typing a city…"
                 value={location}
-                onChange={(v) => setLocation(v)}
+                // The picker has always reported coordinates for a chosen city
+                // and this dropped them. They're what places a vendor on the
+                // map; without them a vendor is findable by nobody searching a
+                // location. Null for free text, which is honest — we don't know
+                // where "chicagoo" is.
+                onChange={(v, c) => {
+                  setLocation(v);
+                  setCityCoords(c);
+                }}
                 required
               />
             </>
