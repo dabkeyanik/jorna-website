@@ -20,8 +20,15 @@
 // saves once everything is present would make you hold them in your head until
 // the last one. Only the send button needs the whole set; that check is
 // unchanged, and a partial save simply leaves it blocked.
+//
+// It saves itself. There used to be a Save button, and it created the worst
+// possible state: a card headed "Required Info" sitting above fields that were
+// already filled in, because what's on screen and what the send check reads are
+// two different things until you press it. Nothing about typing an address
+// tells you that. Now a pause writes it, and the heading answers for what was
+// actually saved.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { updateBooking, updateEvent } from "@/lib/jorna";
 import {
@@ -33,10 +40,19 @@ import {
   type Address,
 } from "@/lib/address";
 import { addressPin } from "@/lib/geocode";
+import { createSaver, type Saver } from "@/lib/autosave";
 import { isDeadBooking, sendReadiness, type BookingGapField } from "@/lib/planning";
 import { priceUnitKind, type BundleDetail, type BundleBooking } from "@/lib/types";
 import { AddressFields } from "@/components/AddressFields";
 import { Button, Card, Field } from "@/components/ui";
+
+/**
+ * How long a pause counts as "done typing".
+ *
+ * Long enough that a guest count of 200 is one save rather than three, short
+ * enough that looking up from the keyboard finds it already written.
+ */
+const AUTOSAVE_MS = 900;
 
 export function DraftDetails({
   bundle,
@@ -120,84 +136,104 @@ export function DraftDetails({
     ),
   );
 
-  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * Save what's here.
-   *
-   * The only thing refused is a malformed ZIP — that's not an incomplete
-   * answer, it's a wrong one, and it would be written into the address string
-   * and read back as rubbish. Everything else can be half-done.
-   */
-  async function save() {
-    setError(null);
-    if (addr.zip.trim() && !isValidZip(addr.zip)) {
-      setError("That ZIP doesn't look right — five digits, or ZIP+4.");
-      return;
-    }
+  // A ZIP that's present but not yet five digits is somebody mid-typing, not a
+  // wrong answer. The address waits for it to finish; everything else saves
+  // anyway, so a date entered a minute ago isn't held hostage by a postcode.
+  const zipReady = !addr.zip.trim() || isValidZip(addr.zip);
 
-    setBusy(true);
-    try {
-      // A partial address still composes, and parses back into the same parts
-      // next time — it just won't satisfy the send check, which is right.
-      const composed = formatAddress(addr);
-      const location = composed || undefined;
-      const count = Number(guests) > 0 ? Number(guests) : undefined;
+  // Everything the card can write, as one comparable value. An autosave that
+  // would change nothing doesn't fire — which is most of them, since focus
+  // moving through a form re-renders it constantly without altering a thing.
+  const snapshot = JSON.stringify({ date, addr, guests, times });
 
-      // Written onto every live booking, because that's what a vendor is sent
-      // and what the send check reads.
-      await Promise.all(
-        live.map((b) =>
-          updateBooking(b.booking_id, {
-            ...(date ? { date_iso: date } : {}),
-            ...(location ? { location } : {}),
-            ...(count != null ? { guest_count: count } : {}),
-            ...(times[b.booking_id]?.start
-              ? { time_start: times[b.booking_id].start }
-              : {}),
-            ...(times[b.booking_id]?.end
-              ? { time_end: times[b.booking_id].end }
-              : {}),
-          }),
-        ),
-      );
+  /** The writes themselves, with no interest in whether anyone is watching. */
+  async function writeDetails() {
+    // A partial address still composes, and parses back into the same parts
+    // next time — it just won't satisfy the send check, which is right.
+    const composed = zipReady ? formatAddress(addr) : "";
+    const location = composed || undefined;
+    const count = Number(guests) > 0 ? Number(guests) : undefined;
 
-      // And onto the event when there is one, so the dashboard and the run sheet
-      // read the same answers.
-      if (bundle.event?.event_id) {
-        await updateEvent(bundle.event.event_id, {
+    // Written onto every live booking, because that's what a vendor is sent
+    // and what the send check reads.
+    await Promise.all(
+      live.map((b) =>
+        updateBooking(b.booking_id, {
           ...(date ? { date_iso: date } : {}),
           ...(location ? { location } : {}),
           ...(count != null ? { guest_count: count } : {}),
-          ...(await addressPin(addr)),
-        }).catch(() => {});
-      }
+          ...(times[b.booking_id]?.start
+            ? { time_start: times[b.booking_id].start }
+            : {}),
+          ...(times[b.booking_id]?.end ? { time_end: times[b.booking_id].end } : {}),
+        }),
+      ),
+    );
 
-      await onSaved();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't save those details.");
-    } finally {
-      setBusy(false);
+    // And onto the event when there is one, so the dashboard and the run sheet
+    // read the same answers.
+    if (bundle.event?.event_id) {
+      await updateEvent(bundle.event.event_id, {
+        ...(date ? { date_iso: date } : {}),
+        ...(location ? { location } : {}),
+        ...(count != null ? { guest_count: count } : {}),
+        ...(location ? await addressPin(addr) : {}),
+      }).catch(() => {});
     }
   }
 
+  // Debouncing, ordering and the unmount flush all live in lib/autosave, where
+  // they're testable. Built once and kept, so it survives the re-render its own
+  // status change causes.
+  const saver = useRef<Saver | null>(null);
+  if (saver.current === null) {
+    saver.current = createSaver({
+      delayMs: AUTOSAVE_MS,
+      onStatus: setStatus,
+      onError: (err) =>
+        setError(err instanceof ApiError ? err.message : "Couldn't save those details."),
+      // The point of the whole exercise: the heading above reads the saved
+      // plan, so it can't go on asking for something already written.
+      after: onSaved,
+    });
+  }
+
+  // Reported every render, which is what lets the saver see a change the moment
+  // it happens without the component tracking one itself.
+  useEffect(() => {
+    saver.current?.submit(snapshot, () => {
+      setError(null);
+      return writeDetails();
+    });
+  });
+
+  // Leaving the page mid-pause shouldn't lose the last thing typed — which is
+  // the exact complaint autosave exists to answer, and it would be a poor joke
+  // to reintroduce it here.
+  useEffect(() => () => saver.current?.flush(), []);
+
   return (
     <Card className="mt-4 p-5">
-      {/* Saving is the first of the two things to do here, so it sits where the
-          eye starts. Sending is the last, and waits at the bottom. */}
+      {/* Where the Save button used to be. It says what already happened rather
+          than asking for something — there is nothing left to press. */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h2 className="serif text-lg text-ink">
           {sent ? "Still needed" : readiness.canSend ? "Details" : "Before this can be sent"}
         </h2>
-        <Button disabled={busy} onClick={save}>
-          {busy ? "Saving…" : "Save details"}
-        </Button>
+        <span
+          aria-live="polite"
+          className={`text-sm ${status === "saved" ? "text-green" : "text-ink-faint"}`}
+        >
+          {status === "saving" ? "Saving…" : status === "saved" ? "Saved" : null}
+        </span>
       </div>
       <p className="mt-1 text-sm text-ink-soft">
         {sent
           ? "Your vendors have this plan, but a total can't be worked out without these — and nothing can be paid until it can."
-          : "These go to every vendor in the plan. Save as much as you have — you can come back for the rest."}
+          : "These go to every vendor in the plan. Fill in what you have — it saves itself, and you can come back for the rest."}
       </p>
 
       <div className="mt-4 grid gap-4">
@@ -231,6 +267,15 @@ export function DraftDetails({
               showGaps={false}
               zipHint={venueZip && venueZip === addr.zip ? venueZip : null}
             />
+            {!zipReady ? (
+              // Said here rather than as a save error, because nothing failed —
+              // the rest of the card is saving normally, and this one field is
+              // waiting for the other two digits.
+              <p className="mt-2 text-xs text-ink-faint">
+                Finish the ZIP — five digits, or ZIP+4 — and the address saves with
+                it.
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -267,12 +312,23 @@ export function DraftDetails({
         ))}
       </div>
 
+      {/* An autosave that fails quietly is worse than the button it replaced, so
+          a failure says so and offers the retry by hand. */}
       {error ? (
-        <p className="mt-4 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
-          {error}
-        </p>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-maroon/10 px-3 py-2">
+          <p className="text-sm text-maroon dark:text-gold">
+            {error} Your answers are still here — nothing is lost.
+          </p>
+          <Button
+            variant="ghost"
+            size="md"
+            disabled={status === "saving"}
+            onClick={() => saver.current?.saveNow()}
+          >
+            {status === "saving" ? "Saving…" : "Try again"}
+          </Button>
+        </div>
       ) : null}
-
     </Card>
   );
 }
