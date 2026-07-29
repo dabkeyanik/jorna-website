@@ -70,7 +70,14 @@ export function Field({
   hint,
   icon,
   ...rest
-}: { label: string; hint?: string; icon?: ReactNode } & InputHTMLAttributes<HTMLInputElement>) {
+}: {
+  /** Omit when the caller draws its own header — e.g. a label with a control
+      beside it, which can't be nested in this <label> without the click
+      landing on the input. */
+  label?: string;
+  hint?: string;
+  icon?: ReactNode;
+} & InputHTMLAttributes<HTMLInputElement>) {
   // The native calendar button is hidden (globals.css), so open the picker when
   // the field is clicked. showPicker() needs the click's user gesture; typing
   // still works if it's unsupported.
@@ -83,7 +90,9 @@ export function Field({
 
   return (
     <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-ink-soft">{label}</span>
+      {label ? (
+        <span className="mb-1.5 block text-sm font-medium text-ink-soft">{label}</span>
+      ) : null}
       <span className="relative block">
         {icon ? (
           <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-ink-faint">

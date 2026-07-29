@@ -122,16 +122,19 @@ function PlanInner() {
   // form uses, to a city, a state, and roughly where that is — matching vendors
   // is a question about travel radius, so a point is what the backend wants.
   const [zip, setZip] = useState("");
+  // Which of the two the person is answering with. A toggle rather than "fill
+  // in whichever" — with both on screen it's never clear which one the search
+  // is actually using, and the answer has to be one or the other.
+  const [byZip, setByZip] = useState(false);
   // The answer is stored with the question it answers. Lookups are async, so
   // without the pairing a resolved place outlives the ZIP that produced it and
   // the hint reads "Evanston" for a moment after you've typed a Houston ZIP.
   const [resolved, setResolved] = useState<{ zip: string; place: ZipPlace | null } | null>(null);
 
-  // What the ZIP is actually contributing: nothing while a city is chosen, and
-  // nothing for an answer that belongs to a different ZIP. Derived rather than
-  // cleared, so the effect below never has to write state synchronously.
-  const zipPlace =
-    !location.trim() && resolved?.zip === zip.trim() ? resolved.place : null;
+  // What the ZIP is contributing: nothing unless it's the chosen mode, and
+  // nothing for an answer belonging to a different ZIP. Derived rather than
+  // cleared, so the effect below never writes state synchronously.
+  const zipPlace = byZip && resolved?.zip === zip.trim() ? resolved.place : null;
   const zipPlaceLabel = zipPlace ? `${zipPlace.city}, ${zipPlace.state}` : "";
   const [budget, setBudget] = useState("mid-range");
   const [styles, setStyles] = useState<string[]>([]);
@@ -213,12 +216,11 @@ function PlanInner() {
       const res = await generateBundles({
         needed_categories: needed,
         booked_categories: [],
-        // A picked city wins — it's what the person actually chose. The ZIP
-        // stands in only when they left the city blank, and it resolves to the
-        // same shape: a name for the booking, a point for the matching.
-        location: location.trim() || zipPlaceLabel || null,
-        latitude: coords?.lat ?? zipPlace?.point?.lat ?? null,
-        longitude: coords?.lng ?? zipPlace?.point?.lng ?? null,
+        // Whichever the toggle is on. Both resolve to the same two things: a
+        // name to put on the booking, and a point to match vendors against.
+        location: (byZip ? zipPlaceLabel : location.trim()) || null,
+        latitude: (byZip ? zipPlace?.point?.lat : coords?.lat) ?? null,
+        longitude: (byZip ? zipPlace?.point?.lng : coords?.lng) ?? null,
         event_date: eventDate || null,
         guest_count: guests ? Number(guests) : null,
         // Only as a pair. One half of a window says nothing an availability
@@ -261,16 +263,45 @@ function PlanInner() {
 
       <Card className="mx-auto mt-8 max-w-3xl p-6 sm:p-7">
         <div className="grid gap-4 sm:grid-cols-3">
-          <CityCombobox
-            label="City & state"
-            placeholder="Start typing a city…"
-            icon={IconPin}
-            value={location}
-            onChange={(v, c) => {
-              setLocation(v);
-              setCoords(c);
-            }}
-          />
+          <div>
+            <div className="mb-1.5 flex items-baseline justify-between gap-2">
+              <span className="text-sm font-medium text-ink-soft">
+                {byZip ? "ZIP code" : "City & state"}
+              </span>
+              <button
+                type="button"
+                onClick={() => setByZip((v) => !v)}
+                className="shrink-0 text-xs font-semibold text-gold hover:underline"
+              >
+                {byZip ? "Use a city" : "Use a ZIP"}
+              </button>
+            </div>
+            {byZip ? (
+              <Field
+                inputMode="numeric"
+                maxLength={5}
+                placeholder="60201"
+                icon={IconPin}
+                value={zip}
+                onChange={(e) => setZip(e.target.value.replace(/[^0-9]/g, ""))}
+              />
+            ) : (
+              <CityCombobox
+                placeholder="Start typing a city…"
+                icon={IconPin}
+                value={location}
+                onChange={(v, c) => {
+                  setLocation(v);
+                  setCoords(c);
+                }}
+              />
+            )}
+            {/* Say what a ZIP resolved to. A field that quietly decides where
+                you're searching is worse than one that tells you. */}
+            {byZip && zipPlaceLabel ? (
+              <p className="mt-1 text-xs text-ink-faint">Looking near {zipPlaceLabel}.</p>
+            ) : null}
+          </div>
           <Field
             label="Event date"
             type="date"
@@ -289,27 +320,6 @@ function PlanInner() {
           />
         </div>
 
-        {/* Under the city, because it answers the same question. Hidden once a
-            city is chosen — two ways to say where you are, both filled in and
-            disagreeing, is a question nobody should have to arbitrate. */}
-        {location.trim() ? null : (
-          <div className="mt-4 sm:max-w-[calc(33%-0.5rem)]">
-            <Field
-              label="ZIP code"
-              inputMode="numeric"
-              maxLength={5}
-              placeholder="60201"
-              icon={IconPin}
-              value={zip}
-              onChange={(e) => setZip(e.target.value.replace(/[^\d]/g, ""))}
-            />
-            <p className="mt-1 text-xs text-ink-faint">
-              {zipPlaceLabel
-                ? `Looking near ${zipPlaceLabel}.`
-                : "Or give us a ZIP and we'll work out where that is."}
-            </p>
-          </div>
-        )}
 
         <div className="mt-7">
           <p className="mb-2.5 text-sm font-medium text-ink-soft">Time</p>

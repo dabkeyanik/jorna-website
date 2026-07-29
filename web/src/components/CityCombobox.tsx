@@ -20,7 +20,8 @@ export function CityCombobox({
   placeholder,
   required,
 }: {
-  label: string;
+  /** Omit when the caller draws its own header — see Field. */
+  label?: string;
   value: string;
   /** coords is set only when a suggestion is picked; null for free text. */
   onChange: (value: string, coords: Coords | null) => void;
@@ -64,7 +65,9 @@ export function CityCombobox({
 
   return (
     <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-ink-soft">{label}</span>
+      {label ? (
+        <span className="mb-1.5 block text-sm font-medium text-ink-soft">{label}</span>
+      ) : null}
       <div className="relative" ref={boxRef}>
         <span className="relative block">
           {icon ? (
