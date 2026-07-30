@@ -50,6 +50,14 @@ const IconUsers = (
   </svg>
 );
 
+/** "2027-10-01" → "1 Oct 2027". Raw ISO reads like a database row. */
+function prettyDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
 function SkeletonBundles() {
   return (
     <section className="mt-12">
@@ -110,6 +118,17 @@ function PlanInner() {
   // distance-based matching; null when the location was free-typed.
   const [coords, setCoords] = useState<Coords | null>(null);
   const [eventDate, setEventDate] = useState(params.get("date") ?? "");
+  // A celebration that genuinely runs across days — a Friday-to-Sunday wedding.
+  // This becomes the booking's date_end: what a per-day vendor bills for, and
+  // what the escrow gate treats as the last day.
+  const [eventDateEnd, setEventDateEnd] = useState("");
+  const [multiDay, setMultiDay] = useState(false);
+  // Or: the date isn't settled, and this is the window it falls inside. A
+  // different thing entirely — the backend takes its first day as a provisional
+  // date and drops the width, rather than booking a fortnight-long event.
+  const [dateMode, setDateMode] = useState<"on" | "between">("on");
+  const [windowStart, setWindowStart] = useState("");
+  const [windowEnd, setWindowEnd] = useState("");
   const [guests, setGuests] = useState(params.get("guests") ?? "");
   // Optional, and worth asking: a vendor's day isn't one booking, so knowing
   // the hours is what lets somebody with a morning ceremony be offered for an
@@ -221,7 +240,17 @@ function PlanInner() {
         location: (byZip ? zipPlaceLabel : location.trim()) || null,
         latitude: (byZip ? zipPlace?.point?.lat : coords?.lat) ?? null,
         longitude: (byZip ? zipPlace?.point?.lng : coords?.lng) ?? null,
-        event_date: eventDate || null,
+        // Exactly one of these two. A settled date can carry a last day; a
+        // window carries neither, and never reaches the booking's date_end —
+        // see DateRange. Sending both would make the backend choose, and the
+        // client would never learn which it picked.
+        event_date: dateMode === "on" ? eventDate || null : null,
+        event_date_end:
+          dateMode === "on" && multiDay ? eventDateEnd || null : null,
+        date_range:
+          dateMode === "between" && (windowStart || windowEnd)
+            ? { start: windowStart || null, end: windowEnd || null }
+            : null,
         guest_count: guests ? Number(guests) : null,
         // Only as a pair. One half of a window says nothing an availability
         // check can use, and would be written onto the bookings as a start with
@@ -262,7 +291,7 @@ function PlanInner() {
       </header>
 
       <Card className="mx-auto mt-8 max-w-3xl p-6 sm:p-7">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <div className="mb-1.5 flex items-baseline justify-between gap-2">
               <span className="text-sm font-medium text-ink-soft">
@@ -303,13 +332,9 @@ function PlanInner() {
             ) : null}
           </div>
           <Field
-            label="Event date"
-            type="date"
-            icon={IconCalendar}
-            value={eventDate}
-            onChange={(e) => setEventDate(e.target.value)}
-          />
-          <Field
+            // Named so the results below can send someone back to it — without
+            // a headcount their per-person slots have no total to compare.
+            id="plan-guests"
             label="Guests"
             type="number"
             min={1}
@@ -318,6 +343,104 @@ function PlanInner() {
             value={guests}
             onChange={(e) => setGuests(e.target.value)}
           />
+        </div>
+
+        {/* ── When ──────────────────────────────────────────────────────
+            Three different answers, and the difference matters downstream.
+            A settled day (optionally running into others) becomes the
+            booking's first and last day: what a per-day vendor bills for,
+            what the escrow gate waits out, what the run sheet lays out. An
+            unsettled window is none of that — it's a hint for matching, and
+            its first day is pencilled in as somewhere to start.
+
+            Kept out of the grid above because it now needs the room. */}
+        <div className="mt-7">
+          <div className="mb-2.5 flex items-baseline justify-between gap-2">
+            <p className="text-sm font-medium text-ink-soft">When</p>
+            <button
+              type="button"
+              onClick={() => setDateMode((m) => (m === "on" ? "between" : "on"))}
+              className="shrink-0 text-xs font-semibold text-gold hover:underline"
+            >
+              {dateMode === "on" ? "Not sure of the date yet" : "I know the date"}
+            </button>
+          </div>
+
+          {dateMode === "on" ? (
+            <>
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                <Field
+                  label={multiDay ? "First day" : "Event date"}
+                  type="date"
+                  icon={IconCalendar}
+                  value={eventDate}
+                  onChange={(e) => setEventDate(e.target.value)}
+                />
+                {multiDay ? (
+                  <Field
+                    label="Last day"
+                    type="date"
+                    icon={IconCalendar}
+                    min={eventDate || undefined}
+                    value={eventDateEnd}
+                    onChange={(e) => setEventDateEnd(e.target.value)}
+                  />
+                ) : (
+                  <div className="flex items-end">
+                    {/* Same affordance and wording as the booking form, so the
+                        two places you can say this say it the same way. */}
+                    <button
+                      type="button"
+                      className="pb-2.5 text-sm font-semibold text-gold hover:underline"
+                      onClick={() => setMultiDay(true)}
+                    >
+                      + Runs across multiple days
+                    </button>
+                  </div>
+                )}
+              </div>
+              {multiDay ? (
+                <button
+                  type="button"
+                  className="mt-2 text-xs text-ink-faint hover:text-ink"
+                  onClick={() => {
+                    setMultiDay(false);
+                    setEventDateEnd("");
+                  }}
+                >
+                  Single day instead
+                </button>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                <Field
+                  label="Sometime after"
+                  type="date"
+                  icon={IconCalendar}
+                  value={windowStart}
+                  onChange={(e) => setWindowStart(e.target.value)}
+                />
+                <Field
+                  label="And before"
+                  type="date"
+                  icon={IconCalendar}
+                  min={windowStart || undefined}
+                  value={windowEnd}
+                  onChange={(e) => setWindowEnd(e.target.value)}
+                />
+              </div>
+              {/* Said before it happens. A date nobody chose, appearing on a
+                  plan as though they had, is the thing this window is most
+                  likely to cause. */}
+              <p className="mt-2 text-xs text-ink-faint">
+                {windowStart
+                  ? `We'll pencil your plan in for ${prettyDate(windowStart)} and look for vendors free around then. Change it on your plan before you send it.`
+                  : "We'll look for vendors free around then, and pencil your plan in for the first day."}
+              </p>
+            </>
+          )}
         </div>
 
 
@@ -433,13 +556,45 @@ function PlanInner() {
           <p className="mt-2 text-center text-sm text-ink-soft">
             Compare, tweak, and choose — you can edit any bundle after picking it.
           </p>
+          {/* Three totals can only be compared if all three are totals. Without
+              a headcount every per-person service is carried at its rate, so the
+              cheapest-looking bundle may simply be the one with the most
+              unpriced catering — and one number fixes it. */}
+          {!guests && options.some((o) => (o.bundle.pending_quantity_count ?? 0) > 0) ? (
+            <div className="mx-auto mt-6 flex max-w-2xl flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/40 bg-gold/[0.08] px-4 py-3">
+              <p className="text-sm text-ink-soft">
+                Some of these charge per guest, so the totals below don&apos;t
+                include them yet.{" "}
+                <span className="text-ink">Add a guest count to compare properly.</span>
+              </p>
+              <Button
+                variant="ghost"
+                size="md"
+                onClick={() => {
+                  const field = document.getElementById("plan-guests");
+                  field?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  (field as HTMLInputElement | null)?.focus({ preventScroll: true });
+                }}
+              >
+                Add guests
+              </Button>
+            </div>
+          ) : null}
+
           {options.every((o) => o.bundle.items.length === 0) ? (
             <p className="mt-8 text-center text-ink-soft">
               We couldn&apos;t find available vendors for those categories and date yet. Try a
               different date or fewer categories.
             </p>
           ) : (
-            <BundleResults options={options} onChoose={choose} choosingLabel={choosingLabel} />
+            <BundleResults
+              options={options}
+              // What a per-person rate was priced against, so a resolved slot can
+              // name it rather than showing a total with nothing behind it.
+              guestCount={guests ? Number(guests) : null}
+              onChoose={choose}
+              choosingLabel={choosingLabel}
+            />
           )}
         </section>
       ) : null}

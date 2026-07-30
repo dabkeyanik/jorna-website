@@ -1,6 +1,22 @@
 "use client";
 
-import { categoryLabel, type BundleOption } from "@/lib/types";
+// The three generated teams, side by side.
+//
+// Every figure here goes through priceLine, the same function the plan and the
+// booking rows use. It used to print `item.price_min` bare: a caterer at $62 a
+// head appeared as "$62" in a column beside an $8,500 venue, and the headline
+// total a client picks a bundle on was a sum of rates and totals mixed together.
+// The backend now resolves each slot against the event's guest count and hours
+// (see chatbot_service._price_for) and says which figures are still rates, so
+// this can show what a bundle actually costs — and admit when it can't.
+
+import {
+  categoryLabel,
+  priceLine,
+  priceUnitLabel,
+  type BundleOption,
+  type BundleItem,
+} from "@/lib/types";
 import { Avatar, Button, Card, Stars } from "./ui";
 
 function money(n: number) {
@@ -12,13 +28,31 @@ function isRecommended(option: BundleOption) {
   return option.label.trim().toLowerCase() === "balanced";
 }
 
+/**
+ * One line-up row's figure and its caption.
+ *
+ * `guestCount` comes from the builder's own form, so a resolved per-person slot
+ * can name what it was multiplied by — "Total · 200 guests" rather than a
+ * number with nothing behind it.
+ */
+function itemPrice(item: BundleItem, guestCount: number | null) {
+  return priceLine({
+    price: item.price_min,
+    price_unit: item.price_unit,
+    price_pending_quantity: item.price_pending_quantity,
+    guest_count: guestCount,
+  });
+}
+
 function BundleCard({
   option,
+  guestCount,
   recommended,
   onChoose,
   choosing,
 }: {
   option: BundleOption;
+  guestCount: number | null;
   recommended: boolean;
   onChoose?: (option: BundleOption) => void;
   choosing?: boolean;
@@ -28,6 +62,16 @@ function BundleCard({
   const count = bundle.items.length;
   const rated = bundle.items.filter((i) => i.rating > 0);
   const avg = rated.length ? rated.reduce((s, i) => s + i.rating, 0) / rated.length : 0;
+
+  // Items whose total still can't be worked out. The bundle's total carries
+  // them at their rate, so it's a floor rather than an estimate — and the
+  // client has to be told which of the two they're reading.
+  const pending =
+    bundle.pending_quantity_count ??
+    bundle.items.filter((i) => i.price_pending_quantity).length;
+  // A range only when there is one. The builder currently prices min = max, so
+  // printing "$14,200–$14,200" would be noise pretending to be precision.
+  const spread = bundle.estimated_total_max > bundle.estimated_total_min;
 
   return (
     <Card
@@ -53,9 +97,13 @@ function BundleCard({
 
       {/* Headline total */}
       <div className="mt-4 text-center">
-        <p className="text-[0.68rem] uppercase tracking-[0.18em] text-ink-faint">Estimated total</p>
+        <p className="text-[0.68rem] uppercase tracking-[0.18em] text-ink-faint">
+          {pending > 0 ? "Estimated so far" : "Estimated total"}
+        </p>
         <p className="serif mt-0.5 text-[2rem] leading-none text-ink">
-          {money(bundle.estimated_total_min)}
+          {spread
+            ? `${money(bundle.estimated_total_min)}–${money(bundle.estimated_total_max)}`
+            : money(bundle.estimated_total_min)}
         </p>
         <p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-ink-faint">
           <span>
@@ -75,27 +123,60 @@ function BundleCard({
 
       {/* Line-up */}
       <ul className="flex-1 space-y-3">
-        {bundle.items.map((item) => (
-          <li
-            key={`${item.category}-${item.vendor_id ?? item.vendor_name}`}
-            className="flex items-center gap-3"
-          >
-            <Avatar src={item.pfp_url} name={item.vendor_name} size={38} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-ink">
-                {item.service_name || categoryLabel(item.category)}
-              </p>
-              <p className="truncate text-xs text-ink-faint">
-                {categoryLabel(item.category)} · {item.vendor_name}
-              </p>
-            </div>
-            <div className="shrink-0 text-right">
-              <p className="text-sm font-semibold text-ink">{money(item.price_min)}</p>
-              <Stars rating={item.rating} className="text-[0.7rem]" />
-            </div>
-          </li>
-        ))}
+        {bundle.items.map((item) => {
+          const price = itemPrice(item, guestCount);
+          return (
+            <li
+              key={`${item.category}-${item.vendor_id ?? item.vendor_name}`}
+              className="flex items-center gap-3"
+            >
+              <Avatar src={item.pfp_url} name={item.vendor_name} size={38} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-ink">
+                  {item.service_name || categoryLabel(item.category)}
+                </p>
+                <p className="truncate text-xs text-ink-faint">
+                  {categoryLabel(item.category)} · {item.vendor_name}
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-sm font-semibold text-ink">{money(price.amount)}</p>
+                {/* The unit, always, when there is one — a figure that depends
+                    on a quantity is not comparable to one that doesn't, and the
+                    column is full of both. */}
+                {price.caption ? (
+                  <p
+                    className={`text-[0.65rem] ${
+                      price.isTotal ? "text-ink-faint" : "text-gold"
+                    }`}
+                  >
+                    {price.caption}
+                  </p>
+                ) : null}
+                <Stars rating={item.rating} className="text-[0.7rem]" />
+              </div>
+            </li>
+          );
+        })}
       </ul>
+
+      {pending > 0 ? (
+        <p className="mt-4 rounded-lg border border-gold/40 bg-gold/[0.08] px-3 py-2 text-xs leading-relaxed text-ink-soft">
+          {pending === 1 ? "One service is" : `${pending} services are`} priced{" "}
+          {/* Named rather than described in the abstract: the row above says
+              "per person", and this says what to do about it. */}
+          {[
+            ...new Set(
+              bundle.items
+                .filter((i) => i.price_pending_quantity)
+                .map((i) => priceUnitLabel(i.price_unit) || "per unit"),
+            ),
+          ].join(" / ")}
+          , so the total above doesn&apos;t include{" "}
+          {pending === 1 ? "it" : "them"} yet. Add a guest count and times above
+          to price {pending === 1 ? "it" : "them"}.
+        </p>
+      ) : null}
 
       {unfilled.length > 0 ? (
         <p className="mt-4 rounded-lg bg-gold/10 px-3 py-2 text-xs leading-relaxed text-ink-soft">
@@ -120,10 +201,13 @@ function BundleCard({
 
 export function BundleResults({
   options,
+  guestCount = null,
   onChoose,
   choosingLabel,
 }: {
   options: BundleOption[];
+  /** From the builder's form — what a per-person rate was multiplied by. */
+  guestCount?: number | null;
   onChoose?: (option: BundleOption) => void;
   /** Label of the option currently being selected, so only its button spins. */
   choosingLabel?: string | null;
@@ -135,6 +219,7 @@ export function BundleResults({
         <BundleCard
           key={o.label}
           option={o}
+          guestCount={guestCount}
           recommended={isRecommended(o)}
           onChoose={onChoose}
           choosing={choosingLabel === o.label}

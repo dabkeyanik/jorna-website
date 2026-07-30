@@ -27,8 +27,18 @@ export interface BundleItem {
   service_name?: string | null;
   vendor_name: string;
   pfp_url?: string | null;
+  /**
+   * What this slot costs — rate × quantity, resolved against the event's own
+   * guest count and hours. Only when `price_pending_quantity` is true is this
+   * still a bare rate, and then it must not be rendered as a total.
+   *
+   * The same three-field contract a booking carries, so an item and the booking
+   * it becomes read the same way. Both go through `priceLine`.
+   */
   price_min: number;
   price_max: number;
+  price_unit?: string | null;
+  price_pending_quantity?: boolean;
   rating: number;
   match_reason: string;
 }
@@ -37,6 +47,12 @@ export interface Bundle {
   items: BundleItem[];
   estimated_total_min: number;
   estimated_total_max: number;
+  /**
+   * How many items are still priced at a rate. Non-zero means the totals above
+   * carry those items at their rate rather than their real cost — a floor, not
+   * an estimate. Say so rather than showing it as the price of the bundle.
+   */
+  pending_quantity_count?: number;
   unfilled_categories?: string[];
 }
 
@@ -53,6 +69,15 @@ export interface MultiBundleResponse {
   options: BundleOption[];
 }
 
+/**
+ * A window the date falls somewhere inside — "sometime in October".
+ *
+ * Not a duration. A celebration that genuinely runs several days says so with
+ * `event_date` + `event_date_end`, which become the booking's first and last
+ * day: what per-day pricing multiplies by, what the escrow gate waits for, and
+ * what the run sheet spreads across. A window is none of those — the backend
+ * takes its first day as a provisional date and drops the width.
+ */
 export interface DateRange {
   start?: string | null;
   end?: string | null;
@@ -62,6 +87,8 @@ export interface BundleRequest {
   needed_categories?: string[];
   booked_categories?: string[];
   event_date?: string | null;
+  /** Last day, for a celebration that really does run across several. */
+  event_date_end?: string | null;
   date_range?: DateRange | null;
   location?: string | null;
   latitude?: number | null;
