@@ -24,18 +24,18 @@ guard the backend already had, and two were not bugs at all.
 
 ## Status
 
-**25 of 25 items are resolved — 24 shipped and live.** Deployed across seven batches; the
+**25 of 25 items are resolved and shipped.** Deployed across nine batches; the
 backend runs on Railway from `main`, the site on Cloudflare Pages, all 41 routes
-verified serving 200 after each deploy. Backend suite: **649 passing**, up from
-620, with 32 tests added. Each batch's commit message records what changed and
+verified serving 200 after each deploy. Backend suite: **677 passing**, up from
+620, with 60 tests added. Each batch's commit message records what changed and
 why.
 
 Three pieces were held back as decisions rather than fixes. All three are now
-decided:
+decided — and the largest of them is built:
 
 | | What | Decided |
 | --- | --- | --- |
-| **16** | A reschedule path for a paid booking | **Spec'd, awaiting go-ahead.** All seven design questions answered — see `RESCHEDULE_PROPOSAL.md`, now a build spec rather than a set of questions. |
+| **16** | A reschedule path for a paid booking | **Built and live.** All seven design questions answered, then implemented to `RESCHEDULE_PROPOSAL.md`. |
 | **10** (part) | Linking a booking to a `function_id` | **Not now.** Per-booking headcounts are live and solve the practical problem; the link would only save retyping, at the cost of a production migration. |
 | **8** (part) | A 1:1 conversation before any booking | **Later, with rate limits designed alongside.** It's the one surface a spammer can reach every vendor through, and the limits belong in the same change rather than bolted on after an incident. |
 
@@ -508,7 +508,7 @@ about.
 
 ---
 
-### 16. A paid booking has no reschedule path ⏸ spec'd, awaiting go-ahead
+### 16. A paid booking has no reschedule path ✅ done
 
 **Frontend:** [`bundle/page.tsx:728-732`](web/src/app/bundle/page.tsx#L728-L732)
 **Backend:** `services/plan_readiness.py:181-221` (`locked_fields_for`)
@@ -525,10 +525,12 @@ about.
       "cancel the requests affected and book again" — a paid booking has no
       cancel button and the server refuses to remove one, so the only
       instruction on screen pointed at a control that isn't there.
-- [ ] **Spec'd, awaiting go-ahead:** the change-request flow. Every design
-      question is answered — see `RESCHEDULE_PROPOSAL.md`, which is now a build
-      spec: schema, four endpoints, guards, refund policy, re-pricing consent,
-      UI and the test list.
+- [x] Built to `RESCHEDULE_PROPOSAL.md`: `change_requests` table (migration
+      0041, verified up and down), four endpoints, the conflict re-check on
+      accept, refund-less-10% on decline, re-pricing both ways with client
+      consent on a rise, a 7-day expiry reading `AUTO_RELEASE_DAYS`, and UI on
+      both sides. **28 tests**, including that escrow never moves on a proposal
+      and that this is not a way round the 24-hour window.
 
 ---
 
