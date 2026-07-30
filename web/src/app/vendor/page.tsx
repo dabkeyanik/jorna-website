@@ -85,7 +85,14 @@ function ServiceRow({ service, canBook }: { service: ServiceItem; canBook: boole
         )}
         <div className="flex flex-1 flex-col p-4">
           <div className="flex items-start justify-between gap-3">
-            <h3 className="serif text-lg text-ink">{service.name}</h3>
+            <h3 className="serif text-lg text-ink">
+              <Link
+                href={`/service?id=${service.service_id}`}
+                className="transition hover:text-maroon dark:hover:text-gold"
+              >
+                {service.name}
+              </Link>
+            </h3>
             <div className="shrink-0 text-right">
               <p className="serif text-lg text-ink">{money(service.price)}</p>
               {unit ? <p className="text-xs text-ink-faint">{unit}</p> : null}
