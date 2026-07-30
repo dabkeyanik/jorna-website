@@ -594,13 +594,25 @@ export interface BookingGap {
   label: string;
 }
 
+/**
+ * Whether a stored answer is really an answer.
+ *
+ * "TBD" is what the bundle builder writes when it wasn't told — a non-empty
+ * string, so every plain truthiness check read it as filled in. It means the
+ * same as blank and is treated the same. Mirrors the backend's `is_unset`.
+ */
+export function isUnset(value?: string | null): boolean {
+  const text = (value ?? "").trim();
+  return !text || text.toUpperCase() === "TBD";
+}
+
 export function bookingGaps(
   b: BundleBooking,
   event?: BundleEventInfo | null,
 ): BookingGap[] {
   const gaps: BookingGap[] = [];
 
-  if (!b.date_iso || b.date_iso === "TBD") {
+  if (isUnset(b.date_iso)) {
     gaps.push({ field: "date", label: "a date" });
   }
 
@@ -611,30 +623,30 @@ export function bookingGaps(
     gaps.push({ field: "location", label: "a full address" });
   }
 
-  switch (priceUnitKind(b.price_unit)) {
-    case "person":
-      // The booking's own count, and not the event's. Unlike the date and the
-      // address, this one is arithmetic: the backend resolves the total from
-      // the booking it prices, so an event-level headcount satisfied this check
-      // without satisfying the backend. The plan would send, the vendor would
-      // approve, and the booking arrived at checkout still flagged
-      // price_pending_quantity — unpayable, and past the only screen that could
-      // have fixed it.
-      if (!(b.guest_count ?? 0)) {
-        gaps.push({ field: "guests", label: "a guest count" });
-      }
-      break;
-    case "hour":
-      if (!b.time_start || !b.time_end) {
-        gaps.push({ field: "hours", label: "a start and end time" });
-      }
-      break;
-    // Per day is covered by the date above; a single-day booking is a valid
-    // span, so date_end being absent isn't a gap.
-    case "day":
-    case "event":
-      break;
+  // On every booking, whatever it costs. A vendor accepting is agreeing to be
+  // somewhere at a time, and that's as true of a flat-rate DJ as an hourly one.
+  //
+  // This used to be asked only where the *price* depended on it, which is a
+  // different question — so a per-event or per-person booking passed the gate
+  // carrying "TBD" for both, and vendors were asked to hold a day with no hours
+  // attached to it.
+  if (isUnset(b.time_start) || isUnset(b.time_end)) {
+    gaps.push({ field: "hours", label: "a start and end time" });
   }
+
+  // The pricing unit still decides which quantity is needed on top.
+  if (priceUnitKind(b.price_unit) === "person" && !(b.guest_count ?? 0)) {
+    // The booking's own count, and not the event's. Unlike the date and the
+    // address, this one is arithmetic: the backend resolves the total from the
+    // booking it prices, so an event-level headcount satisfied this check
+    // without satisfying the backend. The plan would send, the vendor would
+    // approve, and the booking arrived at checkout still flagged
+    // price_pending_quantity — unpayable, and past the only screen that could
+    // have fixed it.
+    gaps.push({ field: "guests", label: "a guest count" });
+  }
+  // Per day is covered by the date above; a single-day booking is a valid span,
+  // so date_end being absent isn't a gap.
 
   return gaps;
 }

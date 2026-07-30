@@ -11,9 +11,10 @@
 // don't disagree.
 //
 // Only what's relevant is asked for. A plan of flat-rate services is never asked
-// for a headcount, and per-hour times are asked for on the one booking that
-// needs them rather than across the plan. A field already answered stays on
-// show so it can be corrected.
+// for a headcount. Times are asked for once, for the plan, because every booking
+// needs them — a vendor accepting is agreeing to be somewhere at a time — while
+// an hourly service also gets its own pair, since there the window is the price.
+// A field already answered stays on show so it can be corrected.
 //
 // Saving takes whatever is filled in. Details arrive over weeks — the venue
 // before the headcount, the headcount before the times — and a form that only
@@ -41,7 +42,12 @@ import {
 } from "@/lib/address";
 import { addressPin } from "@/lib/geocode";
 import { createSaver, type Saver } from "@/lib/autosave";
-import { isDeadBooking, sendReadiness, type BookingGapField } from "@/lib/planning";
+import {
+  isDeadBooking,
+  isUnset,
+  sendReadiness,
+  type BookingGapField,
+} from "@/lib/planning";
 import { priceUnitKind, type BundleDetail, type BundleBooking } from "@/lib/types";
 import { AddressFields } from "@/components/AddressFields";
 import { Button, Card, Field } from "@/components/ui";
@@ -125,15 +131,34 @@ export function DraftDetails({
   const hourly = live.filter(
     (b) =>
       priceUnitKind(b.price_unit) === "hour" &&
-      (!sent || !b.time_start || !b.time_end),
+      (!sent || isUnset(b.time_start) || isUnset(b.time_end)),
   );
   const [times, setTimes] = useState<Record<string, { start: string; end: string }>>(() =>
     Object.fromEntries(
       hourly.map((b) => [
         b.booking_id,
-        { start: b.time_start ?? "", end: b.time_end ?? "" },
+        {
+          start: isUnset(b.time_start) ? "" : b.time_start!,
+          end: isUnset(b.time_end) ? "" : b.time_end!,
+        },
       ]),
     ),
+  );
+  // One window for the plan, because every booking needs times now — not only
+  // the hourly ones — and asking six vendors' worth of them separately would be
+  // six fields to answer the same question. The per-service pairs above still
+  // win where they're filled in; this fills the rest.
+  //
+  // Seeded from whatever already has real hours, so a plan that was given a
+  // window in the builder doesn't ask for it twice.
+  const seedHours = live.find(
+    (b) => !isUnset(b.time_start) && !isUnset(b.time_end),
+  );
+  const [hoursStart, setHoursStart] = useState(
+    seedHours && !isUnset(seedHours.time_start) ? seedHours.time_start! : "",
+  );
+  const [hoursEnd, setHoursEnd] = useState(
+    seedHours && !isUnset(seedHours.time_end) ? seedHours.time_end! : "",
   );
 
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -147,7 +172,7 @@ export function DraftDetails({
   // Everything the card can write, as one comparable value. An autosave that
   // would change nothing doesn't fire — which is most of them, since focus
   // moving through a form re-renders it constantly without altering a thing.
-  const snapshot = JSON.stringify({ date, addr, guests, times });
+  const snapshot = JSON.stringify({ date, addr, guests, times, hoursStart, hoursEnd });
 
   /** The writes themselves, with no interest in whether anyone is watching. */
   async function writeDetails() {
@@ -172,12 +197,20 @@ export function DraftDetails({
         const put = <T,>(field: string, value: T | undefined) =>
           value !== undefined && !locked.has(field) ? { [field]: value } : {};
 
+        // Its own hours where it has a field of its own (hourly services, where
+        // the window is the price); the plan's window where it doesn't and has
+        // none set. A booking that already carries real times keeps them —
+        // filling a blank is not the same as overwriting an answer.
+        const own = times[b.booking_id];
+        const start = own?.start || (isUnset(b.time_start) ? hoursStart : "");
+        const end = own?.end || (isUnset(b.time_end) ? hoursEnd : "");
+
         return updateBooking(b.booking_id, {
           ...put("date_iso", date || undefined),
           ...put("location", location),
           ...put("guest_count", count),
-          ...put("time_start", times[b.booking_id]?.start || undefined),
-          ...put("time_end", times[b.booking_id]?.end || undefined),
+          ...put("time_start", start || undefined),
+          ...put("time_end", end || undefined),
         });
       }),
     );
@@ -285,6 +318,35 @@ export function DraftDetails({
                 it.
               </p>
             ) : null}
+          </div>
+        ) : null}
+
+        {/* The plan's own window. Every booking needs one — a vendor accepting
+            is agreeing to be somewhere at a time — and asking per vendor would
+            be six fields for one answer. */}
+        {show("hours", Boolean(hoursStart && hoursEnd)) ? (
+          <div>
+            <p className="mb-2 text-sm font-medium text-ink-soft">
+              When does it run?
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field
+                label="Starts"
+                type="time"
+                value={hoursStart}
+                onChange={(e) => setHoursStart(e.target.value)}
+              />
+              <Field
+                label="Ends"
+                type="time"
+                value={hoursEnd}
+                onChange={(e) => setHoursEnd(e.target.value)}
+              />
+            </div>
+            <p className="mt-2 text-xs text-ink-faint">
+              Goes to every vendor who doesn&apos;t have their own hours below.
+              You can give them different times once they&apos;ve accepted.
+            </p>
           </div>
         ) : null}
 
