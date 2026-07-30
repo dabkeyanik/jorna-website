@@ -87,6 +87,75 @@ function prettyDate(iso?: string | null): string | null {
     : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
+/** "18:00" → "6:00 PM". Null when there's nothing readable to show. */
+function clock(raw?: string | null): string | null {
+  if (!raw || raw === "TBD") return null;
+  const m = raw.trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const d = new Date(2000, 0, 1, Number(m[1]), Number(m[2]));
+  return Number.isNaN(d.getTime())
+    ? null
+    : d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+/**
+ * When and where this vendor is expected.
+ *
+ * Every booking has carried a date, a time window and its own location since
+ * the day bookings existed, and no client screen showed any of it. The run
+ * sheet does, but only in the week before — so for months a host with six
+ * vendors booked had nowhere to check that the photographer had the right day,
+ * or that the mehndi artist was coming to the house rather than the hall.
+ *
+ * Blank-tolerant on purpose: a draft is allowed to be missing all three, and
+ * the gap notice above says so. This shows what is known rather than asserting
+ * what isn't.
+ */
+function BookingWhen({
+  booking,
+  eventDateIso,
+}: {
+  booking: BundleBooking;
+  /** The celebration's own date, so a booking on a different day can say so. */
+  eventDateIso?: string | null;
+}) {
+  const date = prettyDate(booking.date_iso);
+  const end = booking.date_end && booking.date_end !== booking.date_iso
+    ? prettyDate(booking.date_end)
+    : null;
+  const start = clock(booking.time_start);
+  const finish = clock(booking.time_end);
+  const when = start ? `${start}${finish ? `–${finish}` : ""}` : null;
+  // Worth flagging rather than leaving to be spotted: a booking sitting on a
+  // different day from the celebration is either a second function or a
+  // mistake, and both are things a host wants to see.
+  const offDay =
+    Boolean(date) &&
+    Boolean(eventDateIso) &&
+    eventDateIso !== "TBD" &&
+    booking.date_iso !== eventDateIso;
+
+  if (!date && !when && !booking.location) return null;
+
+  return (
+    <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-soft">
+      {date ? (
+        <span className={offDay ? "font-medium text-gold" : undefined}>
+          {date}
+          {end ? ` – ${end}` : ""}
+        </span>
+      ) : null}
+      {when ? <span className="tabular-nums">{when}</span> : null}
+      {booking.location ? (
+        <span className="min-w-0 truncate text-ink-faint">{booking.location}</span>
+      ) : null}
+      {offDay ? (
+        <span className="text-ink-faint">· not your main event day</span>
+      ) : null}
+    </div>
+  );
+}
+
 /** A message with the one thing the old string didn't carry: whether it's
     good news. Everything used to render maroon, so "your confirmation is
     recorded" arrived looking like a failure. */
@@ -171,7 +240,14 @@ function isAwaitingVendor(b: BundleBooking, draft: boolean): boolean {
  */
 function statusLine(b: BundleBooking, draft: boolean): { text: string; tone: string } {
   const pay = b.payment_status ?? "unpaid";
-  if (pay !== "unpaid" && pay !== "processing") {
+  // A payment in flight is its own state, and fell through to "Approved" —
+  // so a client returning from Stripe, having just been told "Payment is
+  // processing", found their booking captioned Approved with a Pay button
+  // beside it. That reads as the payment having failed, and invites a second.
+  if (pay === "processing") {
+    return { text: "Payment processing", tone: "text-gold" };
+  }
+  if (pay !== "unpaid") {
     const tone =
       pay === "released"
         ? "text-green"
@@ -241,8 +317,11 @@ function BookingRow({
 
   // Mirror the backend's checkout guards so we never offer a button that must
   // fail: only an approved, not-yet-paid booking with a resolvable total.
-  const payable =
-    booking.status === "approved" && (pay === "unpaid" || pay === "processing");
+  //
+  // "processing" is excluded. A charge is already in flight — offering to start
+  // a second one is how a client pays twice for the same booking, and the
+  // status line now says what's happening instead.
+  const payable = booking.status === "approved" && pay === "unpaid";
   const blockedOnQuantity = payable && booking.price_pending_quantity;
 
   // Escrow actions only exist while the money is held on the platform.
@@ -271,6 +350,7 @@ function BookingRow({
               <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
               {status.text}
             </span>
+            <BookingWhen booking={booking} eventDateIso={event?.date_iso} />
           </div>
         </div>
         <div className="text-right">
@@ -282,7 +362,10 @@ function BookingRow({
       {/* What this one still needs. On a draft nobody has been told anything
           yet, so saying the vendor "can't act" would be describing a request
           that hasn't been made. */}
-      {gaps.length > 0 && !isBeyondActionable(booking) ? (
+      {/* `isBeyondActionable` is false for a rejected unpaid booking, so a
+          vendor who has already declined was still being reported as unable to
+          act until it had a guest count. Nothing is waiting on a dead booking. */}
+      {gaps.length > 0 && !isBeyondActionable(booking) && !isDeadBooking(booking) ? (
         <p className="mt-3 rounded-lg border border-gold/50 bg-gold/[0.08] px-3 py-2 text-xs text-ink-soft">
           {draft
             ? `Needs ${describeGaps(gaps)} before ${booking.vendor_name || "this vendor"} can be asked.`
@@ -311,8 +394,16 @@ function BookingRow({
       ) : null}
 
       {/* Negotiation — only on a negotiable service, before any money moves,
-          and not while the vendor is still deciding whether to take the job */}
-      {booking.open_to_price_negotiation && !isBeyondActionable(booking) && !awaiting ? (
+          and not while the vendor is still deciding whether to take the job.
+          Not on a draft either: `awaiting` is false there because nothing has
+          been asked, which let the button through on a booking no vendor has
+          received. Haggling over a job nobody has been offered is a
+          conversation out of order — and the backend confirms they genuinely
+          haven't been told (booking_service skips the notification on a draft). */}
+      {booking.open_to_price_negotiation &&
+      !isBeyondActionable(booking) &&
+      !awaiting &&
+      !draft ? (
         showNeg ? (
           <div className="mt-3">
             <NegotiationPanel
@@ -660,24 +751,25 @@ function CelebrationPanel({
   async function save() {
     setBusy(true);
     setError(null);
-    // A half-written address is worse than none: vendors are sent to it. Only
-    // asked for while the address is still this client's to set.
-    if (!committed && !isCompleteAddress(addr)) {
-      setShowGaps(true);
-      setBusy(false);
-      setError("Add the full address before saving — vendors travel to it.");
-      return;
-    }
+    // A half-written address is worse than none: vendors are sent to it. So an
+    // incomplete one isn't saved — but it no longer holds the rest of the form
+    // hostage. The budget is never shown to a vendor, and refusing to record
+    // what someone means to spend because they haven't found the venue's
+    // postcode yet is a gate with nothing behind it.
+    const addressReady = isCompleteAddress(addr);
+    const addressStarted = Boolean(formatAddress(addr).trim());
+    if (!committed && addressStarted && !addressReady) setShowGaps(true);
+
     const updates: Partial<EventCreateInput> = {};
     if (spend) updates.budget = Number(spend);
     if (!committed) {
       if (date) updates.date_iso = date;
-      updates.location = formatAddress(addr);
+      if (addressReady) updates.location = formatAddress(addr);
       if (guests) updates.guest_count = Number(guests);
       // The address as a point, so a plan held somewhere the client arranged
       // themselves can still be checked into. Silent when it can't be resolved —
       // the address is what was asked for, and the pin is the app's problem.
-      Object.assign(updates, await addressPin(addr));
+      if (addressReady) Object.assign(updates, await addressPin(addr));
     }
     try {
       if (Object.keys(updates).length > 0) await updateEvent(summary.event_id, updates);
@@ -692,7 +784,7 @@ function CelebrationPanel({
           live.map((b) =>
             updateBooking(b.booking_id, {
               ...(date ? { date_iso: date } : {}),
-              location: formatAddress(addr),
+              ...(addressReady ? { location: formatAddress(addr) } : {}),
               ...(guests ? { guest_count: Number(guests) } : {}),
             }),
           ),

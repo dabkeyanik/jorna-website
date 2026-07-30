@@ -365,10 +365,17 @@ function MarketplaceInner() {
                 onChange={(e) => setDate(e.target.value)}
               />
               {date ? (
+                // What this can actually promise. lib/availability hides a
+                // vendor only on positive evidence of a conflict — an empty,
+                // unparseable or failed response leaves them visible — and most
+                // vendors publish no hours at all, so the filter currently
+                // excludes almost nobody. Worded as "hides vendors booked that
+                // day", a full list read as "these are all free", and a client
+                // picked one on that basis and got declined.
                 <span className="mt-1 block text-xs text-ink-faint">
                   {window
-                    ? "Hides vendors booked over those hours, or closed that day."
-                    : "Hides vendors booked at all that day. Add hours to keep the ones who are only busy elsewhere in it."}
+                    ? "Hides vendors who've told us they're busy over those hours, or closed that day."
+                    : "Hides vendors who've told us they're busy that day. Add hours to keep the ones only busy elsewhere in it."}
                 </span>
               ) : null}
             </div>
@@ -466,6 +473,17 @@ function MarketplaceInner() {
               : `${total} ${total === 1 ? "listing" : "listings"}`}
             {checkingDate ? " · checking availability…" : ""}
           </p>
+          {/* Said once, next to the results, because the filter's own hint is
+              behind a Filters toggle that may be shut by the time these are
+              read — and "40 vendors, filtered by my date" is exactly the moment
+              someone concludes all forty are free. */}
+          {date && !checkingDate ? (
+            <p className="mt-1 text-xs text-ink-faint">
+              Availability is what vendors have published — a vendor who
+              hasn&apos;t set their hours still appears here. Confirm the date
+              with them before you count on it.
+            </p>
+          ) : null}
           <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {visible.map((item) => (
               <VendorCard key={`${item.vendor_id}-${item.service_name ?? ""}`} item={item} />

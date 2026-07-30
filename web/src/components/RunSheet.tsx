@@ -133,11 +133,14 @@ function Entry({
   start,
   end,
   showTimes,
+  onTheDay,
 }: {
   booking: BundleBooking;
   start: string | null;
   end: string | null;
   showTimes: boolean;
+  /** Whether check-in matters yet — see RunSheet. */
+  onTheDay: boolean;
 }) {
   const here = Boolean(booking.vendor_checked_in_at);
   return (
@@ -162,7 +165,7 @@ function Entry({
         {booking.location ? (
           <p className="mt-0.5 text-xs text-ink-faint">{booking.location}</p>
         ) : null}
-        <Nudge booking={booking} />
+        {onTheDay ? <Nudge booking={booking} /> : null}
       </div>
 
       {here ? (
@@ -183,13 +186,31 @@ function Entry({
 
 export function RunSheet({ bundle }: { bundle: BundleDetail }) {
   const days = scheduleFor(bundle);
-  // Held back until the week of — see runSheetIsDue. Nothing here helps a host
-  // whose celebration is months away, and it was pushing what does further down.
-  if (!runSheetIsDue(days)) return null;
+  if (days.length === 0) return null;
+
+  // Two jobs, and only one of them is a same-week job.
+  //
+  // The arrivals board — who has checked in — answers nothing in April about a
+  // wedding in September, and used to hold the whole section back with it. But
+  // the order of the day is a months-out question: it is how a host checks the
+  // photographer has the right date and that the mehndi artist is coming to the
+  // house. Hidden until the week of, there was nowhere to check that at all.
+  //
+  // So the schedule shows whenever there is one, and only the arrivals half
+  // waits. `Nudge` is gated the same way — the backend's can_resend_checkin
+  // already refuses outside the window, so a button months early could only be
+  // refused anyway.
+  const onTheDay = runSheetIsDue(days);
 
   return (
     <section className="mt-8">
-      <h2 className="eyebrow mb-3">The day</h2>
+      <h2 className="eyebrow mb-3">{onTheDay ? "The day" : "The order of the day"}</h2>
+      {!onTheDay ? (
+        <p className="mb-3 text-sm text-ink-soft">
+          Who&apos;s coming, when, and where. Check-ins appear here in the week
+          before.
+        </p>
+      ) : null}
       <div className="grid gap-4">
         {days.map((day) => (
           <div
@@ -201,7 +222,7 @@ export function RunSheet({ bundle }: { bundle: BundleDetail }) {
               <span className="text-sm text-ink-faint">{relative(day.dateIso)}</span>
             </div>
 
-            <Arrivals day={day} />
+            {onTheDay ? <Arrivals day={day} /> : null}
 
             {!day.timesKnown ? (
               <p className="mt-3 text-xs text-ink-faint">
@@ -218,6 +239,7 @@ export function RunSheet({ bundle }: { bundle: BundleDetail }) {
                   start={entry.start}
                   end={entry.end}
                   showTimes={day.timesKnown}
+                  onTheDay={onTheDay}
                 />
               ))}
             </ul>

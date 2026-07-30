@@ -35,8 +35,13 @@ import {
   type MoneyBreakdown,
   type PlanTask,
 } from "@/lib/planning";
-import { categoryLabel, type BundleDetail, type EventItem } from "@/lib/types";
-import { Button, Card, Field, LinkButton } from "@/components/ui";
+import {
+  CATEGORY_LABELS,
+  categoryLabel,
+  type BundleDetail,
+  type EventItem,
+} from "@/lib/types";
+import { Button, Card, Chip, Field, LinkButton } from "@/components/ui";
 import { CityCombobox } from "@/components/CityCombobox";
 import { ClientOnlyRoute } from "@/components/ClientOnlyRoute";
 
@@ -413,6 +418,7 @@ function DashboardInner() {
   const [location, setLocation] = useState("");
   const [guests, setGuests] = useState("");
   const [budget, setBudget] = useState("");
+  const [needed, setNeeded] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -451,6 +457,11 @@ function DashboardInner() {
         location: location.trim(),
         guest_count: guests ? Number(guests) : null,
         budget: budget ? Number(budget) : null,
+        // Without this the "Still to book" hint never fires for a celebration
+        // made here: missingCategories compares against services_needed, and
+        // only the builder was ever setting it. A hand-made celebration got no
+        // checklist at all.
+        services_needed: needed.length > 0 ? needed : null,
       });
       setCreating(false);
       setName("");
@@ -458,6 +469,7 @@ function DashboardInner() {
       setLocation("");
       setGuests("");
       setBudget("");
+      setNeeded([]);
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't create that celebration.");
@@ -543,6 +555,35 @@ function DashboardInner() {
                 onChange={(e) => setBudget(e.target.value)}
               />
             </div>
+
+            {/* What the "Still to book" hint compares against. Only the builder
+                was setting this, so a celebration created here never got a
+                checklist — the one thing that tells a host what they haven't
+                arranged yet. */}
+            <div>
+              <p className="mb-2 text-sm font-medium text-ink-soft">
+                What you&apos;ll need{" "}
+                <span className="text-ink-faint">
+                  (optional · we&apos;ll remind you what&apos;s still unbooked)
+                </span>
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {Object.keys(CATEGORY_LABELS).map((c) => (
+                  <Chip
+                    key={c}
+                    active={needed.includes(c)}
+                    onClick={() =>
+                      setNeeded((list) =>
+                        list.includes(c) ? list.filter((v) => v !== c) : [...list, c],
+                      )
+                    }
+                  >
+                    {categoryLabel(c)}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+
             {error ? (
               <p className="rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
                 {error}
