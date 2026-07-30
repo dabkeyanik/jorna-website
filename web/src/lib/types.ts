@@ -287,6 +287,12 @@ export interface BundleBooking {
   /** Whether this service is open to price negotiation (service.negotiable). */
   open_to_price_negotiation?: boolean;
   /**
+   * A date change out with this vendor, or lately settled by them. Null when
+   * there's none — and null once accepted, because an accepted change is just
+   * the booking's dates now, which the row already shows.
+   */
+  change_request?: ChangeRequest | null;
+  /**
    * The venue's IANA timezone, resolved server-side from the address and pin.
    * Null when it can't be placed. Read it through `todayAtVenue` — "has the
    * event happened yet" is the escrow gate, and it has to be answered on the
@@ -588,6 +594,62 @@ export interface BlockedUser {
   blocked_vendor_id?: string | null;
 }
 
+// ── Date changes ─────────────────────────────────────────────────────
+//
+// Events move, and once a request is with a vendor its date is theirs to hold —
+// so changing it is a request of its own rather than an edit. Turn-based, like
+// a negotiation: the client proposes plan-wide, each vendor answers for their
+// own booking, and only a resolution touches anything.
+
+/** How long a vendor has to answer. Mirrors the backend's RESPONSE_WINDOW_DAYS,
+ *  which reads AUTO_RELEASE_DAYS — one waiting period in the product, not two. */
+export const CHANGE_RESPONSE_DAYS = 7;
+
+/** What the vendor keeps when they can't meet a proposed date. */
+export const RESCHEDULE_CANCELLATION_PCT = 10;
+
+export interface ChangeRequest {
+  change_request_id: string;
+  booking_id?: string;
+  /** pending | accepted | declined | withdrawn | expired */
+  status: string;
+  /** Null on any field means "leave this as it is". */
+  date_iso?: string | null;
+  date_end?: string | null;
+  time_start?: string | null;
+  time_end?: string | null;
+  message?: string | null;
+  /** What the vendor said when declining. */
+  response_message?: string | null;
+  /**
+   * Set when the vendor accepted and the new dates cost more. Its presence *is*
+   * the "waiting on the client" state — there's no separate flag that could get
+   * out of step with it.
+   */
+  repriced_amount_cents?: number | null;
+  client_consented_at?: string | null;
+  created_at?: string | null;
+  resolved_at?: string | null;
+  expires_at?: string | null;
+  /** Present on the board, so a row can name what it's moving from. */
+  service_name?: string | null;
+  vendor_id?: string | null;
+  from_date_iso?: string | null;
+  from_date_end?: string | null;
+  from_time_start?: string | null;
+  from_time_end?: string | null;
+}
+
+/** Whether this request is waiting on the client rather than the vendor. */
+export function awaitingClientConsent(cr: ChangeRequest): boolean {
+  return cr.status === "pending" && cr.repriced_amount_cents != null;
+}
+
+/** A refund is offered once a vendor has said no, or said nothing in time. */
+export function refundableAfterChange(cr?: ChangeRequest | null): boolean {
+  return cr?.status === "declined" || cr?.status === "expired";
+}
+
 // ── Negotiation ──────────────────────────────────────────────────────
 
 export interface NegotiationOffer {
@@ -714,6 +776,8 @@ export interface VendorBooking {
   checkin_longitude?: number | null;
   /** The venue's IANA timezone — see BundleBooking.timezone. */
   timezone?: string | null;
+  /** A date change this vendor still owes an answer on. */
+  change_request?: ChangeRequest | null;
   status: string;
   payment_status?: string | null;
   amount_cents?: number | null;

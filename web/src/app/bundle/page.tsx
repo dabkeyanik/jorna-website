@@ -31,6 +31,7 @@ import { NegotiationPanel } from "@/components/NegotiationPanel";
 import { ReviewPanel } from "@/components/ReviewPanel";
 import { VenueCheckIn } from "@/components/VenueCheckIn";
 import { RunSheet } from "@/components/RunSheet";
+import { DateChangePanel } from "@/components/DateChangePanel";
 import { CityCombobox } from "@/components/CityCombobox";
 import {
   BOOKING_STATUS_LABELS,
@@ -1820,6 +1821,16 @@ function BundleInner() {
             ))}
           </ul>
         </section>
+      ) : null}
+
+      {/* Only on a sent plan. A draft's dates are still directly editable,
+          and the server refuses a proposal against one. */}
+      {!draft ? (
+        <DateChangePanel
+          bundleId={bundle.bundle_id}
+          bookings={bundle.bookings ?? []}
+          onChanged={load}
+        />
       ) : null}
 
       <RunSheet bundle={bundle} />

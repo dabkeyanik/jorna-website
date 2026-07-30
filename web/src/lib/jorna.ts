@@ -4,6 +4,7 @@ import { ApiError, apiFetch, apiUpload } from "./api";
 import type {
   BundleDetail,
   BundleRequest,
+  ChangeRequest,
   AvailabilitySlot,
   BlockedUser,
   ConversationSummary,
@@ -776,6 +777,86 @@ export function disputeBooking(bookingId: string, reason?: string): Promise<unkn
   return apiFetch(`/payments/bookings/${bookingId}/dispute`, {
     method: "POST",
     body: { reason: reason || null },
+  });
+}
+
+// ── Date changes ─────────────────────────────────────────────────────
+//
+// Once a plan is with its vendors its date is theirs to hold, so moving it is a
+// request rather than an edit. The client proposes plan-wide; each vendor
+// answers for their own booking. Nothing is charged or refunded by a proposal —
+// only by a resolution.
+
+export interface ChangeProposal {
+  /** Every field optional — move only the date, only the hours, or both. */
+  date_iso?: string | null;
+  date_end?: string | null;
+  time_start?: string | null;
+  time_end?: string | null;
+  message?: string | null;
+}
+
+/** Ask every vendor on a plan to move. One call, one request per booking. */
+export function proposeChange(
+  bundleId: string,
+  proposal: ChangeProposal,
+): Promise<{ requests: ChangeRequest[]; count: number }> {
+  return apiFetch(`/bundles/${bundleId}/change-request`, {
+    method: "POST",
+    body: proposal,
+  });
+}
+
+/** Where each vendor stands on the current proposal. */
+export function getChangeRequests(
+  bundleId: string,
+): Promise<{ requests: ChangeRequest[] }> {
+  return apiFetch(`/bundles/${bundleId}/change-request`);
+}
+
+/** Take back every outstanding request on a plan. */
+export function withdrawChange(bundleId: string): Promise<{ withdrawn: number }> {
+  return apiFetch(`/bundles/${bundleId}/change-request`, { method: "DELETE" });
+}
+
+/**
+ * The vendor's answer.
+ *
+ * Accepting re-runs their double-booking check server-side and 409s on a clash,
+ * naming it — the same guard approving a booking uses. Surface that message
+ * rather than a generic one; it tells them exactly what to do instead.
+ */
+export function respondToChange(
+  changeRequestId: string,
+  accept: boolean,
+  message?: string,
+): Promise<ChangeRequest> {
+  return apiFetch(`/change-requests/${changeRequestId}/respond`, {
+    method: "POST",
+    body: { accept, message: message || null },
+  });
+}
+
+/** The client agreeing to pay more for the new dates. Charges the difference. */
+export function consentToChangePrice(
+  changeRequestId: string,
+): Promise<ChangeRequest & { additional_cents?: number; message?: string }> {
+  return apiFetch(`/change-requests/${changeRequestId}/consent`, { method: "POST" });
+}
+
+/**
+ * Refund a booking whose vendor couldn't meet the new date.
+ *
+ * Not the 24-hour window — that one is about changing your mind shortly after
+ * paying. This has its own gate (a declined or expired change on this booking)
+ * and is partial: the vendor keeps RESCHEDULE_CANCELLATION_PCT for the date they
+ * held.
+ */
+export function refundAfterFailedReschedule(
+  bookingId: string,
+): Promise<{ message: string; refunded_cents: number; retained_cents: number }> {
+  return apiFetch(`/payments/bookings/${bookingId}/reschedule-refund`, {
+    method: "POST",
   });
 }
 
