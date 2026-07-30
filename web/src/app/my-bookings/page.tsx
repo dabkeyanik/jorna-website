@@ -163,6 +163,7 @@ export default function MyBookingsPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDecline, setConfirmDecline] = useState<string | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("pending");
 
   useEffect(() => {
@@ -195,16 +196,22 @@ export default function MyBookingsPage() {
 
   async function decide(b: VendorBooking, status: "approved" | "rejected") {
     if (!vendor) return;
+    const wasApproved = b.status === "approved";
     setBusyId(b.booking_id);
     setError(null);
     setNotice(null);
     try {
       await setBookingStatus(b.booking_id, status);
       setConfirmDecline(null);
+      setConfirmCancel(null);
       setNotice(
         status === "approved"
           ? "Accepted. The client can pay now — the money is held until after the event."
-          : "Declined.",
+          // Declining a request and pulling out of a booking are the same
+          // call and very different acts; the confirmation should say which.
+          : wasApproved
+            ? "Cancelled. Your client has been told and it's off their plan."
+            : "Declined.",
       );
       await load(vendor.vendor_id);
     } catch (err) {
@@ -337,6 +344,16 @@ export default function MyBookingsPage() {
                 : (BOOKING_STATUS_LABELS[b.status] ?? b.status);
             const decidable =
               b.status === "pending" || b.status === "negotiation_ongoing";
+            // Pulling out of one already accepted. Only while the money hasn't
+            // moved — past that the client is out of pocket for a date they're
+            // holding, and unwinding it is a refund with its own rules. Mirrors
+            // the server's MONEY_MOVED_STATUSES, so the button is never offered
+            // for a call that has to be refused.
+            const cancellable =
+              b.status === "approved" &&
+              !["processing", "paid", "released", "refunded", "disputed"].includes(
+                (b.payment_status ?? "unpaid").toLowerCase(),
+              );
             const price = priceLine(b);
             const dates =
               b.date_end && b.date_end !== b.date_iso
@@ -423,6 +440,53 @@ export default function MyBookingsPage() {
                         onClick={() => decide(b, "approved")}
                       >
                         {busyId === b.booking_id ? "Accepting…" : "Accept"}
+                      </Button>
+                    </div>
+                  )
+                ) : null}
+
+                {/* Pulling out of a booking already accepted. A vendor whose
+                    circumstances changed had no way out of one at all, so the
+                    honest options were to say so in the chat and hope, or not
+                    turn up. Quiet, and behind a confirmation: it is somebody
+                    else's celebration losing a supplier. */}
+                {cancellable ? (
+                  confirmCancel === b.booking_id ? (
+                    <div className="mt-3 rounded-lg bg-panel p-3">
+                      <p className="text-xs text-ink-soft">
+                        Cancel this booking? {b.client_name || "Your client"} is
+                        told straight away, and it comes off their plan. They
+                        haven&apos;t paid, so nothing is refunded — but they will
+                        have to find someone else
+                        {b.date_iso ? ` for ${prettyDate(b.date_iso)}` : ""}.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          size="md"
+                          disabled={busyId === b.booking_id}
+                          onClick={() => decide(b, "rejected")}
+                        >
+                          {busyId === b.booking_id
+                            ? "Cancelling…"
+                            : "Yes, cancel it"}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="md"
+                          onClick={() => setConfirmCancel(null)}
+                        >
+                          Keep the booking
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 flex justify-end">
+                      <Button
+                        variant="quiet"
+                        size="md"
+                        onClick={() => setConfirmCancel(b.booking_id)}
+                      >
+                        Cancel this booking
                       </Button>
                     </div>
                   )
