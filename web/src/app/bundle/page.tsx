@@ -1048,10 +1048,17 @@ function CelebrationPanel({
           // The date and address are what the vendors agreed to hold; changing
           // them is cancelling a request and making a new one, which is a
           // decision rather than an edit.
+          //
+          // Naming something the client can actually do. This said "cancel the
+          // requests affected and book again" — but a paid booking has no
+          // cancel button, and the server refuses to remove one anyway, so the
+          // one instruction on screen pointed at a control that isn't there.
+          // See RESCHEDULE_PROPOSAL.md for the flow this is standing in for.
           <p className="mt-4 border-t border-line-soft pt-4 text-sm text-ink-soft">
-            Your vendors have this plan&apos;s date, address and headcount, so those
-            are settled. To move any of them, cancel the requests affected and
-            book again.
+            Your vendors have this plan&apos;s date, address and headcount, so
+            those are settled. An unpaid request can be cancelled and booked
+            again. Once a booking is paid, message the vendor to agree a change —
+            or report a problem on it if they can&apos;t accommodate one.
           </p>
         )}
         {error ? (

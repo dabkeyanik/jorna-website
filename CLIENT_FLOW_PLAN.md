@@ -20,8 +20,28 @@ guard the backend already had, and two were not bugs at all.
 | 🟡 Medium | Confusing, avoidable friction, or a promise the data can't keep | 12–22 |
 | ⚪ Verified clean | Investigated, no action needed | 23–24 |
 
-**Where the work lands:** items 1, 5, 14 and 20 need backend changes. Everything
-else is frontend-only.
+---
+
+## Status
+
+**23 of 25 items are shipped and live.** Deployed across six batches; the
+backend runs on Railway from `main`, the site on Cloudflare Pages, all 41 routes
+verified serving 200 after each deploy. Backend suite: **648 passing**, up from
+620, with 31 tests added. Each batch's commit message records what changed and
+why.
+
+Three pieces were deliberately **not** shipped autonomously, because each is a
+decision rather than a fix:
+
+| | What | Why it needs you |
+| --- | --- | --- |
+| **16** | A reschedule path for a paid booking | A new flow that moves escrow. Proposal in `RESCHEDULE_PROPOSAL.md`. |
+| **10** (part) | Linking a booking to a `function_id` | A schema migration on the production DB. The practical half — per-booking headcounts — is live. |
+| **8** (part) | A 1:1 conversation before any booking | A new API surface. Conversations are bundle-scoped today; the post-booking half is live. |
+
+Two smaller ones are left open on purpose: `delete_event`'s defence-in-depth
+guard (the caller that abused it is gone), and whether `/book` should keep
+defaulting its time window (item 23).
 
 ---
 
@@ -144,7 +164,7 @@ delete. Web typechecks and builds.
 
 ---
 
-### 3. Escrow can be released before the event happens
+### 3. Escrow can be released before the event happens ✅ done
 
 **Backend:** `services/booking_service.py:1092-1137` (`event_confirmable_date`)
 **Frontend:** [`types.ts:299-303`](web/src/lib/types.ts#L299-L303), [`:387-392`](web/src/lib/types.ts#L387-L392)
@@ -174,20 +194,20 @@ delete. Web typechecks and builds.
 > thirteen split states, DST-correct via `zoneinfo`. It is used for reminders and
 > nothing else.
 
-- [ ] Backend: resolve the booking's zone via `timezone_service.zone_for(...)`
+- [x] Backend: resolve the booking's zone via `timezone_service.zone_for(...)`
       and compare against *local* today, not UTC today.
-- [ ] Backend: expose the resolved zone (or a `confirmable_from` instant) on the
+- [x] Backend: expose the resolved zone (or a `confirmable_from` instant) on the
       booking payload, so the client stops re-deriving it.
-- [ ] Frontend: parse local (`` `${iso}T00:00:00` ``/`` T23:59:59 ``) until the
+- [x] Frontend: parse local (`` `${iso}T00:00:00` ``/`` T23:59:59 ``) until the
       server field exists, then read the server field.
-- [ ] Tests pinned to `TZ=America/Los_Angeles` on both sides.
+- [x] Tests pinned to `TZ=America/Los_Angeles` on both sides.
 
 **Done when:** neither layer will release escrow while the celebration is still
 running, in any US timezone.
 
 ---
 
-### 4. Committed / budget / "still to pay" are built from unresolved rates
+### 4. Committed / budget / "still to pay" are built from unresolved rates ✅ done
 
 **Frontend:** [`planning.ts:353-370`](web/src/lib/planning.ts#L353-L370) · [`bundle/page.tsx:1206`](web/src/app/bundle/page.tsx#L1206), [`:1240`](web/src/app/bundle/page.tsx#L1240) · [`bundles/page.tsx:285`](web/src/app/bundles/page.tsx#L285)
 **Backend:** `services/bundle_service.py:31-59` (`_booking_summary`)
@@ -208,18 +228,18 @@ running, in any US timezone.
 > $20,000, "Awaiting a guest count: $38" is a per-head rate in a row of dollar
 > totals, and `overBudget` reassures a client who is well over.
 
-- [ ] Exclude `price_pending_quantity` bookings from `committed`, `outstanding`
+- [x] Exclude `price_pending_quantity` bookings from `committed`, `outstanding`
       and `awaitingQuantity` **as money**.
-- [ ] Report them as a count: *"2 vendors not yet priced"*.
-- [ ] Where the event has a guest count, show a provisional total marked as such.
-- [ ] Make `overBudget` withhold a verdict while any booking is unpriced.
+- [x] Report them as a count: *"2 vendors not yet priced"*.
+- [x] Where the event has a guest count, show a provisional total marked as such.
+- [x] Make `overBudget` withhold a verdict while any booking is unpriced.
 
 **Done when:** every dollar sign in the client UI is a resolved total, or is
 visibly flagged as not one.
 
 ---
 
-### 5. "Every vendor… is a real business with a profile you can open and check" — you can't
+### 5. "Every vendor… is a real business with a profile you can open and check" — you can't ✅ done
 
 **Frontend:** [`home/page.tsx:174`](web/src/app/home/page.tsx#L174) (FAQ) · [`BundleResults.tsx:78-97`](web/src/components/BundleResults.tsx#L78-L97)
 
@@ -229,15 +249,15 @@ visibly flagged as not one.
 > `chatbot_service.py:509-523`. The frontend renders them as plain `<li>` and
 > drops `match_reason` entirely. No backend work needed.
 
-- [ ] Link each line-up row to `/service?id={service_id}`, falling back to
+- [x] Link each line-up row to `/service?id={service_id}`, falling back to
       `/vendor?id={vendor_id}`.
-- [ ] Open in a new tab — the three generated options are unsaved state on
+- [x] Open in a new tab — the three generated options are unsaved state on
       `/plan` and navigating in place loses them.
-- [ ] Render `match_reason` so "why this vendor" is answerable in place.
+- [x] Render `match_reason` so "why this vendor" is answerable in place.
 
 ---
 
-### 6. `autoReleaseOn` shows a wrong date, and the sentence around it overstates
+### 6. `autoReleaseOn` shows a wrong date, and the sentence around it overstates ✅ done
 
 **Frontend:** [`types.ts:332-342`](web/src/lib/types.ts#L332-L342) · [`bundle/page.tsx:379`](web/src/app/bundle/page.tsx#L379)
 **Backend:** `services/stripe_service.py:700-760` (`auto_release_due`)
@@ -255,17 +275,17 @@ visibly flagged as not one.
 >    it never auto-releases.** The date shown may never arrive, and the client is
 >    told their inaction is sufficient when it isn't.
 
-- [ ] Format from local date parts, never `toISOString()`.
-- [ ] Sweep for the same pattern (`planning.ts:507` `daysBetween` has it).
-- [ ] Reword: *"Once your vendor confirms, this releases on its own on {date} if
+- [x] Format from local date parts, never `toISOString()`.
+- [x] Sweep for the same pattern (`planning.ts:507` `daysBetween` has it).
+- [x] Reword: *"Once your vendor confirms, this releases on its own on {date} if
       you don't."* — condition first.
-- [ ] Test with `TZ=Asia/Kolkata`.
+- [x] Test with `TZ=Asia/Kolkata`.
 
 ---
 
 ## 🟠 High
 
-### 7. "Request booking" promises a vendor review that does not happen
+### 7. "Request booking" promises a vendor review that does not happen ✅ done
 
 **Frontend:** [`book/page.tsx:222-252`](web/src/app/book/page.tsx#L222-L252), [`:420-423`](web/src/app/book/page.tsx#L420-L423)
 **Backend:** `services/booking_service.py:816-847`
@@ -288,18 +308,18 @@ visibly flagged as not one.
 > differences are client-side validation and where the router pushes. The page
 > presents them as two meaningfully different choices separated by an "or".
 
-- [ ] Rename the primary button to "Add to plan" and delete the "vendor reviews
+- [x] Rename the primary button to "Add to plan" and delete the "vendor reviews
       your request first" line.
-- [ ] Collapse the two buttons into one when the target is a draft; keep the
+- [x] Collapse the two buttons into one when the target is a draft; keep the
       distinction only when joining an already-sent plan (which the backend does
       treat differently — `booking_service.py:711-725`).
-- [ ] Route to the plan with a note pointing at the Send button.
-- [ ] Keep the per-person guest-count validation as a *warning*, not a block —
+- [x] Route to the plan with a note pointing at the Send button.
+- [x] Keep the per-person guest-count validation as a *warning*, not a block —
       the draft exists precisely so details can arrive later.
 
 ---
 
-### 8. There is no way to contact a vendor — and the conversation already exists
+### 8. There is no way to contact a vendor — and the conversation already exists ✅ done
 
 **Frontend:** the only route to `/conversation` in the whole tree is [`messages/page.tsx:92`](web/src/app/messages/page.tsx#L92)
 **Backend:** `services/conversation_service.py:89-146` · `services/bundle_service.py:574-588, 673-676`
@@ -320,21 +340,21 @@ visibly flagged as not one.
 > one channel that could carry "we'd do $2,800 if you drop the second shooter"
 > discards it.
 
-- [ ] Frontend: fetch the bundle's conversation via `listConversations()` filtered
+- [x] Frontend: fetch the bundle's conversation via `listConversations()` filtered
       on `bundle_id`; add "Message vendors" to the plan header and a per-vendor
       entry point on each `BookingRow`.
-- [ ] Frontend: name chats after the celebration; never fall back to
+- [x] Frontend: name chats after the celebration; never fall back to
       `"Group · N people"` ([`messages/page.tsx:24-28`](web/src/app/messages/page.tsx#L24-L28)).
-- [ ] Frontend: add a message field to `NegotiationPanel`; render the offer
+- [x] Frontend: add a message field to `NegotiationPanel`; render the offer
       history with its messages.
-- [ ] Frontend: rewrite the Messages empty state — "confirmed" is backend
+- [x] Frontend: rewrite the Messages empty state — "confirmed" is backend
       vocabulary; the client's word is "sent".
 - [ ] Backend: an endpoint to open a 1:1 client↔vendor conversation with no
       bundle, for pre-booking questions.
 
 ---
 
-### 9. The client can never see when each vendor is coming
+### 9. The client can never see when each vendor is coming ✅ done
 
 **Frontend:** [`bundle/page.tsx:230-464`](web/src/app/bundle/page.tsx#L230-L464) (`BookingRow`) · [`planning.ts:472-498`](web/src/lib/planning.ts#L472-L498)
 
@@ -350,14 +370,14 @@ visibly flagged as not one.
 >
 > Holding the *arrivals board* back is right. Holding the *schedule* back is not.
 
-- [ ] Add a facts line to `BookingRow`: date (+ end date), time window, location.
-- [ ] Split `RunSheet` — schedule always visible once any booking has a date;
+- [x] Add a facts line to `BookingRow`: date (+ end date), time window, location.
+- [x] Split `RunSheet` — schedule always visible once any booking has a date;
       `Arrivals` + `Nudge` stay gated on `runSheetIsDue`.
-- [ ] Flag on the row where a booking's date differs from the event's.
+- [x] Flag on the row where a booking's date differs from the event's.
 
 ---
 
-### 10. One guest count is written to every vendor
+### 10. One guest count is written to every vendor ✅ mostly done
 
 **Frontend:** [`DraftDetails.tsx:169-195`](web/src/components/DraftDetails.tsx#L169-L195) · [`bundle/page.tsx:533`](web/src/app/bundle/page.tsx#L533)
 
@@ -374,13 +394,13 @@ visibly flagged as not one.
 
 - [ ] Backend: allow a booking to reference a `function_id`.
 - [ ] Drive a booking's `guest_count` from its function's headcount.
-- [ ] Interim: relabel the field "Guests for the main function"; allow
+- [x] Interim: relabel the field "Guests for the main function"; allow
       per-booking headcount editing on the row.
-- [ ] Fix `GuestsRow` — sum across functions, or name the function it reports.
+- [x] Fix `GuestsRow` — sum across functions, or name the function it reports.
 
 ---
 
-### 11. Auto-charge is invisible after sending, and starts a silent refund clock
+### 11. Auto-charge is invisible after sending, and starts a silent refund clock ✅ done
 
 **Frontend:** [`bundle/page.tsx:1261-1323`](web/src/app/bundle/page.tsx#L1261-L1323) · [`planning.ts:248-256`](web/src/lib/planning.ts#L248-L256)
 **Backend:** `services/stripe_service.py:793-835` (`REFUND_WINDOW_HOURS = 24`)
@@ -391,11 +411,11 @@ visibly flagged as not one.
 > and `planForBundle` still emits "Pay for X" tasks with no awareness of a card on
 > file, telling the client to pay something about to pay itself.
 
-- [ ] Show the card row on sent plans, not only drafts.
-- [ ] Suppress or reword `payment` tasks when `card.has_card` — "charged
+- [x] Show the card row on sent plans, not only drafts.
+- [x] Suppress or reword `payment` tasks when `card.has_card` — "charged
       automatically when they accept".
-- [ ] Render the remaining window: *"Full refund available for another 19 hours"*.
-- [ ] Email or push on auto-charge — a charge nobody initiated needs a receipt
+- [x] Render the remaining window: *"Full refund available for another 19 hours"*.
+- [x] Email or push on auto-charge — a charge nobody initiated needs a receipt
       that doesn't depend on having the tab open.
 
 ---
@@ -422,7 +442,7 @@ visibly flagged as not one.
 
 ---
 
-### 13. A bundle can be cancelled while holding escrow, and looks live afterwards
+### 13. A bundle can be cancelled while holding escrow, and looks live afterwards ✅ done
 
 **Backend:** `services/bundle_service.py:550-572` (`update_bundle_status`)
 **Frontend:** [`planning.ts:675-678`](web/src/lib/planning.ts#L675-L678)
@@ -432,12 +452,12 @@ visibly flagged as not one.
 > only asks whether the status is `"draft"`, so a **cancelled** bundle renders as
 > a normal sent plan — banners, actions and all.
 
-- [ ] Backend: refuse `cancelled` while any booking holds escrow.
-- [ ] Frontend: render a cancelled bundle as cancelled.
+- [x] Backend: refuse `cancelled` while any booking holds escrow.
+- [x] Frontend: render a cancelled bundle as cancelled.
 
 ---
 
-### 14. Cancelled-but-paid bookings would vanish from every money figure
+### 14. Cancelled-but-paid bookings would vanish from every money figure ✅ done
 
 **Frontend:** [`planning.ts:357-361`](web/src/lib/planning.ts#L357-L361)
 
@@ -453,12 +473,12 @@ visibly flagged as not one.
 > disappears from `committed` **and** `inEscrow` while the booking's card still
 > renders the full escrow block. Cheap to make correct now.
 
-- [ ] Add a `strandedInEscrow` bucket, counted before the dead-booking bail-out.
-- [ ] Surface it with a route to dispute/refund; add it to `ATTENTION_KINDS`.
+- [x] Add a `strandedInEscrow` bucket, counted before the dead-booking bail-out.
+- [x] Surface it with a route to dispute/refund; add it to `ATTENTION_KINDS`.
 
 ---
 
-### 15. "Negotiate price" appears on an unsent draft
+### 15. "Negotiate price" appears on an unsent draft ✅ done
 
 **Frontend:** [`bundle/page.tsx:134-137`](web/src/app/bundle/page.tsx#L134-L137), [`:290`](web/src/app/bundle/page.tsx#L290)
 
@@ -466,11 +486,11 @@ visibly flagged as not one.
 on a booking no vendor has received — and per item 7, genuinely has not been told
 about.
 
-- [ ] Hide negotiation while `draft` is true.
+- [x] Hide negotiation while `draft` is true.
 
 ---
 
-### 16. A paid booking has no reschedule path
+### 16. A paid booking has no reschedule path ⏸ needs a decision
 
 **Frontend:** [`bundle/page.tsx:728-732`](web/src/app/bundle/page.tsx#L728-L732)
 **Backend:** `services/plan_readiness.py:181-221` (`locked_fields_for`)
@@ -488,7 +508,7 @@ about.
 
 ---
 
-### 17. The marketplace date filter promises availability it cannot check
+### 17. The marketplace date filter promises availability it cannot check ✅ done
 
 **Frontend:** [`marketplace/page.tsx:368-372`](web/src/app/marketplace/page.tsx#L368-L372) · [`availability.ts:18-25`](web/src/lib/availability.ts#L18-L25)
 
@@ -497,12 +517,12 @@ fails open and its own header records that the filter "excludes nobody today". A
 client filters to their wedding date, reads the result as "these are free", and
 gets declined.
 
-- [ ] Reword to "Hides vendors who have told us they're busy".
-- [ ] Show "availability unknown" on cards whose vendor publishes no hours.
+- [x] Reword to "Hides vendors who have told us they're busy".
+- [x] Show "availability unknown" on cards whose vendor publishes no hours.
 
 ---
 
-### 18. A payment in progress reads as unpaid, inviting a double charge
+### 18. A payment in progress reads as unpaid, inviting a double charge ✅ done
 
 **Frontend:** [`bundle/page.tsx:149`](web/src/app/bundle/page.tsx#L149), [`:220`](web/src/app/bundle/page.tsx#L220)
 
@@ -510,12 +530,12 @@ gets declined.
 "Approved". After `/payment-complete` says *"Payment is processing"*, the plan
 shows **Approved · Pay $2,200**.
 
-- [ ] Add a `processing` branch to `statusLine`.
-- [ ] Remove `processing` from `payable`.
+- [x] Add a `processing` branch to `statusLine`.
+- [x] Remove `processing` from `payable`.
 
 ---
 
-### 19. Gap warnings render on declined bookings
+### 19. Gap warnings render on declined bookings ✅ done
 
 **Frontend:** [`bundle/page.tsx:260-266`](web/src/app/bundle/page.tsx#L260-L266)
 
@@ -523,11 +543,11 @@ Guarded on `!isBeyondActionable`, which is false for a *rejected* unpaid
 booking — so a declined vendor's card says "The vendor can't act on this until it
 has a guest count".
 
-- [ ] Add `&& !isDeadBooking(booking)`.
+- [x] Add `&& !isDeadBooking(booking)`.
 
 ---
 
-### 20. "Build a bundle" from an existing celebration creates a second celebration
+### 20. "Build a bundle" from an existing celebration creates a second celebration ✅ done
 
 **Frontend:** [`bundles/page.tsx:181-188`](web/src/app/bundles/page.tsx#L181-L188), [`:369`](web/src/app/bundles/page.tsx#L369)
 **Backend:** `models/chatbot_schemas.py:213-253` (`BundleRequest`)
@@ -536,32 +556,32 @@ has a guest count".
 > `_ensure_bundle_event` always creates a fresh event for a generated bundle. The
 > client ends up with two dashboard cards for one wedding and no way to merge.
 
-- [ ] Backend: accept an optional `event_id` on `POST /chatbot/bundles`; have
+- [x] Backend: accept an optional `event_id` on `POST /chatbot/bundles`; have
       `_ensure_bundle_event` adopt it instead of creating one.
-- [ ] Frontend: pass it from the dashboard; warn on the button until it exists.
+- [x] Frontend: pass it from the dashboard; warn on the button until it exists.
 
 ---
 
-### 21. "Still to book" never fires for hand-made celebrations
+### 21. "Still to book" never fires for hand-made celebrations ✅ done
 
 **Frontend:** [`planning.ts:521-535`](web/src/lib/planning.ts#L521-L535) · [`bundles/page.tsx:433-439`](web/src/app/bundles/page.tsx#L433-L439)
 
 `missingCategories` reads `event.services_needed`, which the dashboard's "New
 celebration" form never sets.
 
-- [ ] Add a category multi-select to that form, or derive from the celebration
+- [x] Add a category multi-select to that form, or derive from the celebration
       type the way `/plan?event=wedding` does.
 
 ---
 
-### 22. Budget can't be saved while the address is incomplete
+### 22. Budget can't be saved while the address is incomplete ✅ done
 
 **Frontend:** [`bundle/page.tsx:634-639`](web/src/app/bundle/page.tsx#L634-L639)
 
 The `isCompleteAddress` check blocks the whole save. A budget is never sent to a
 vendor; it shouldn't be hostage to a street name.
 
-- [ ] Save the budget regardless; gate only the address fields.
+- [x] Save the budget regardless; gate only the address fields.
 
 ---
 
