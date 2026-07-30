@@ -45,6 +45,10 @@ function BookInner() {
   const [location, setLocation] = useState("");
   const [guests, setGuests] = useState("");
   const [bundleChoice, setBundleChoice] = useState(NEW_BUNDLE);
+  // What the chosen plan just filled in, phrased for the client. Null when
+  // they're starting a new plan and there was nothing to inherit.
+  const [filledFrom, setFilledFrom] = useState<string[] | null>(null);
+  const [draftBusy, setDraftBusy] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -108,6 +112,113 @@ function BookInner() {
     });
   }
 
+  const selectedBundle =
+    bundleChoice === NEW_BUNDLE
+      ? null
+      : bundles.find((b) => b.bundle_id === bundleChoice) ?? null;
+
+  // A draft plan hasn't been sent, so a service can join it half-finished and be
+  // completed later. Once a plan has gone out its vendors are waiting, and the
+  // backend refuses an incomplete addition — there'd be no draft to fix it in.
+  const planAlreadySent = selectedBundle != null && selectedBundle.status !== "draft";
+
+  /**
+   * Take the plan's settled facts into the form.
+   *
+   * Picking a plan is a deliberate "use this one's details", so its facts win
+   * over anything typed — a booking whose date quietly disagrees with the plan
+   * it's joining is worse than losing a half-typed value. Fields the plan says
+   * nothing about keep what's there.
+   */
+  function chooseBundle(id: string) {
+    setBundleChoice(id);
+    setError(null);
+
+    if (id === NEW_BUNDLE) {
+      setFilledFrom(null);
+      return;
+    }
+    const b = bundles.find((x) => x.bundle_id === id);
+    if (!b) {
+      setFilledFrom(null);
+      return;
+    }
+
+    const filled: string[] = [];
+    const name = b.event_name || b.name;
+    if (name) setEventName(name);
+
+    // The event owns the plan's date, place and headcount; the times and any
+    // multi-day span live on its bookings, which share them.
+    const sample = (b.bookings ?? []).find((bk) => bk.time_start || bk.date_end);
+
+    if (b.event?.date_iso) {
+      setDateIso(b.event.date_iso);
+      filled.push(b.event.date_iso);
+    }
+    if (sample?.date_end) {
+      setDateEnd(sample.date_end);
+      setMultiDay(true);
+      filled.push(`through ${sample.date_end}`);
+    }
+    if (b.event?.location) {
+      setLocation(b.event.location);
+      filled.push(b.event.location);
+    }
+    if (b.event?.guest_count) {
+      setGuests(String(b.event.guest_count));
+      filled.push(`${b.event.guest_count} guests`);
+    }
+    if (sample?.time_start && sample?.time_end) {
+      setTimeStart(sample.time_start);
+      setTimeEnd(sample.time_end);
+      filled.push(`${sample.time_start}–${sample.time_end}`);
+    }
+
+    setFilledFrom(filled.length ? filled : null);
+  }
+
+  /**
+   * Add the service to the plan without telling the vendor.
+   *
+   * Nothing is validated: a draft exists so a client can gather what they want
+   * first and settle the details once, in one place, rather than answering the
+   * same questions on every service they add. The plan's "still needed" card is
+   * what chases the gaps, and pressing Send is what tells the vendors.
+   */
+  async function addAsDraft() {
+    if (!service) return;
+    setDraftBusy(true);
+    setError(null);
+    try {
+      const res = await createBooking({
+        service_id: service.service_id,
+        event_name: eventName.trim() || "My Event",
+        date_iso: dateIso,
+        date_end: multiDay && dateEnd ? dateEnd : null,
+        time_start: timeStart,
+        time_end: timeEnd,
+        location: location.trim(),
+        guest_count: guests ? Number(guests) : null,
+        venue_latitude: service.venue_latitude ?? null,
+        venue_longitude: service.venue_longitude ?? null,
+        bundle_id: bundleChoice === NEW_BUNDLE ? null : bundleChoice,
+      });
+      // Back to browsing: a draft is how a plan gets assembled, and assembling
+      // means adding the next thing.
+      const params = new URLSearchParams({
+        added: res.bundle_id,
+        name: service.name,
+      });
+      router.push(`/marketplace?${params.toString()}`);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Couldn't add this to your plan. Try again.",
+      );
+      setDraftBusy(false);
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!service) return;
@@ -168,6 +279,40 @@ function BookInner() {
 
       <Card className="mt-7 p-6">
         <form onSubmit={submit} className="grid gap-4">
+          {/* First, because it decides the rest: an existing plan already knows
+              the date, the place and the headcount, and choosing it fills them
+              in rather than asking the same questions again. */}
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-ink-soft">Add to</span>
+            <select
+              value={bundleChoice}
+              onChange={(e) => chooseBundle(e.target.value)}
+              className="w-full rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5 text-ink outline-none focus:border-gold"
+            >
+              <option value={NEW_BUNDLE}>A new plan</option>
+              {bundles.map((b) => (
+                <option key={b.bundle_id} value={b.bundle_id}>
+                  {b.event_name || b.name}
+                  {b.status !== "draft" ? " (already sent)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {filledFrom ? (
+            <p className="-mt-1 rounded-lg bg-panel px-3 py-2 text-sm text-ink-soft">
+              Filled in from this plan: <span className="text-ink">{filledFrom.join(" · ")}</span>.
+              Change anything below that&apos;s different for this service.
+            </p>
+          ) : null}
+
+          {planAlreadySent ? (
+            <p className="-mt-1 rounded-lg bg-gold/10 px-3 py-2 text-sm text-ink-soft">
+              This plan is already with your vendors, so anything added to it goes
+              out straight away and can&apos;t be saved as a draft.
+            </p>
+          ) : null}
+
           <Field
             label="Event name"
             placeholder="Priya & Arjun's Wedding"
@@ -256,24 +401,6 @@ function BookInner() {
             onChange={(e) => setGuests(e.target.value)}
           />
 
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-ink-soft">
-              Add to
-            </span>
-            <select
-              value={bundleChoice}
-              onChange={(e) => setBundleChoice(e.target.value)}
-              className="w-full rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5 text-ink outline-none focus:border-gold"
-            >
-              <option value={NEW_BUNDLE}>A new bundle</option>
-              {bundles.map((b) => (
-                <option key={b.bundle_id} value={b.bundle_id}>
-                  {b.event_name || b.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
           {total !== null ? (
             <p className="rounded-lg bg-panel px-3 py-2 text-sm text-ink-soft">
               Estimated total: <strong className="text-ink">{money(total)}</strong>
@@ -287,13 +414,41 @@ function BookInner() {
             </p>
           ) : null}
 
-          <Button type="submit" size="lg" disabled={busy}>
+          <Button type="submit" size="lg" disabled={busy || draftBusy}>
             {busy ? "Sending request…" : "Request booking"}
           </Button>
           <p className="text-center text-xs text-ink-faint">
             The vendor reviews your request first. You only pay once they accept —
             and the money is held in escrow until after the event.
           </p>
+
+          {!planAlreadySent ? (
+            <>
+              <div className="flex items-center gap-3">
+                <span className="h-px flex-1 bg-line-soft" />
+                <span className="text-xs uppercase tracking-[0.14em] text-ink-faint">
+                  or
+                </span>
+                <span className="h-px flex-1 bg-line-soft" />
+              </div>
+              {/* type="button" so it never trips the form's required fields —
+                  a draft is exactly the case where they aren't required. */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="lg"
+                disabled={busy || draftBusy}
+                onClick={addAsDraft}
+              >
+                {draftBusy ? "Adding…" : "Add to plan as a draft"}
+              </Button>
+              <p className="text-center text-xs text-ink-faint">
+                Nothing is sent to the vendor and nothing here is required. Fill in
+                the details from your dashboard whenever you&apos;re ready, then send
+                the request.
+              </p>
+            </>
+          ) : null}
         </form>
       </Card>
     </div>
