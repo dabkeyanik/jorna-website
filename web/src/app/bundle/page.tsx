@@ -9,7 +9,6 @@ import {
   confirmBookingEvent,
   createCheckoutSession,
   deleteBundle,
-  deleteEvent,
   disputeBooking,
   getBundle,
   getGuestList,
@@ -119,6 +118,32 @@ function isBeyondActionable(b: BundleBooking): boolean {
   if (b.status === "payment_confirmed") return true;
   const ps = (b.payment_status ?? "unpaid").toLowerCase();
   return ["paid", "released", "refunded", "disputed"].includes(ps);
+}
+
+/**
+ * Payment states where money has moved, is moving, or moved and came back.
+ *
+ * Mirrors the backend's MONEY_MOVED_STATUSES exactly, because that is what
+ * refuses the delete — a plan holding any of these is a financial record before
+ * it is a plan, and deleting it strands the charge rather than reversing it.
+ *
+ * Deliberately not `isBeyondActionable` above, which answers a different
+ * question (can this booking still be swapped) and omits "processing".
+ */
+const MONEY_MOVED = ["processing", "paid", "released", "refunded", "disputed"];
+
+/** What's been paid on this plan, or null when nothing has. */
+function heldOnPlan(
+  bookings: BundleBooking[],
+): { amount: number; count: number } | null {
+  const held = bookings.filter((b) =>
+    MONEY_MOVED.includes((b.payment_status ?? "unpaid").toLowerCase()),
+  );
+  if (held.length === 0) return null;
+  return {
+    amount: held.reduce((sum, b) => sum + (b.price ?? 0), 0),
+    count: held.length,
+  };
 }
 
 /**
@@ -941,21 +966,23 @@ function BundleInner() {
   }
 
   /**
-   * Delete the whole thing — bundle and event both, for the same reason rename
-   * writes to both. Deleting only the bundle left the event behind as an empty
-   * card on the dashboard, which looked like the delete had half-failed.
+   * Delete the whole thing — bundle and event both.
    *
-   * The bundle goes first because it's the one carrying the bookings; if the
-   * event delete then fails, what's left is an empty event the dashboard offers
-   * to rebuild rather than anything broken.
+   * The event is the server's job, not ours. _delete_bundle_cascade removes it
+   * only once no other bundle references it; this used to call DELETE /events
+   * afterwards as well, which has no such check — so deleting one of two
+   * bundles filed under a celebration took the celebration with it and orphaned
+   * the other, defeating a guard written to prevent exactly that. The sibling
+   * links are rendered further down this very page.
+   *
+   * A plan holding money can't be deleted at all; the server refuses and the
+   * button isn't offered. See heldOnPlan.
    */
   async function removeBundle() {
     if (!bundleId) return;
-    const eventId = bundle?.event_id ?? bundle?.event?.event_id ?? null;
     setBundleBusy(true);
     try {
       await deleteBundle(bundleId);
-      if (eventId) await deleteEvent(eventId).catch(() => {});
       router.push("/bundles");
     } catch (err) {
       setNotice({ text: err instanceof ApiError ? err.message : "Couldn't delete this event.", ok: false });
@@ -1044,6 +1071,7 @@ function BundleInner() {
   const plan = planForBundle(bundle);
   const cash = moneyForBundle(bundle);
   const draft = isDraftBundle(bundle);
+  const heldMoney = heldOnPlan(bundle.bookings ?? []);
   // The address forms seed themselves once, from the venue when there is one.
   // Swapping the venue changes the answer but not the state React is already
   // holding, so the old address stayed on screen — and would have been saved
@@ -1159,16 +1187,32 @@ function BundleInner() {
               >
                 Rename
               </Button>
-              <Button
-                variant="quiet"
-                size="md"
-                onClick={() => setConfirmDelete(true)}
-              >
-                Delete
-              </Button>
+              {/* Not offered at all once money is on the plan. The server
+                  refuses (bundle_service.MONEY_MOVED_STATUSES), so a button
+                  here could only ever produce an error — and a Delete that
+                  looks available right up until you press it reads as the app
+                  losing your plan, not as a rule protecting it. */}
+              {!heldMoney ? (
+                <Button
+                  variant="quiet"
+                  size="md"
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  Delete
+                </Button>
+              ) : null}
             </div>
           </div>
         )}
+
+        {heldMoney ? (
+          <p className="mt-3 rounded-xl bg-panel px-3 py-2 text-xs text-ink-faint">
+            {money(heldMoney.amount)} has been paid on this plan, so it
+            can&apos;t be deleted — deleting it wouldn&apos;t return the money,
+            only the record of where it went. Refund or report a problem on{" "}
+            {heldMoney.count === 1 ? "that booking" : "those bookings"} first.
+          </p>
+        ) : null}
 
         {confirmDelete ? (
           <div className="mt-3 rounded-xl bg-panel p-3">
