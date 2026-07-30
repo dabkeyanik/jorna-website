@@ -21,6 +21,7 @@
 // to a single large pool (QUERY_POOL) and hides "Show more".
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ApiError } from "@/lib/api";
 import { searchVendors } from "@/lib/jorna";
@@ -125,6 +126,10 @@ function MarketplaceInner() {
   const searchParams = useSearchParams();
 
   const [query, setQuery] = useState("");
+  // Set once by /book after a draft add; read straight off the URL rather than
+  // held in state, so it clears on the next navigation without any cleanup.
+  const addedBundleId = searchParams.get("added");
+  const addedName = searchParams.get("name");
   const [category, setCategory] = useState(searchParams.get("category") ?? "");
   const [subcategory, setSubcategory] = useState<string | undefined>(
     searchParams.get("subcategory") ?? undefined,
@@ -262,6 +267,24 @@ function MarketplaceInner() {
 
   return (
     <div className="mx-auto w-[min(1080px,100%-2rem)] py-10">
+      {/* Adding a service as a draft lands back here, because assembling a plan
+          means adding the next thing. The confirmation names what went where so
+          the return doesn't read as the click having failed. */}
+      {addedBundleId ? (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-green/30 bg-green/10 px-4 py-3 text-sm">
+          <p className="text-ink-soft">
+            <span className="text-ink">{addedName || "That service"}</span> was added
+            to your plan as a draft — no request sent yet.
+          </p>
+          <Link
+            href={`/bundle?id=${addedBundleId}`}
+            className="shrink-0 font-semibold text-gold hover:underline"
+          >
+            View plan →
+          </Link>
+        </div>
+      ) : null}
+
       <header className="text-center">
         <span className="eyebrow">Marketplace</span>
         <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold sm:text-5xl">
