@@ -23,7 +23,15 @@ export function VendorCard({ item }: { item: VendorSearchItem }) {
 
   return (
     <Link
-      href={`/vendor?id=${item.vendor_id}`}
+      // The card leads with the service name and its price, so the service is
+      // what a click is asking about. Falls back to the vendor's profile for a
+      // row that somehow arrives without a service id, which is better than a
+      // dead card.
+      href={
+        item.service_id
+          ? `/service?id=${item.service_id}`
+          : `/vendor?id=${item.vendor_id}`
+      }
       className="group flex flex-col overflow-hidden rounded-2xl border border-card-edge bg-card shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:border-gold/50 hover:shadow-[0_20px_44px_-22px_rgba(74,11,26,0.4)]"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-panel">

@@ -158,7 +158,17 @@ export function ServiceSwapPanel({
                     className="flex items-center justify-between gap-3 rounded-xl border border-card-edge bg-panel p-3"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-ink">{s.name}</p>
+                      {/* A new tab on purpose: this picker is a modal over the
+                          bundle, and navigating in place would close it and
+                          lose the swap the client came here to make. */}
+                      <a
+                        href={`/service?id=${s.service_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block truncate text-sm font-semibold text-ink transition hover:text-maroon dark:hover:text-gold"
+                      >
+                        {s.name}
+                      </a>
                       <p className="truncate text-xs text-ink-faint">
                         {s.vendor_name}
                         {/* This list compares listings, so the listing's own

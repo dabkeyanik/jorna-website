@@ -123,6 +123,8 @@ export interface VendorSearchItem {
   first_name: string;
   last_name: string;
   category: string;
+  /** A row is a vendor+service pair; this names which listing it is. */
+  service_id?: string | null;
   service_name?: string | null;
   service_price?: number | null;
   distance_miles?: number | null;
@@ -165,6 +167,9 @@ export interface ServiceItem {
   name: string;
   price: number;
   price_unit?: string | null;
+  /** How long the service runs, when the vendor said. Returned by the API all
+   *  along; it just had never been declared here. */
+  duration_minutes?: number | null;
   experience?: string | null;
   media?: string[];
   category?: string | null;

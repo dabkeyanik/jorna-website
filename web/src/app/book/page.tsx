@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { createBooking, getService, listBundles } from "@/lib/jorna";
+import { daysBetweenInclusive, estimateTotal, hoursBetween } from "@/lib/pricing";
 import {
   categoryLabel,
   priceUnitKind,
@@ -96,31 +97,15 @@ function BookInner() {
   const needsGuests = kind === "person";
   const perDay = kind === "day";
 
-  // Show what they'll actually be charged, using the same arithmetic the backend
-  // uses (rate x quantity; day counts the end date inclusively).
+  // Show what they'll actually be charged. The arithmetic lives in lib/pricing
+  // so this form and the service page's estimator can't drift apart — all this
+  // does is turn the form's fields into the quantity that rate multiplies by.
   function estimate(): number | null {
-    const rate = service?.price ?? 0;
-    if (kind === "person") {
-      const g = Number(guests);
-      return g > 0 ? rate * g : null;
-    }
-    if (kind === "day") {
-      if (!dateIso) return null;
-      const start = Date.parse(`${dateIso}T00:00:00Z`);
-      const end = Date.parse(`${(multiDay && dateEnd) || dateIso}T00:00:00Z`);
-      if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
-      const days = Math.round((end - start) / 86400000) + 1;
-      return rate * days;
-    }
-    if (kind === "hour") {
-      const [sh, sm] = timeStart.split(":").map(Number);
-      const [eh, em] = timeEnd.split(":").map(Number);
-      if ([sh, sm, eh, em].some(Number.isNaN)) return null;
-      let hours = eh + em / 60 - (sh + sm / 60);
-      if (hours <= 0) hours += 24; // crosses midnight
-      return hours > 0 && hours <= 24 ? rate * hours : null;
-    }
-    return rate;
+    return estimateTotal(service, {
+      guests: Number(guests),
+      days: daysBetweenInclusive(dateIso, (multiDay && dateEnd) || dateIso),
+      hours: hoursBetween(timeStart, timeEnd),
+    });
   }
 
   async function submit(e: React.FormEvent) {
