@@ -25,8 +25,12 @@ export interface Quantity {
  *
  * A neutral starting point, not a guess about this celebration: the estimate
  * next to it always names the quantity it used, so a number that isn't theirs
- * is visibly not theirs. 6 hours matches the booking form's own 17:00–23:00
- * default, so the two screens open on the same figure.
+ * is visibly not theirs.
+ *
+ * Only the service page's estimator uses these. The booking form no longer
+ * defaults its time window — a defaulted one was indistinguishable from an
+ * answered one — so it simply shows no estimate until the hours are given,
+ * which is the honest answer to "what will this cost".
  */
 export const DEFAULT_QUANTITY: Required<Quantity> = {
   guests: 150,

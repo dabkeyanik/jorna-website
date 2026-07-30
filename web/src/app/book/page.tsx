@@ -40,8 +40,13 @@ function BookInner() {
   const [dateIso, setDateIso] = useState("");
   const [dateEnd, setDateEnd] = useState("");
   const [multiDay, setMultiDay] = useState(false);
-  const [timeStart, setTimeStart] = useState("17:00");
-  const [timeEnd, setTimeEnd] = useState("23:00");
+  // Blank, not 17:00–23:00. A defaulted window is indistinguishable from an
+  // answered one — here, on the vendor's request, and in ScheduleDay.timesKnown,
+  // which is what decides whether the run sheet dares print clock times. So a
+  // booking nobody set times for looked like one that had been, and the plan
+  // never asked. Empty is honest, and the plan chases it before sending.
+  const [timeStart, setTimeStart] = useState("");
+  const [timeEnd, setTimeEnd] = useState("");
   const [location, setLocation] = useState("");
   const [guests, setGuests] = useState("");
   const [bundleChoice, setBundleChoice] = useState(NEW_BUNDLE);

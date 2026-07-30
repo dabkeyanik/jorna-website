@@ -1,86 +1,178 @@
-# Rescheduling a paid booking — a proposal
+# Rescheduling a paid booking — build spec
 
-Item 16 in `CLIENT_FLOW_PLAN.md`. Not built, because it is a decision about what
-a booking *means* rather than a defect in how one is displayed, and it moves
-escrow.
+Item 16 in `CLIENT_FLOW_PLAN.md`. **Decisions made; not yet built.** Awaiting a
+go-ahead before anything touches escrow.
+
+---
 
 ## The hole
 
-Events move. Once a request has reached a vendor, `plan_readiness.COMMITTED_FIELDS`
+Events move. Once a request reaches a vendor, `plan_readiness.COMMITTED_FIELDS`
 freezes the date, times, location, headcount and end date — correctly, since
-those are what the vendor agreed to. But the app's own advice for changing them
-is unactionable:
+those are what the vendor agreed to. But for a **paid** booking there is no way
+to change them: no cancel button (`isBeyondActionable`), and
+`remove_booking_from_bundle` refuses once money has moved. Past the 24-hour
+refund window the only exits are a dispute (adversarial, wrong for "the venue
+flooded") or nothing (the vendor turns up on a dead date, and escrow
+auto-releases seven days after a day that no longer means anything).
 
-> "Your vendors have this plan's date, address and headcount, so those are
-> settled. To move any of them, cancel the requests affected and book again."
-> — [`bundle/page.tsx`](web/src/app/bundle/page.tsx)
+## Shape
 
-For a **paid** booking there is no cancel button (`isBeyondActionable`), and
-`remove_booking_from_bundle` refuses it anyway now that money has moved. So past
-the 24-hour refund window the only exits are:
+A **change request**, mirroring `negotiation_service`: turn-based, server
+enforces whose turn it is, resolution mutates the booking. One mental model for
+"I want to change something we agreed", whether it's a price or a date.
 
-- **Dispute** — freezes the money for manual review. Adversarial, and wrong for
-  "the venue flooded, we've moved to the 14th."
-- **Nothing** — the booking keeps its old date, the vendor turns up on the wrong
-  day or doesn't, and escrow auto-releases seven days after a date that no
-  longer means anything.
+**Escrow does not move on a proposal, only on a resolution.** A client cannot
+free their money by proposing an impossible date; a vendor cannot strand it by
+ignoring one.
 
-Neither is a reschedule. A client who moves their wedding today has no route
-through the product that keeps the vendor, the money, and the truth together.
+---
 
-## What it should probably be
+## Decisions
 
-A **change request**: the same shape as the negotiation flow, which already
-exists and already works this way — one side proposes, the other accepts or
-declines, and acceptance mutates the booking.
+| # | Question | Decision |
+|---|---|---|
+| 1 | Scope | **Per plan, per-vendor answer.** One proposal, each vendor answers independently. |
+| 2 | Vendor declines | **Refund less a cancellation fee**, at the client's option. |
+| 3 | Fee | **Flat 10%**, published, from a single constant. |
+| 4 | Conflict on accept | **Refuse**, naming the clash. Same guard approval uses. |
+| 5 | Vendor deadline | **7 days**, reusing `AUTO_RELEASE_DAYS`. |
+| 6 | Re-pricing | **Re-price both ways; a rise needs the client's second consent.** |
+| 7 | Sequencing | Spec first, build on approval. |
+
+### Why 10%
+
+Roughly the platform fee already taken, so it reads as "you keep what was
+already spent" rather than a penalty. That matters because of who triggers it:
+the *vendor* declined. A fee that looked punitive would be hardest to defend in
+exactly the case that produces it.
+
+---
+
+## Flow
 
 ```
-client proposes new date/times          → booking.change_request (pending)
-  vendor accepts                        → fields updated, escrow untouched
-  vendor declines                       → client chooses: keep as booked, or refund
-  no answer within N days               → client may withdraw for a full refund
+client proposes new date/times, plan-wide
+  │
+  ├─ each live booking gets a pending change_request
+  │  vendors are notified; escrow untouched
+  │
+  ├─ vendor ACCEPTS
+  │    → re-run the double-booking check
+  │        conflict → refuse, name the clash, vendor declines instead
+  │    → re-price from the new dates
+  │        lower  → apply, refund the difference
+  │        higher → hold pending the client's consent
+  │        same   → apply
+  │    → booking's committed fields updated
+  │
+  ├─ vendor DECLINES
+  │    → booking stays at its original date, still paid
+  │    → client offered: keep it, or refund at 90%
+  │
+  └─ 7 days, no answer
+       → client may withdraw for a refund at 90%
 ```
 
-Escrow does not move on a proposal, only on a resolution. That is the property
-worth protecting: a client cannot free their money by proposing an impossible
-date, and a vendor cannot strand it by ignoring one.
+The plan shows a per-vendor board: accepted / declined / waiting.
 
-### Why mirror negotiations
+---
 
-`negotiation_service` is turn-based, the backend enforces whose turn it is, and
-`NegotiationPanel` already renders the pattern. Reusing the shape means one
-mental model for "I want to change something we agreed", whether the thing is a
-price or a date, and one place to fix it.
+## Schema
 
-## Questions this needs answered
+One table. Nullable throughout except the keys — a proposal may move only the
+date, only the times, or both.
 
-1. **Does an accepted reschedule re-run the availability check?** A vendor
-   accepting a new date they're already booked on is a double-booking.
-   `update_booking_status` has a conflict guard for approval — should acceptance
-   go through it, and what happens if it fails?
-2. **What happens to the rest of the plan?** A wedding moving takes every vendor
-   with it. Is a change request per booking, or per plan with a per-vendor
-   response? Per plan is what a client wants; per booking is what the data
-   models.
-3. **Does a decline entitle the client to a refund outside the 24-hour window?**
-   It should — the vendor can't supply what was asked for. But that is a
-   commercial decision, and it is the one that decides whether vendors decline
-   freely or feel pressured to accept.
-4. **How long may a vendor sit on it?** `auto_release_due` waits 7 days on a
-   comparable question. The same number is the obvious answer.
-5. **Per-day pricing.** Moving a 3-day booking to a 2-day window changes the
-   total. Does an accepted reschedule re-price, and if the price rises, does
-   that need a second acceptance from the client?
+```python
+class ChangeRequest(Base):
+    change_request_id  # uuid pk
+    booking_id         # fk, indexed
+    proposed_by        # user_id — always the client in v1
+    status             # pending | accepted | declined | withdrawn | expired
+    # What is being asked for. Null means "unchanged".
+    date_iso, date_end, time_start, time_end
+    # Set when a re-price needs the client's second consent.
+    repriced_amount_cents
+    client_consented_at
+    message            # optional, like a negotiation offer
+    created_at, resolved_at
+```
 
-## Smallest honest thing to do now
+`plan_id` is deliberately absent: the group is the plan the bookings already
+belong to, so a proposal is *n* rows created in one transaction and read back by
+joining on `bundle_id`. Nothing new owns the grouping.
 
-If the full flow isn't wanted yet, **fix the advice**, which is currently a
-dead end:
+---
 
-- Replace "cancel the requests affected and book again" with what the client can
-  actually do — message the vendor (now possible from the booking row), and
-  report a problem if they can't accommodate it.
-- Say plainly that a paid booking's date can't be changed in-app yet.
+## Endpoints
 
-That is a ten-minute change and stops the app instructing people to press
-buttons that aren't there. It does not solve the problem.
+```
+POST   /bundles/{bundle_id}/change-request     client proposes, plan-wide
+POST   /change-requests/{id}/respond           vendor: accept | decline
+POST   /change-requests/{id}/consent           client: OK a price rise
+DELETE /bundles/{bundle_id}/change-request     client withdraws the lot
+```
+
+Guards, each mirroring one that already exists:
+
+- Propose: caller owns the bundle; at least one live booking; the plan is sent
+  (a draft is still editable directly, so this would be the wrong tool).
+- Respond: caller is the booking's vendor; request is `pending`.
+- Accept: re-run `update_booking_status`'s overlap check. **Refuse on conflict**,
+  returning the clashing booking's event name and date.
+- Consent: caller owns the booking; there is a `repriced_amount_cents`.
+- Expiry: a sweep like `auto_release_due`, marking `expired` after 7 days.
+
+## Refunds
+
+```python
+RESCHEDULE_CANCELLATION_PCT = 10  # one constant; every string reads from it
+```
+
+Refund = `resolve_total_cents(booking) * (100 - PCT) / 100`, via the existing
+Stripe refund path. Available to the client when a request is `declined` or
+`expired`, and only then — it does not reopen the ordinary 24-hour window.
+
+Disclosed at checkout and again on the propose screen, from the same constant,
+so the copy and the arithmetic cannot drift.
+
+---
+
+## UI
+
+**Client, on the plan** — "Propose a new date" beside the settled-details notice
+that currently explains why nothing is editable. Then a per-vendor board, and a
+consent prompt on any booking whose price rose: *"Moving this adds $500.
+Confirm?"*
+
+**Vendor, on the booking** — the request, what's changing, accept/decline with
+an optional message. A refused acceptance says which booking clashed.
+
+**Copy that changes** — the settled-details paragraph in `bundle/page.tsx`
+currently says to message the vendor. It should point at the flow instead.
+
+---
+
+## Tests
+
+- Propose creates one request per live booking; dead ones are skipped.
+- Escrow does not move on propose.
+- Accept updates the committed fields; decline leaves them alone.
+- **Accept into a conflict is refused** and the booking is unchanged.
+- Decline offers a 90% refund; accept offers none.
+- A shorter booking refunds the difference; a longer one waits for consent and
+  does **not** charge before it.
+- Expiry at 7 days, not 6.
+- A vendor cannot respond to another vendor's request; a client cannot accept
+  their own.
+- Withdraw cancels every outstanding request on the plan.
+
+---
+
+## Open, deliberately
+
+- **Vendor-initiated proposals.** The schema allows it (`proposed_by`); v1 does
+  not expose it. A vendor who needs to move asks in the chat.
+- **Location changes.** `COMMITTED_FIELDS` freezes location too, and moving a
+  venue is a different problem — it re-anchors check-in for every other vendor.
+  Out of scope.

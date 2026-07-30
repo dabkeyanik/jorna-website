@@ -24,24 +24,36 @@ guard the backend already had, and two were not bugs at all.
 
 ## Status
 
-**23 of 25 items are shipped and live.** Deployed across six batches; the
+**25 of 25 items are resolved — 24 shipped and live.** Deployed across seven batches; the
 backend runs on Railway from `main`, the site on Cloudflare Pages, all 41 routes
-verified serving 200 after each deploy. Backend suite: **648 passing**, up from
-620, with 31 tests added. Each batch's commit message records what changed and
+verified serving 200 after each deploy. Backend suite: **649 passing**, up from
+620, with 32 tests added. Each batch's commit message records what changed and
 why.
 
-Three pieces were deliberately **not** shipped autonomously, because each is a
-decision rather than a fix:
+Three pieces were held back as decisions rather than fixes. All three are now
+decided:
 
-| | What | Why it needs you |
+| | What | Decided |
 | --- | --- | --- |
-| **16** | A reschedule path for a paid booking | A new flow that moves escrow. Proposal in `RESCHEDULE_PROPOSAL.md`. |
-| **10** (part) | Linking a booking to a `function_id` | A schema migration on the production DB. The practical half — per-booking headcounts — is live. |
-| **8** (part) | A 1:1 conversation before any booking | A new API surface. Conversations are bundle-scoped today; the post-booking half is live. |
+| **16** | A reschedule path for a paid booking | **Spec'd, awaiting go-ahead.** All seven design questions answered — see `RESCHEDULE_PROPOSAL.md`, now a build spec rather than a set of questions. |
+| **10** (part) | Linking a booking to a `function_id` | **Not now.** Per-booking headcounts are live and solve the practical problem; the link would only save retyping, at the cost of a production migration. |
+| **8** (part) | A 1:1 conversation before any booking | **Later, with rate limits designed alongside.** It's the one surface a spammer can reach every vendor through, and the limits belong in the same change rather than bolted on after an incident. |
 
-Two smaller ones are left open on purpose: `delete_event`'s defence-in-depth
-guard (the caller that abused it is gone), and whether `/book` should keep
-defaulting its time window (item 23).
+The two smaller leftovers are **done**: `delete_event` now refuses while a bundle
+references it (item 12), and `/book` no longer defaults its time window
+(item 23).
+
+### The reschedule decisions, for the record
+
+| Question | Decision |
+| --- | --- |
+| Scope | Per plan, per-vendor answer |
+| Vendor declines | Refund less a cancellation fee, at the client's option |
+| Fee | Flat **10%**, published, from one constant |
+| Conflict on accept | Refuse, naming the clash — same guard approval uses |
+| Vendor deadline | 7 days, reusing `AUTO_RELEASE_DAYS` |
+| Re-pricing | Both ways; a **rise needs the client's second consent** |
+| Sequencing | Spec first, build on approval |
 
 ---
 
@@ -349,8 +361,9 @@ visibly flagged as not one.
       history with its messages.
 - [x] Frontend: rewrite the Messages empty state — "confirmed" is backend
       vocabulary; the client's word is "sent".
-- [ ] Backend: an endpoint to open a 1:1 client↔vendor conversation with no
-      bundle, for pre-booking questions.
+- [ ] **Deferred by decision:** an endpoint to open a 1:1 client↔vendor
+      conversation with no bundle. To be built *with* rate limits, not before
+      them — it's the one surface a spammer can reach every vendor through.
 
 ---
 
@@ -392,8 +405,12 @@ visibly flagged as not one.
 > the label "N coming" presents the largest function's number as the whole
 > celebration's.
 
-- [ ] Backend: allow a booking to reference a `function_id`.
-- [ ] Drive a booking's `guest_count` from its function's headcount.
+- [ ] **Deferred by decision:** link a booking to a `function_id` so its
+      headcount follows the RSVPs. Per-booking headcounts are live and solve the
+      practical problem — the mehndi caterer can be set to 80 while the
+      reception's is 300 — so this would only save retyping, at the cost of a
+      production migration. `headcountGap` deliberately reports rather than
+      moves numbers anyway.
 - [x] Interim: relabel the field "Guests for the main function"; allow
       per-booking headcount editing on the row.
 - [x] Fix `GuestsRow` — sum across functions, or name the function it reports.
@@ -422,7 +439,7 @@ visibly flagged as not one.
 
 ## 🟡 Medium
 
-### 12. The frontend bypasses the backend's own orphan guard when deleting ✅ mostly done
+### 12. The frontend bypasses the backend's own orphan guard when deleting ✅ done
 
 **Frontend:** [`bundle/page.tsx:952-964`](web/src/app/bundle/page.tsx#L952-L964)
 **Backend:** `services/bundle_service.py:735-746` · `services/event_service.py:83-90`
@@ -437,8 +454,9 @@ visibly flagged as not one.
 - [x] Deleted the `await deleteEvent(eventId)` line. The backend handles it.
       Done alongside item 2 — it is the same function, and leaving a known bug
       in code being actively edited is worse than the small scope expansion.
-- [ ] Backend (defence in depth): make `delete_event` refuse while a bundle
-      references it.
+- [x] Backend: `delete_event` refuses while a bundle references it. The caller
+      that abused it is gone; this stops the next one, and iOS, which has never
+      been through this path.
 
 ---
 
@@ -490,7 +508,7 @@ about.
 
 ---
 
-### 16. A paid booking has no reschedule path ⏸ needs a decision
+### 16. A paid booking has no reschedule path ⏸ spec'd, awaiting go-ahead
 
 **Frontend:** [`bundle/page.tsx:728-732`](web/src/app/bundle/page.tsx#L728-L732)
 **Backend:** `services/plan_readiness.py:181-221` (`locked_fields_for`)
@@ -503,8 +521,14 @@ about.
 > `remove_booking_from_bundle` would refuse anyway. Past 24 hours the only exits
 > are dispute or nothing.
 
-- [ ] Design a change-request flow: client proposes, vendor accepts, escrow follows.
-- [ ] Interim: make the copy name something the client can actually do.
+- [x] Interim: the copy names something the client can actually do. It said
+      "cancel the requests affected and book again" — a paid booking has no
+      cancel button and the server refuses to remove one, so the only
+      instruction on screen pointed at a control that isn't there.
+- [ ] **Spec'd, awaiting go-ahead:** the change-request flow. Every design
+      question is answered — see `RESCHEDULE_PROPOSAL.md`, which is now a build
+      spec: schema, four endpoints, guards, refund policy, re-pricing consent,
+      UI and the test list.
 
 ---
 
@@ -646,7 +670,7 @@ typechecks and builds. A `$500/day` marquee over a 15-day window now bills
 
 ## ⚪ Verified clean — no action
 
-### 23. `priceLine`'s `price_pending_quantity` fallback
+### 23. `priceLine`'s `price_pending_quantity` fallback ✅ done
 
 > `_booking_summary` emits `"price_pending_quantity": total_cents is None` on
 > **every** booking (`bundle_service.py:59`). The field is never absent, so the
@@ -657,7 +681,10 @@ typechecks and builds. A `$500/day` marquee over a 15-day window now bills
 > 17:00–23:00, so a defaulted time window is indistinguishable from an answered
 > one — here and in `ScheduleDay.timesKnown`.
 
-- [ ] (Optional) Stop defaulting the time window, or mark it as unanswered.
+- [x] `/book` no longer defaults its time window. A defaulted 17:00–23:00 was
+      indistinguishable from an answered one — on the vendor's request and in
+      `ScheduleDay.timesKnown`, which decides whether the run sheet dares print
+      clock times at all.
 
 ### 24. The send gate mirrors the server field for field
 
