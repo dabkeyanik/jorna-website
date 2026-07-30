@@ -40,6 +40,7 @@ import {
   eventHasStarted,
   lastDay,
   priceLine,
+  refundWindowLeft,
   withinRefundWindow,
   type BundleBooking,
   type BundleDetail,
@@ -329,6 +330,7 @@ function BookingRow({
   const youConfirmed = Boolean(booking.customer_confirmed_at);
   const canConfirm = held && !youConfirmed && canConfirmBooking(booking);
   const refundable = held && withinRefundWindow(booking.paid_at);
+  const refundLeft = refundable ? refundWindowLeft(booking.paid_at) : null;
   const gaps = bookingGaps(booking, event);
 
   return (
@@ -547,13 +549,24 @@ function BookingRow({
           ) : (
             <div className="flex flex-wrap items-center justify-end gap-2">
               {refundable ? (
-                <Button
-                  variant="ghost"
-                  size="md"
-                  onClick={() => onOpenPanel(booking.booking_id, "refund")}
-                >
-                  Request refund
-                </Button>
+                <>
+                  {/* Named, because it expires. The window runs from paid_at —
+                      with a card on file, a moment the client didn't choose and
+                      may never have seen — and the button used to vanish
+                      without ever having said it was going to. */}
+                  {refundLeft ? (
+                    <span className="mr-auto text-xs text-ink-faint">
+                      Full refund available for another {refundLeft}
+                    </span>
+                  ) : null}
+                  <Button
+                    variant="ghost"
+                    size="md"
+                    onClick={() => onOpenPanel(booking.booking_id, "refund")}
+                  >
+                    Request refund
+                  </Button>
+                </>
               ) : null}
               <Button
                 variant="ghost"
@@ -582,6 +595,55 @@ function BookingRow({
         <ReviewPanel bookingId={booking.booking_id} />
       ) : null}
     </Card>
+  );
+}
+
+/**
+ * The card the backend charges as each vendor accepts.
+ *
+ * Shown on a sent plan as well as a draft. It used to live inside the draft
+ * banner, which disappears the moment you send — so from then on the card that
+ * would be charged, automatically, for every acceptance was unnamed and
+ * unchangeable. A stale card meant failed charges the client couldn't fix, and
+ * removing one wasn't possible from the web at all.
+ *
+ * Nothing here charges anything; the backend does that, on acceptance.
+ */
+function CardOnFile({
+  card,
+  busy,
+  onAdd,
+  sent,
+}: {
+  card: SavedCard | null;
+  busy: boolean;
+  onAdd: () => void;
+  sent: boolean;
+}) {
+  const named = card?.has_card
+    ? `${card.brand ? card.brand[0].toUpperCase() + card.brand.slice(1) : "Card"}${
+        card.last4 ? ` ending ${card.last4}` : ""
+      }`
+    : null;
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-ground-2 px-4 py-3">
+      <p className="text-sm text-ink-soft">
+        {named ? (
+          <>
+            <span className="font-medium text-ink">{named}</span>
+            {sent
+              ? " — charged automatically as each vendor accepts. You won't be asked again."
+              : " — charged as each vendor accepts, never for one who declines."}
+          </>
+        ) : sent
+          ? "No card on file, so you'll be asked to pay each booking yourself as vendors accept."
+          : "Add a card and each vendor is paid as they accept. Without one you'll be asked to pay each booking yourself."}
+      </p>
+      <Button variant="ghost" size="md" disabled={busy} onClick={onAdd}>
+        {busy ? "Opening…" : named ? "Change card" : "Add a card"}
+      </Button>
+    </div>
   );
 }
 
@@ -1359,6 +1421,18 @@ function BundleInner() {
             ) : null}
           </div>
 
+          {/* Money held against a booking that isn't going ahead. It used to
+              fall out of every total while its card still offered the full set
+              of escrow controls — so the plan quietly forgot a sum the client
+              could still see a Report a problem button for. */}
+          {cash.strandedInEscrow > 0 ? (
+            <p className="mt-2 rounded-lg bg-maroon/10 px-3 py-2 text-xs text-maroon dark:text-gold">
+              {money(cash.strandedInEscrow)} is still held on a booking that
+              isn&apos;t going ahead. Report a problem on it below so we can
+              return it.
+            </p>
+          ) : null}
+
           {/* Counted, not totalled — their price is a rate, and there is no
               honest figure until a guest count lands. Saying "$38 awaiting a
               guest count" in a row of dollar totals was worse than silence. */}
@@ -1450,33 +1524,7 @@ function BundleInner() {
               bookings, where they're always writable. */}
           <DraftDetails key={venueKey} bundle={bundle} onSaved={load} />
 
-          {/* What happens to money, said before it happens. The card is charged
-              as each vendor accepts — nothing on send, and nothing at all for a
-              vendor who says no. Without one the plan still sends and each
-              booking is payable by hand, which is what it did before. */}
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-ground-2 px-4 py-3">
-            <p className="text-sm text-ink-soft">
-              {card?.has_card ? (
-                <>
-                  <span className="font-medium text-ink">
-                    {card.brand ? card.brand[0].toUpperCase() + card.brand.slice(1) : "Card"}
-                    {card.last4 ? ` ending ${card.last4}` : ""}
-                  </span>{" "}
-                  — charged as each vendor accepts, never for one who declines.
-                </>
-              ) : (
-                "Add a card and each vendor is paid as they accept. Without one you'll be asked to pay each booking yourself."
-              )}
-            </p>
-            <Button
-              variant="ghost"
-              size="md"
-              disabled={addingCard}
-              onClick={addCard}
-            >
-              {addingCard ? "Opening…" : card?.has_card ? "Change card" : "Add a card"}
-            </Button>
-          </div>
+          <CardOnFile card={card} busy={addingCard} onAdd={addCard} sent={false} />
 
           {/* Last, after the fields it depends on. It used to sit above them,
               inviting you to send a plan before filling in what sending needs. */}
@@ -1507,9 +1555,21 @@ function BundleInner() {
                 {plan.awaiting.length === 1
                   ? `${plan.awaiting[0].vendor_name || "One vendor"} has your request and hasn't answered yet.`
                   : `${plan.awaiting.length} vendors have your request and haven't answered yet.`}{" "}
-                Their answers appear here — nothing is charged until one accepts
-                and you pay. You can cancel a request while it&apos;s still open.
+                Their answers appear here. You can cancel a request while
+                it&apos;s still open.{" "}
+                {/* "nothing is charged until one accepts and you pay" was true
+                    before the card on file existed. With one, accepting IS the
+                    charge — and a client told they'd be asked first is being
+                    told the wrong thing about their own money. */}
+                {card?.has_card
+                  ? "When one accepts, your card is charged for that booking."
+                  : "Nothing is charged until one accepts and you pay."}
               </p>
+
+              {/* The card lives here too now. It used to be inside the draft
+                  banner, which vanishes on send — leaving the card that gets
+                  charged automatically unnamed and unchangeable from then on. */}
+              <CardOnFile card={card} busy={addingCard} onAdd={addCard} sent />
             </section>
           ) : null}
 

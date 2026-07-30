@@ -344,6 +344,18 @@ export interface MoneyBreakdown {
    */
   unpricedCount: number;
   refunded: number;
+  /**
+   * Money still held against a booking that is otherwise dead — cancelled or
+   * rejected while paid.
+   *
+   * Not reachable today: BookingStatus has no "cancelled" member and nothing
+   * sets one, so the constant both sides carry is defensive. But the
+   * dead-booking bail-out below runs *after* the refunded case and before every
+   * sum, so the day it does become reachable, paid escrow would drop out of
+   * `committed` and `inEscrow` while the booking's own card still rendered the
+   * full escrow block. Counted rather than silently skipped.
+   */
+  strandedInEscrow: number;
 }
 
 /**
@@ -364,6 +376,7 @@ export function moneyForBundle(bundle: BundleDetail): MoneyBreakdown {
     outstanding: 0,
     unpricedCount: 0,
     refunded: 0,
+    strandedInEscrow: 0,
   };
 
   for (const b of bundle.bookings ?? []) {
@@ -374,7 +387,14 @@ export function moneyForBundle(bundle: BundleDetail): MoneyBreakdown {
       sum.refunded += price;
       continue;
     }
-    if (isDeadBooking(b)) continue;
+    // Dead, but the money isn't. Skipping outright dropped it from every total
+    // while the booking's card went on offering escrow controls for it.
+    if (isDeadBooking(b)) {
+      if (pay === "paid" || pay === "disputed" || pay === "processing") {
+        sum.strandedInEscrow += price;
+      }
+      continue;
+    }
 
     // A rate is not a total, and there is no third thing it could be. It can't
     // join any of the sums below — including `committed`, which is the one that

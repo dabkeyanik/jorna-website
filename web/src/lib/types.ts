@@ -441,6 +441,25 @@ export function withinRefundWindow(paidAt?: string | null): boolean {
 }
 
 /**
+ * How much of the refund window is left, in words. Null once it's gone.
+ *
+ * The window runs from `paid_at` — and with a card on file that is a moment the
+ * client didn't choose and may never have seen. Nothing counted it down;
+ * "Request refund" simply stopped being rendered, so the option expired in
+ * silence. A deadline worth having is a deadline worth stating.
+ */
+export function refundWindowLeft(paidAt?: string | null): string | null {
+  const paid = parseServerTime(paidAt);
+  if (paid === null) return null;
+  const msLeft = REFUND_WINDOW_HOURS * 3600 * 1000 - (Date.now() - paid);
+  if (msLeft <= 0) return null;
+  const hours = Math.floor(msLeft / 3_600_000);
+  if (hours >= 1) return `${hours} ${hours === 1 ? "hour" : "hours"}`;
+  const minutes = Math.max(1, Math.floor(msLeft / 60_000));
+  return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+}
+
+/**
  * Whether the event is far enough along to confirm. Mirrors the backend's
  * event_confirmable_date: funds never release before the event's last day, and
  * a TBD date isn't confirmable at all.

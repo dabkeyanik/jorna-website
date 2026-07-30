@@ -105,6 +105,7 @@ const ZERO_MONEY: MoneyBreakdown = {
   outstanding: 0,
   unpricedCount: 0,
   refunded: 0,
+  strandedInEscrow: 0,
 };
 
 /**
