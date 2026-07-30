@@ -126,7 +126,11 @@ export interface VendorSearchItem {
   service_name?: string | null;
   service_price?: number | null;
   distance_miles?: number | null;
+  /** The vendor's blended rating across every listing they sell. */
   rating?: number | null;
+  /** This row's listing on its own. Read with `service_num_reviews`. */
+  service_rating?: number | null;
+  service_num_reviews?: number | null;
   location?: string | null;
   pfp_url?: string | null;
   travel_radius_miles?: number | null;
@@ -172,7 +176,13 @@ export interface ServiceItem {
   location?: string | null;
   venue_latitude?: number | null;
   venue_longitude?: number | null;
+  // This listing's own reviews. Read `rating` together with `num_reviews`: an
+  // unreviewed listing reports 0, which is "new", not "one star".
+  rating?: number | null;
+  num_reviews?: number | null;
   vendor_name?: string | null;
+  // The vendor's blended record across every listing they sell — a different
+  // number answering a different question from `rating` above.
   vendor_rating?: number | null;
   vendor_pfp_url?: string | null;
 }
@@ -180,10 +190,15 @@ export interface ServiceItem {
 export interface Review {
   review_id: string;
   vendor_id: string;
+  // Which listing was reviewed. Null only for a review written before the
+  // column existed whose service has since been removed.
+  service_id?: string | null;
   user_id: string;
   rating: number;
   comment?: string | null;
   created_at?: string | null;
+  reviewer_name?: string | null;
+  reviewer_pfp?: string | null;
 }
 
 export interface VendorSearchParams {

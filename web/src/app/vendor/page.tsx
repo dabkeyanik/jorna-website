@@ -91,6 +91,21 @@ function ServiceRow({ service, canBook }: { service: ServiceItem; canBook: boole
               {unit ? <p className="text-xs text-ink-faint">{unit}</p> : null}
             </div>
           </div>
+          {/* This listing's own rating, not the vendor's. A vendor strong at one
+              thing and weaker at another used to show the blended score on both
+              rows, which told a client nothing about the one they were reading.
+              Hidden until there's a review to average — an unreviewed listing
+              reports 0, and five empty stars beside a real price reads as a bad
+              vendor rather than a new listing. */}
+          {service.num_reviews ? (
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-ink-faint">
+              <Stars rating={service.rating} />
+              <span>
+                {service.rating?.toFixed(1)} · {service.num_reviews}{" "}
+                {service.num_reviews === 1 ? "review" : "reviews"}
+              </span>
+            </p>
+          ) : null}
           {service.description ? (
             <p className="mt-1.5 text-sm text-ink-soft">{service.description}</p>
           ) : null}
@@ -312,9 +327,13 @@ function VendorInner() {
         <div className="flex items-baseline gap-3">
           <h2 className="serif text-2xl text-ink">Reviews</h2>
           {reviews.length > 0 && vendor.rating ? (
+            // Said out loud, because each service row above now carries its own
+            // rating and this average is a different one. Two numbers that
+            // disagree are confusing; two numbers that say what they cover are
+            // just informative.
             <span className="text-sm text-ink-soft">
               <Stars rating={vendor.rating} /> · {reviews.length}{" "}
-              {reviews.length === 1 ? "review" : "reviews"}
+              {reviews.length === 1 ? "review" : "reviews"} across all listings
             </span>
           ) : null}
         </div>
