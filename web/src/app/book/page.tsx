@@ -222,7 +222,12 @@ function BookInner() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!service) return;
-    if (needsGuests && !(Number(guests) > 0)) {
+    // Only where it's actually required. Joining a sent plan goes straight to
+    // the vendor and the server refuses it without a headcount, so blocking
+    // here saves a round trip. On a draft nothing is sent and the plan's "still
+    // needed" card chases the gap — blocking there turned an optional field
+    // into a wall in front of the one action on the page.
+    if (planAlreadySent && needsGuests && !(Number(guests) > 0)) {
       setError("This service is priced per person — add a guest count so we can total it.");
       return;
     }
@@ -324,7 +329,7 @@ function BookInner() {
             <Field
               label={multiDay ? "Start date" : "Date"}
               type="date"
-              required
+              required={planAlreadySent}
               value={dateIso}
               onChange={(e) => setDateIso(e.target.value)}
             />
@@ -333,7 +338,7 @@ function BookInner() {
                 label="End date"
                 type="date"
                 min={dateIso || undefined}
-                required
+                required={planAlreadySent}
                 value={dateEnd}
                 onChange={(e) => setDateEnd(e.target.value)}
               />
@@ -366,14 +371,14 @@ function BookInner() {
             <Field
               label="Start time"
               type="time"
-              required
+              required={planAlreadySent}
               value={timeStart}
               onChange={(e) => setTimeStart(e.target.value)}
             />
             <Field
               label="End time"
               type="time"
-              required
+              required={planAlreadySent}
               value={timeEnd}
               onChange={(e) => setTimeEnd(e.target.value)}
             />
@@ -382,19 +387,30 @@ function BookInner() {
           <Field
             label="Location"
             placeholder="Venue or address"
-            required
+            required={planAlreadySent}
             value={location}
             onChange={(e) => setLocation(e.target.value)}
           />
 
+          {/* Required only where it really is. A per-person service can't be
+              totalled without it, but on a draft nothing is being totalled yet
+              — the plan asks for it before you send. Marking it required there
+              blocked the page's only action over a number the client may
+              genuinely not have for months. */}
           <Field
-            label={needsGuests ? "Guest count (required)" : "Guest count (optional)"}
+            label={
+              needsGuests && planAlreadySent
+                ? "Guest count (required)"
+                : "Guest count (optional)"
+            }
             type="number"
             min={1}
-            required={needsGuests}
+            required={needsGuests && planAlreadySent}
             hint={
               needsGuests
-                ? "This service is priced per person, so the total needs it."
+                ? planAlreadySent
+                  ? "This service is priced per person, so the total needs it."
+                  : "Priced per person — add it now or on your plan, before you send."
                 : undefined
             }
             value={guests}
@@ -414,23 +430,35 @@ function BookInner() {
             </p>
           ) : null}
 
-          <Button type="submit" size="lg" disabled={busy || draftBusy}>
-            {busy ? "Sending request…" : "Request booking"}
-          </Button>
-          <p className="text-center text-xs text-ink-faint">
-            The vendor reviews your request first. You only pay once they accept —
-            and the money is held in escrow until after the event.
-          </p>
+          {/* Two buttons here used to make the same API call.
+              POST /bookings notifies the vendor only when the plan it joins has
+              already been sent (booking_service: "Draft plan — vendors are told
+              when it's sent"). So on a new or draft plan, "Request booking" and
+              "Add to plan as a draft" were byte-identical requests differing
+              only in where they navigated — while the page presented them as a
+              meaningful choice, and the primary one promised a vendor review
+              that does not happen. The very next screen then said "Not sent
+              yet". Whichever the client believed, one of the two was lying.
 
-          {!planAlreadySent ? (
+              So the buttons now follow what the backend actually does: one
+              action when nothing is sent, differing only in where you go next,
+              and a single send when the plan is already out with its vendors. */}
+          {planAlreadySent ? (
             <>
-              <div className="flex items-center gap-3">
-                <span className="h-px flex-1 bg-line-soft" />
-                <span className="text-xs uppercase tracking-[0.14em] text-ink-faint">
-                  or
-                </span>
-                <span className="h-px flex-1 bg-line-soft" />
-              </div>
+              <Button type="submit" size="lg" disabled={busy || draftBusy}>
+                {busy ? "Sending request…" : "Send this request"}
+              </Button>
+              <p className="text-center text-xs text-ink-faint">
+                This plan is already with your vendors, so this one goes out as
+                soon as you add it. They review it first — you only pay once they
+                accept, and the money is held in escrow until after the event.
+              </p>
+            </>
+          ) : (
+            <>
+              <Button type="submit" size="lg" disabled={busy || draftBusy}>
+                {busy ? "Adding…" : "Add to plan"}
+              </Button>
               {/* type="button" so it never trips the form's required fields —
                   a draft is exactly the case where they aren't required. */}
               <Button
@@ -440,15 +468,15 @@ function BookInner() {
                 disabled={busy || draftBusy}
                 onClick={addAsDraft}
               >
-                {draftBusy ? "Adding…" : "Add to plan as a draft"}
+                {draftBusy ? "Adding…" : "Add and keep browsing"}
               </Button>
               <p className="text-center text-xs text-ink-faint">
-                Nothing is sent to the vendor and nothing here is required. Fill in
-                the details from your dashboard whenever you&apos;re ready, then send
-                the request.
+                Nothing reaches {service.vendor_name || "the vendor"} yet, and
+                nothing here is required — you can fill in the rest on your plan.
+                Sending the plan is what asks them.
               </p>
             </>
-          ) : null}
+          )}
         </form>
       </Card>
     </div>

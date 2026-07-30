@@ -125,6 +125,19 @@ function BundleCard({
       <ul className="flex-1 space-y-3">
         {bundle.items.map((item) => {
           const price = itemPrice(item, guestCount);
+          // The site promises twice that these are real businesses "with a
+          // profile you can open and check", and this list was plain <li>: you
+          // committed a five-vendor team having seen a name, a price and a star
+          // count. Both ids have been on the payload all along.
+          //
+          // A new tab on purpose — the three options are unsaved state on
+          // /plan, and navigating in place loses them.
+          const href = item.service_id
+            ? `/app/service?id=${item.service_id}`
+            : item.vendor_id
+              ? `/app/vendor?id=${item.vendor_id}`
+              : null;
+          const heading = item.service_name || categoryLabel(item.category);
           return (
             <li
               key={`${item.category}-${item.vendor_id ?? item.vendor_name}`}
@@ -133,11 +146,29 @@ function BundleCard({
               <Avatar src={item.pfp_url} name={item.vendor_name} size={38} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-ink">
-                  {item.service_name || categoryLabel(item.category)}
+                  {href ? (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="transition hover:text-maroon hover:underline dark:hover:text-gold"
+                    >
+                      {heading}
+                    </a>
+                  ) : (
+                    heading
+                  )}
                 </p>
                 <p className="truncate text-xs text-ink-faint">
                   {categoryLabel(item.category)} · {item.vendor_name}
                 </p>
+                {/* Why this vendor. The backend has always sent it and nothing
+                    ever showed it, so "matched for you" was unevidenced. */}
+                {item.match_reason ? (
+                  <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-ink-soft">
+                    {item.match_reason}
+                  </p>
+                ) : null}
               </div>
               <div className="shrink-0 text-right">
                 <p className="text-sm font-semibold text-ink">{money(price.amount)}</p>
