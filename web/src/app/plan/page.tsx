@@ -108,11 +108,16 @@ function PlanInner() {
     }
   }, [loading, user, router, celebration]);
 
-  // Arriving from a celebration on the dashboard (/plan?date=&city=&guests=).
-  // Seeded in the initializers, like `needed` below, so the form is filled on
-  // the first paint. These only prefill: the generated bundle still creates its
-  // own event, because neither /chatbot/bundles nor PATCH /bundles takes an
-  // event_id to attach to an existing one.
+  // Arriving from a celebration on the dashboard
+  // (/plan?event_id=&date=&city=&guests=). Seeded in the initializers, like
+  // `needed` below, so the form is filled on the first paint.
+  //
+  // The celebration itself comes too, not just its facts. This used to prefill
+  // only, and the generated bundle always minted its own event — so building a
+  // bundle for a wedding already on the dashboard produced a second card for
+  // the same wedding, with no way to merge them. Read once from the URL; it
+  // isn't something the form edits.
+  const attachToEventId = params.get("event_id");
   const [location, setLocation] = useState(params.get("city") ?? "");
   // Set when a suggested city is picked, so we can send coordinates for
   // distance-based matching; null when the location was free-typed.
@@ -233,6 +238,7 @@ function PlanInner() {
     setOptions(null);
     try {
       const res = await generateBundles({
+        event_id: attachToEventId,
         needed_categories: needed,
         booked_categories: [],
         // Whichever the toggle is on. Both resolve to the same two things: a

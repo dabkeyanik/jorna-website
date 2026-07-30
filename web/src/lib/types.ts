@@ -86,6 +86,12 @@ export interface DateRange {
 export interface BundleRequest {
   needed_categories?: string[];
   booked_categories?: string[];
+  /**
+   * Attach the generated bundle to a celebration the client already has,
+   * instead of minting a new one. Without it, building a bundle for an
+   * existing wedding produced a second dashboard card for the same wedding.
+   */
+  event_id?: string | null;
   event_date?: string | null;
   /** Last day, for a celebration that really does run across several. */
   event_date_end?: string | null;

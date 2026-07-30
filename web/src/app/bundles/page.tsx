@@ -186,6 +186,11 @@ function toCelebrations(events: EventItem[], bundles: BundleDetail[]): Celebrati
 /** Carry what's known about a celebration into the builder's form. */
 function buildQuery(c: Celebration): string {
   const q = new URLSearchParams();
+  // The celebration itself, not just its facts. The builder used to only
+  // prefill, and always created its own event — so building a bundle for a
+  // wedding already on this dashboard produced a second card for the same
+  // wedding, with no way to merge them.
+  if (c.event) q.set("event_id", c.event.event_id);
   if (c.dateIso && c.dateIso !== "TBD") q.set("date", c.dateIso);
   if (c.location) q.set("city", c.location);
   if (c.guestCount != null) q.set("guests", String(c.guestCount));
@@ -385,8 +390,8 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
           with several bundles opens the first; the plan links the rest. */}
       <div className="mt-5">
         {bundles.length === 0 ? (
-          // Prefill only — the builder can't attach to an existing event, so
-          // this carries the details across rather than pretending to link.
+          // Carries the celebration itself, not just its details — the bundle
+          // built there joins this card rather than starting a second one.
           <LinkButton href={`/plan${buildQuery(celebration)}`}>Build a bundle</LinkButton>
         ) : (
           <LinkButton href={`/bundle?id=${bundles[0].bundle_id}`}>

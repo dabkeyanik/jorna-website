@@ -41,6 +41,7 @@ import {
   eventHasStarted,
   lastDay,
   priceLine,
+  priceUnitKind,
   refundWindowLeft,
   withinRefundWindow,
   type BundleBooking,
@@ -153,6 +154,109 @@ function BookingWhen({
       ) : null}
       {offDay ? (
         <span className="text-ink-faint">· not your main event day</span>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * This booking's own headcount, editable.
+ *
+ * A celebration here is usually several gatherings with different guest lists —
+ * a mehndi of eighty, a reception of three hundred — and the number that
+ * matters is per gathering: a caterer bills against the function they're
+ * working, not the week. The guest list has always modelled that
+ * (FunctionHeadcount, per function), but the plan had a single field that fanned
+ * one number across every booking, so the mehndi caterer was billed for the
+ * reception.
+ *
+ * The API has taken a per-booking guest_count all along. This is the field that
+ * was never offered. Only where it's still the client's to set: once a vendor
+ * has been told a number, `locked_fields` says so and the server refuses.
+ */
+function BookingGuests({
+  booking,
+  onSaved,
+}: {
+  booking: BundleBooking;
+  onSaved: () => void | Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(
+    booking.guest_count != null ? String(booking.guest_count) : "",
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const locked = (booking.locked_fields ?? []).includes("guest_count");
+  if (priceUnitKind(booking.price_unit) !== "person") return null;
+  if (isBeyondActionable(booking) || isDeadBooking(booking)) return null;
+
+  if (locked) {
+    return (
+      <p className="mt-2 text-xs text-ink-faint">
+        {booking.guest_count} guests — {booking.vendor_name || "your vendor"} has
+        this number, so it&apos;s settled.
+      </p>
+    );
+  }
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      await updateBooking(booking.booking_id, {
+        guest_count: Number(value) > 0 ? Number(value) : null,
+      });
+      setEditing(false);
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't save that.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <p className="mt-2 text-xs text-ink-soft">
+        {booking.guest_count
+          ? `${booking.guest_count} guests for this one`
+          : "No guest count yet"}{" "}
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="font-semibold text-gold hover:underline"
+        >
+          {booking.guest_count ? "Change" : "Add"}
+        </button>
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <input
+        type="number"
+        min={1}
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="80"
+        aria-label={`Guests for ${booking.service_name || "this service"}`}
+        className="w-24 rounded-lg border border-card-edge bg-ground-2 px-2.5 py-1 text-sm tabular-nums text-ink outline-none focus:border-gold"
+      />
+      <Button size="md" disabled={busy} onClick={save}>
+        {busy ? "Saving…" : "Save"}
+      </Button>
+      <Button variant="ghost" size="md" onClick={() => setEditing(false)}>
+        Cancel
+      </Button>
+      <span className="text-xs text-ink-faint">
+        Just this booking — a mehndi and a reception rarely share a headcount.
+      </span>
+      {error ? (
+        <span className="text-xs text-maroon dark:text-gold">{error}</span>
       ) : null}
     </div>
   );
@@ -291,6 +395,7 @@ function BookingRow({
   onSwap,
   onRemove,
   onNegotiated,
+  onUpdated,
 }: {
   booking: BundleBooking;
   event: BundleEventInfo | null | undefined;
@@ -310,6 +415,8 @@ function BookingRow({
   onSwap: (b: BundleBooking) => void;
   onRemove: (b: BundleBooking) => void;
   onNegotiated: () => void;
+  /** Re-read the plan after an edit that isn't an escrow action. */
+  onUpdated: () => void;
 }) {
   const [reason, setReason] = useState("");
   const [showNeg, setShowNeg] = useState(false);
@@ -357,6 +464,7 @@ function BookingRow({
               {status.text}
             </span>
             <BookingWhen booking={booking} eventDateIso={event?.date_iso} />
+            <BookingGuests booking={booking} onSaved={onUpdated} />
           </div>
         </div>
         <div className="text-right">
@@ -727,10 +835,21 @@ function GuestsRow({
   const href = `/guests?event=${eventId}&bundle=${bundleId}`;
   const started = (list?.guests.length ?? 0) > 0;
 
-  // Across every function, because this is a summary — the per-function
-  // breakdown, which is the number a caterer actually bills against, is on the
-  // list itself.
-  const attending = list ? Math.max(0, ...list.headcount.map((h) => h.attending)) : 0;
+  // The biggest gathering, named as such.
+  //
+  // This was the same max, reported as "N coming" — the largest single
+  // function's number presented as the celebration's, which is a different
+  // claim and usually a smaller one. A celebration is several gatherings with
+  // different lists, and there is no single honest total: summing them
+  // double-counts everyone invited to more than one.
+  const biggest = list
+    ? list.headcount.reduce(
+        (best, h) => (h.attending > (best?.attending ?? -1) ? h : best),
+        null as (typeof list.headcount)[number] | null,
+      )
+    : null;
+  const attending = biggest?.attending ?? 0;
+  const manyFunctions = (list?.headcount.length ?? 0) > 1;
   const waiting = list ? list.headcount.reduce((n, h) => n + h.no_reply, 0) : 0;
   const gap = plannedFor && plannedFor > 0 ? attending - plannedFor : null;
 
@@ -744,6 +863,9 @@ function GuestsRow({
           {started ? (
             <p className="text-ink">
               <span className="tabular-nums">{attending}</span> coming
+              {manyFunctions && biggest?.name ? (
+                <span className="text-ink-soft"> to {biggest.name}</span>
+              ) : null}
               {waiting > 0 ? (
                 <span className="text-ink-soft">
                   {" "}
@@ -1324,6 +1446,7 @@ function BundleInner() {
           "Couldn't remove that booking. Please try again.",
         )
       }
+      onUpdated={() => void load()}
       onNegotiated={() => {
         setNotice({ text: "Price agreed — the booking is approved at the new price.", ok: true });
         void load();
