@@ -161,7 +161,17 @@ export function ServiceSwapPanel({
                       <p className="truncate text-sm font-semibold text-ink">{s.name}</p>
                       <p className="truncate text-xs text-ink-faint">
                         {s.vendor_name}
-                        {s.vendor_rating ? ` · ★ ${s.vendor_rating.toFixed(1)}` : ""}
+                        {/* This list compares listings, so the listing's own
+                            rating is the one that answers the question. Fall
+                            back to the vendor's only when this listing has no
+                            reviews of its own, and say which it is — an
+                            unlabelled star that silently switches between the
+                            two is worse than either. */}
+                        {s.num_reviews && s.rating
+                          ? ` · ★ ${s.rating.toFixed(1)} (${s.num_reviews})`
+                          : s.vendor_rating
+                            ? ` · vendor ★ ${s.vendor_rating.toFixed(1)}`
+                            : ""}
                       </p>
                       {missingQty ? (
                         <p className="mt-1 text-xs text-gold">

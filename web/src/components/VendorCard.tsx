@@ -44,9 +44,16 @@ export function VendorCard({ item }: { item: VendorSearchItem }) {
         <span className="absolute left-3 top-3 rounded-full bg-ground/90 px-2.5 py-1 text-xs font-semibold text-maroon backdrop-blur dark:text-gold">
           {categoryLabel(item.category)}
         </span>
-        {item.rating ? (
+        {/* The card leads with the service, so the badge is that listing's own
+            rating — not the vendor's blend, which used to be shown here and
+            described something the client isn't looking at.
+            No fallback to the vendor's number: this badge is a bare star row
+            with nowhere to put a label, so a quiet swap between two different
+            averages would be unreadable. An unreviewed listing shows nothing,
+            and the vendor's record is a tap away on their page. */}
+        {item.service_num_reviews && item.service_rating ? (
           <span className="absolute right-3 top-3 rounded-full bg-ground/90 px-2 py-1 text-xs backdrop-blur">
-            <Stars rating={item.rating} />
+            <Stars rating={item.service_rating} />
           </span>
         ) : null}
       </div>

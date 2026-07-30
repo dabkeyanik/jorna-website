@@ -78,8 +78,23 @@ export function listServices(params: {
   });
 }
 
+/** Everything a vendor has been reviewed on, across all their listings. */
 export function getVendorReviews(vendorId: string): Promise<Paginated<Review>> {
   return apiFetch<Paginated<Review>>(`/reviews/vendor/${vendorId}`, { auth: false });
+}
+
+/**
+ * Reviews for one listing. Narrower than the vendor's on purpose — a vendor
+ * excellent at one thing and ordinary at another has two honest records, and a
+ * listing shouldn't borrow the other one's.
+ */
+export function getServiceReviews(
+  serviceId: string,
+  params: { limit?: number; offset?: number } = {},
+): Promise<Paginated<Review>> {
+  return apiFetch<Paginated<Review>>(`/reviews/service/${serviceId}${query({ ...params })}`, {
+    auth: false,
+  });
 }
 
 /** The review for a booking, or null if the client hasn't left one yet. */
