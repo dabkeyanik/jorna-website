@@ -15,10 +15,9 @@
 // jobs are same-week jobs; months out it was a second copy of the vendor list,
 // above the parts of the page a host can still do something about.
 //
-// Times are shown only when the day's look real. Bookings can't be created
-// without a time, so an unset one arrives as a default rather than as nothing —
-// see ScheduleDay.timesKnown. When they don't, the vendors still list, without
-// invented clock times.
+// Times are shown when there are any to show — see ScheduleDay.timesKnown. A day
+// where nothing has hours yet lists its vendors without inventing clock times,
+// and says so.
 
 import { useState } from "react";
 import { ApiError } from "@/lib/api";

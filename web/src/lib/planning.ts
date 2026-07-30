@@ -435,11 +435,11 @@ export interface ScheduleDay {
   /** Vendors expected — the ones a check-in could come from. */
   expected: number;
   /**
-   * False when the day's times can't be trusted: all identical, or all
-   * midnight. Bookings are created with a required time, so an unset one
-   * arrives as a default rather than as nothing, and a run sheet that laid
-   * five vendors on top of each other at 12:00am would invent a schedule
-   * nobody entered. The day still lists its vendors, just without clock times.
+   * Whether any booking on this day carries a readable time.
+   *
+   * False only when none does — every one still "TBD" or blank. The day then
+   * lists its vendors without clock times rather than inventing any, and the
+   * run sheet says so.
    */
   timesKnown: boolean;
 }
@@ -493,11 +493,25 @@ export function scheduleFor(bundle: BundleDetail): ScheduleDay[] {
         }))
         .sort((a, b) => (a.startMinutes ?? 1e9) - (b.startMinutes ?? 1e9));
 
+      // Do we have any real time to show?
+      //
+      // This used to also require the day's start times to differ from each
+      // other, and not all be midnight — a guess at whether they were entered
+      // or defaulted, back when a booking could only be created with a time and
+      // an unanswered one therefore arrived as a default rather than as
+      // nothing.
+      //
+      // Both halves of that premise are gone. /book no longer prefills a window,
+      // and a booking can't reach a vendor without real hours — "TBD" reads as
+      // unset now, and parseTime returns null for it either way. Meanwhile the
+      // builder writes one window across the plan, and so does the details card,
+      // so every vendor sharing a start time is what a correctly filled-in plan
+      // looks like. The heuristic had come to fire on exactly the case it was
+      // meant to protect: a host who set their times, sent the plan, and then
+      // read "No times set on these bookings yet" on the run sheet while the
+      // vendors' own dashboards showed the times back to them.
       const starts = entries.map((e) => e.startMinutes);
-      const known =
-        starts.some((s) => s != null) &&
-        !starts.every((s) => s === 0) &&
-        new Set(starts).size > 1;
+      const known = starts.some((s) => s != null);
 
       return {
         dateIso,
