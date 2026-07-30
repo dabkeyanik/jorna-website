@@ -90,11 +90,20 @@ function Nudge({ booking }: { booking: BundleBooking }) {
 
   if (booking.vendor_checked_in_at) return null;
   if (!booking.can_resend_checkin) {
-    // Nothing to press, but "sent four minutes ago" is worth saying — a button
-    // that quietly disappears into its cooldown reads as one that didn't work.
     if (note) return <p className="mt-1 text-xs text-green">{note}</p>;
-    const cooling = booking.resend_checkin_reason?.startsWith("Just sent");
-    return cooling ? (
+    // Say why, whatever the reason is.
+    //
+    // This showed only the cooldown one and dropped the rest on the floor —
+    // "Available closer to the day", "There's nowhere to check in against until
+    // the plan has an address", "This vendor hasn't taken the booking yet". The
+    // server computes each of them precisely and sends them here for exactly
+    // this purpose, and the row rendered blank space instead.
+    //
+    // The window is narrow on purpose (six hours before the start, twelve
+    // after), so most of the time there genuinely is no button — which is fine,
+    // and unhelpful only while nothing on screen admits it. A control that is
+    // absent without explanation reads as missing rather than as not yet.
+    return booking.resend_checkin_reason ? (
       <p className="mt-1 text-xs text-ink-faint">{booking.resend_checkin_reason}</p>
     ) : null;
   }
@@ -227,6 +236,18 @@ export function RunSheet({ bundle }: { bundle: BundleDetail }) {
               <p className="mt-3 text-xs text-ink-faint">
                 No times set on these bookings yet — add them so everyone knows when
                 to arrive.
+              </p>
+            ) : null}
+
+            {/* Said once for the day rather than on every vendor's row. Before
+                the week of, each row's answer is the same — "available closer to
+                the day" — and six copies of one sentence is not more
+                informative than one. */}
+            {!onTheDay ? (
+              <p className="mt-3 text-xs text-ink-faint">
+                Vendors check in at the venue on the day. From about a week
+                before, you&apos;ll see who has arrived here — and be able to
+                nudge anyone who hasn&apos;t.
               </p>
             ) : null}
 
