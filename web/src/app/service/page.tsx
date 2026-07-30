@@ -36,12 +36,20 @@ function monthYear(iso?: string | null): string {
 }
 
 /** A soft monogram standing in for a photo nobody uploaded. */
-function Monogram({ name, className = "" }: { name: string; className?: string }) {
+function Monogram({
+  name,
+  className = "",
+  letterClass = "text-6xl",
+}: {
+  name: string;
+  className?: string;
+  letterClass?: string;
+}) {
   return (
     <div
       className={`grid place-items-center bg-gradient-to-br from-panel to-ground-2 ${className}`}
     >
-      <span className="serif text-6xl text-gold/70">
+      <span className={`serif ${letterClass} text-gold/70`}>
         {(name || "·").charAt(0).toUpperCase()}
       </span>
     </div>
@@ -55,8 +63,19 @@ function Monogram({ name, className = "" }: { name: string; className?: string }
 function Gallery({ media, name }: { media: string[]; name: string }) {
   const [active, setActive] = useState(0);
 
+  // No photos: a band, not a hole. This kept the 4:3 frame the real gallery
+  // uses, which on the page's 1100px column is over 800px of empty gradient —
+  // so a listing with nothing to show pushed its name, price and description
+  // clean off the screen, and the one thing it had least of took up the most
+  // room. Sized to read as a placeholder rather than a missing image.
   if (media.length === 0) {
-    return <Monogram name={name} className="aspect-[4/3] w-full rounded-2xl" />;
+    return (
+      <Monogram
+        name={name}
+        className="h-24 w-full rounded-2xl sm:h-28"
+        letterClass="text-3xl"
+      />
+    );
   }
 
   const rest = media.slice(0, 5).filter((_, i) => i !== active);
