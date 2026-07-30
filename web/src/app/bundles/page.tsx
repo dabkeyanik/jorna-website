@@ -98,7 +98,7 @@ const ZERO_MONEY: MoneyBreakdown = {
   inEscrow: 0,
   released: 0,
   outstanding: 0,
-  awaitingQuantity: 0,
+  unpricedCount: 0,
   refunded: 0,
 };
 
@@ -210,7 +210,13 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
   // means the same thing on both screens.
   const allDraft = bundles.length > 0 && bundles.every(isDraftBundle);
   const stage = bundles.length === 0 ? null : allDraft ? "draft" : "plan";
-  const overBudget = budget != null && celebration.money.committed > budget;
+  // Withheld while anything is unpriced. "Under budget" is a claim, and a plan
+  // with an unpriced caterer in it can't support one — the missing figure is
+  // frequently the largest. Reporting "$5,240 of $40,000" on a celebration
+  // heading for $60,000 is worse than reporting nothing.
+  const unpriced = celebration.money.unpricedCount;
+  const overBudget =
+    budget != null && unpriced === 0 && celebration.money.committed > budget;
   // Scale against the budget when there is one, so the bar shows how much of it
   // is spoken for; against the committed total otherwise, and never past 100%.
   const barBase = Math.max(
@@ -282,6 +288,7 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 text-xs">
             <span className="text-ink-soft">
               {money(celebration.money.committed)} committed
+              {unpriced > 0 ? <span className="text-ink-faint"> so far</span> : null}
               {celebration.budget ? (
                 <span className={overBudget ? "text-maroon dark:text-gold" : "text-ink-faint"}>
                   {" "}
@@ -316,6 +323,14 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
           {celebration.money.outstanding > 0 ? (
             <p className="mt-1.5 text-xs text-ink-faint">
               {money(celebration.money.outstanding)} still to pay
+            </p>
+          ) : null}
+
+          {unpriced > 0 ? (
+            <p className="mt-1.5 text-xs text-ink-faint">
+              {unpriced === 1 ? "1 booking isn't" : `${unpriced} bookings aren't`}{" "}
+              priced yet — they charge by the guest, hour or day
+              {celebration.budget ? ", so this can't be read against your budget" : ""}.
             </p>
           ) : null}
         </div>

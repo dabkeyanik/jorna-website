@@ -399,9 +399,15 @@ function BookingRow({
             // receipt has been surprised by their own payment — so the date is
             // on the screen, next to the button that would settle it sooner,
             // together with the one thing that stops it.
+            //
+            // The condition leads, because it is a real one: auto-release also
+            // needs the vendor to have confirmed. Written the old way — "if you
+            // do nothing, this releases on {date}" — it promised a date that
+            // never arrives for a plan whose vendor stays quiet, and implied
+            // the client's inaction alone was enough.
             <p className="text-xs text-ink-soft">
               {prettyDate(autoReleaseOn(booking))
-                ? `Confirming pays ${booking.vendor_name || "your vendor"} now. If you do nothing, this releases on its own on ${prettyDate(autoReleaseOn(booking))} — raise an issue before then if something went wrong.`
+                ? `Confirming pays ${booking.vendor_name || "your vendor"} now. Once they've confirmed too, this releases on its own from ${prettyDate(autoReleaseOn(booking))} even if you don't — raise an issue before then if something went wrong.`
                 : `Confirming pays ${booking.vendor_name || "your vendor"} now.`}
             </p>
           )}
@@ -1245,7 +1251,9 @@ function BundleInner() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-[0.68rem] uppercase tracking-[0.16em] text-ink-faint">
-                Committed
+                {/* A total that excludes some of the plan is not the plan's
+                    total, and shouldn't be labelled as one. */}
+                {cash.unpricedCount > 0 ? "Committed so far" : "Committed"}
               </p>
               <p className="serif text-3xl text-ink">{money(cash.committed)}</p>
             </div>
@@ -1258,6 +1266,23 @@ function BundleInner() {
               </p>
             ) : null}
           </div>
+
+          {/* Counted, not totalled — their price is a rate, and there is no
+              honest figure until a guest count lands. Saying "$38 awaiting a
+              guest count" in a row of dollar totals was worse than silence. */}
+          {cash.unpricedCount > 0 ? (
+            <p className="mt-2 text-xs text-ink-soft">
+              {cash.unpricedCount === 1
+                ? "One booking isn't priced yet"
+                : `${cash.unpricedCount} bookings aren't priced yet`}{" "}
+              — they charge by the guest, hour or day, so they aren&apos;t in the
+              figure above.{" "}
+              <a href="#still-needed" className="font-medium text-gold hover:underline">
+                Add what&apos;s missing
+              </a>
+              .
+            </p>
+          ) : null}
 
           {cash.committed > 0 ? (
             <>
@@ -1280,11 +1305,6 @@ function BundleInner() {
                   { label: "In escrow", value: cash.inEscrow, tone: "text-gold" },
                   { label: "Released", value: cash.released, tone: "text-green" },
                   { label: "To pay", value: cash.outstanding, tone: "text-ink" },
-                  {
-                    label: "Awaiting a guest count",
-                    value: cash.awaitingQuantity,
-                    tone: "text-ink-soft",
-                  },
                   { label: "Refunded", value: cash.refunded, tone: "text-ink-faint" },
                 ]
                   .filter((row) => row.value > 0)

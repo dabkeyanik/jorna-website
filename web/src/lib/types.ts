@@ -280,6 +280,13 @@ export interface BundleBooking {
   guest_count?: number | null;
   /** Whether this service is open to price negotiation (service.negotiable). */
   open_to_price_negotiation?: boolean;
+  /**
+   * The venue's IANA timezone, resolved server-side from the address and pin.
+   * Null when it can't be placed. Read it through `todayAtVenue` — "has the
+   * event happened yet" is the escrow gate, and it has to be answered on the
+   * venue's calendar, not the browser's.
+   */
+  timezone?: string | null;
   // Escrow lifecycle (ISO timestamps, null until they happen).
   /** When Stripe payment succeeded. The 24h refund window runs from here. */
   paid_at?: string | null;
@@ -319,14 +326,46 @@ export const REFUND_WINDOW_HOURS = 24;
  * Mirrors the backend's AUTO_RELEASE_DAYS. Confirming needs both parties, so a
  * client who never gets round to it used to hold their vendor's payment
  * indefinitely; after this long, not answering is taken as no objection.
+ *
+ * Not unconditional: the backend's auto_release_due also requires
+ * `vendor_confirmed_at`, deliberately, so it never pays a vendor who hasn't
+ * claimed to have delivered. A plan whose vendor stays silent never
+ * auto-releases at all — so anything on screen has to say the vendor's
+ * confirmation is the trigger, not merely the client's silence.
  */
 export const AUTO_RELEASE_DAYS = 7;
 
-/** Whether the event's first day has arrived. */
-export function eventHasStarted(b: { date_iso?: string | null }): boolean {
+/**
+ * Today's date where the celebration is, as "YYYY-MM-DD".
+ *
+ * The escrow gate is "has the event happened yet", and that is a question about
+ * the calendar hanging on the wall at the venue — not the server's, and not the
+ * browser's. The backend publishes the venue's IANA zone on every booking
+ * (booking_service._zone_name) and decides the gate against it; this reads the
+ * same clock so the two can't reach different days.
+ *
+ * "en-CA" because its short date format is ISO — the one locale that gives
+ * YYYY-MM-DD without assembling it by hand. Falls back to the browser's own
+ * timezone for a booking the server couldn't place, which is what it did before
+ * and is still nearer than UTC for most people.
+ */
+export function todayAtVenue(timezone?: string | null): string {
+  try {
+    return new Date().toLocaleDateString("en-CA", timezone ? { timeZone: timezone } : {});
+  } catch {
+    // An unrecognised zone name. Better the local calendar than a thrown error
+    // on the screen where someone is trying to release a payment.
+    return new Date().toLocaleDateString("en-CA");
+  }
+}
+
+/** Whether the event's first day has arrived, at the venue. */
+export function eventHasStarted(b: {
+  date_iso?: string | null;
+  timezone?: string | null;
+}): boolean {
   if (!b.date_iso || b.date_iso === "TBD") return false;
-  const start = Date.parse(`${b.date_iso}T00:00:00Z`);
-  return !Number.isNaN(start) && Date.now() >= start;
+  return todayAtVenue(b.timezone) >= b.date_iso;
 }
 
 /**
@@ -349,13 +388,21 @@ export function eventHasStarted(b: { date_iso?: string | null }): boolean {
 export function canConfirmBooking(b: {
   date_iso?: string | null;
   date_end?: string | null;
+  timezone?: string | null;
   vendor_checked_in_at?: string | null;
 }): boolean {
   if (eventIsOver(b)) return true;
   return Boolean(b.vendor_checked_in_at) && eventHasStarted(b);
 }
 
-/** The date escrow releases itself, or null when there's no date to count from. */
+/**
+ * The date escrow releases itself, or null when there's no date to count from.
+ *
+ * Built from local date parts rather than `toISOString()`. That converts to UTC
+ * first, so east of Greenwich a local midnight is the *previous* day there —
+ * and the date printed beside "this releases on its own on…" came out a day
+ * early for every host in India, which is not a niche case for this product.
+ */
 export function autoReleaseOn(b: {
   date_iso?: string | null;
   date_end?: string | null;
@@ -365,7 +412,9 @@ export function autoReleaseOn(b: {
   const d = new Date(`${last}T00:00:00`);
   if (Number.isNaN(d.getTime())) return null;
   d.setDate(d.getDate() + AUTO_RELEASE_DAYS);
-  return d.toISOString().slice(0, 10);
+  const month = `${d.getMonth() + 1}`.padStart(2, "0");
+  const day = `${d.getDate()}`.padStart(2, "0");
+  return `${d.getFullYear()}-${month}-${day}`;
 }
 
 /**
@@ -411,11 +460,18 @@ export function formatCheckInTime(iso?: string | null): string {
       });
 }
 
-export function eventHasPassed(dateIso?: string | null): boolean {
+/**
+ * Whether a day is behind us at the venue.
+ *
+ * Strictly after: the last day being *reached* isn't the event being over, and
+ * at one minute past midnight on the morning of the wedding it plainly hasn't
+ * happened. Mirrors the backend's `today > end`. A client whose vendor finishes
+ * early still settles up the same day through the check-in route — see
+ * canConfirmBooking.
+ */
+export function eventHasPassed(dateIso?: string | null, timezone?: string | null): boolean {
   if (!dateIso || dateIso === "TBD") return false;
-  const day = Date.parse(`${dateIso}T23:59:59Z`);
-  if (Number.isNaN(day)) return false;
-  return Date.now() > day;
+  return todayAtVenue(timezone) > dateIso;
 }
 
 /** When a booking finishes: its end date if it spans days, else its date. */
@@ -440,8 +496,9 @@ export function lastDay(b: {
 export function eventIsOver(b: {
   date_iso?: string | null;
   date_end?: string | null;
+  timezone?: string | null;
 }): boolean {
-  return eventHasPassed(lastDay(b));
+  return eventHasPassed(lastDay(b), b.timezone);
 }
 
 export interface BundleDetail {
@@ -630,6 +687,8 @@ export interface VendorBooking {
       venue_latitude — the server resolves it the same way. */
   checkin_latitude?: number | null;
   checkin_longitude?: number | null;
+  /** The venue's IANA timezone — see BundleBooking.timezone. */
+  timezone?: string | null;
   status: string;
   payment_status?: string | null;
   amount_cents?: number | null;

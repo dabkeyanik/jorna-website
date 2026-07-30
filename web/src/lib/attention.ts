@@ -17,7 +17,7 @@ import {
   listBundles,
   listVendorBookings,
 } from "@/lib/jorna";
-import { eventHasPassed, type BundleDetail, type VendorBooking } from "@/lib/types";
+import type { BundleDetail, VendorBooking } from "@/lib/types";
 import { ATTENTION_KINDS, planForBundle, taskDetail } from "@/lib/planning";
 import { vendorTasks } from "@/lib/vendorPlan";
 

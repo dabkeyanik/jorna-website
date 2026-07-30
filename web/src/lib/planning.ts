@@ -335,18 +335,34 @@ export interface MoneyBreakdown {
   released: number;
   /** Approved and payable, not yet paid. */
   outstanding: number;
-  /** Approved but unpayable until a guest count or date range lands. */
-  awaitingQuantity: number;
+  /**
+   * Bookings approved but not yet priceable — a rate with no quantity to
+   * multiply. A **count, not an amount**: their `price` is a per-head or
+   * per-hour rate, and adding rates to totals is what made "Committed $5,240"
+   * out of a celebration costing four times that. There is no honest figure to
+   * report until a guest count lands, so this reports the gap instead.
+   */
+  unpricedCount: number;
   refunded: number;
 }
 
+/**
+ * Where a plan's money is.
+ *
+ * Only resolved totals are added up. A booking still pending a quantity carries
+ * a *rate* in `price` — the backend says so explicitly with
+ * `price_pending_quantity` — and summing $38 per head into a column of totals
+ * is how a $20,000 celebration reported "$5,240 committed", and how a budget
+ * bar reassured a host who was comfortably over. Those bookings are counted,
+ * not totalled, and the caller says so.
+ */
 export function moneyForBundle(bundle: BundleDetail): MoneyBreakdown {
   const sum: MoneyBreakdown = {
     committed: 0,
     inEscrow: 0,
     released: 0,
     outstanding: 0,
-    awaitingQuantity: 0,
+    unpricedCount: 0,
     refunded: 0,
   };
 
@@ -360,13 +376,18 @@ export function moneyForBundle(bundle: BundleDetail): MoneyBreakdown {
     }
     if (isDeadBooking(b)) continue;
 
+    // A rate is not a total, and there is no third thing it could be. It can't
+    // join any of the sums below — including `committed`, which is the one that
+    // fed the budget comparison.
+    if (b.price_pending_quantity) {
+      sum.unpricedCount += 1;
+      continue;
+    }
+
     sum.committed += price;
     if (pay === "paid" || pay === "disputed") sum.inEscrow += price;
     else if (pay === "released") sum.released += price;
-    else if (b.status === "approved") {
-      if (b.price_pending_quantity) sum.awaitingQuantity += price;
-      else sum.outstanding += price;
-    }
+    else if (b.status === "approved") sum.outstanding += price;
   }
   return sum;
 }
