@@ -519,6 +519,25 @@ export function listConversations(): Promise<ConversationSummary[]> {
   return apiFetch<ConversationSummary[]>("/conversations");
 }
 
+/**
+ * The group chat for one plan, or null if there isn't one yet.
+ *
+ * Conversations are created by select_bundle — the act of sending — so every
+ * sent plan has one and no draft does. There's no endpoint to fetch by bundle,
+ * so this filters the list; the list is short (one or two per plan) and already
+ * carries bundle_id.
+ *
+ * Prefers "all_parties" over "vendors_only": the latter exists so vendors can
+ * talk among themselves, and the client isn't in it.
+ */
+export async function getBundleConversation(
+  bundleId: string,
+): Promise<ConversationSummary | null> {
+  const all = await listConversations();
+  const mine = all.filter((c) => c.bundle_id === bundleId);
+  return mine.find((c) => c.type === "all_parties") ?? mine[0] ?? null;
+}
+
 export function getUnreadCount(): Promise<{ unread_count: number }> {
   return apiFetch<{ unread_count: number }>("/conversations/unread-count");
 }

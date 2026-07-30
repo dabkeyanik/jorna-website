@@ -41,6 +41,11 @@ export function NegotiationPanel({
   const [error, setError] = useState<string | null>(null);
   const [showOffer, setShowOffer] = useState(false);
   const [amount, setAmount] = useState<string>("");
+  // Both endpoints have always accepted a message and this panel never sent
+  // one, so the only channel that could carry "we'd do $2,800 if you drop the
+  // second shooter" discarded it — leaving a bare number to be accepted or
+  // refused with no way to say why either way.
+  const [note, setNote] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -78,10 +83,11 @@ export function NegotiationPanel({
       setError("Enter an amount greater than zero.");
       return;
     }
+    const words = note.trim() || undefined;
     void run(() =>
       neg
-        ? counterOffer(neg.negotiation_id, cents)
-        : startNegotiation(bookingId, cents),
+        ? counterOffer(neg.negotiation_id, cents, words)
+        : startNegotiation(bookingId, cents, words),
     );
   }
 
@@ -110,31 +116,60 @@ export function NegotiationPanel({
                 </span>{" "}
                 — {mineIsCurrent ? "you" : neg.proposed_by_name || "the other party"}
               </p>
+              {/* The offers have always been on the payload and nothing ever
+                  rendered them, so a haggle was a single number with no memory
+                  of how it got there — and any reason either side gave was
+                  invisible even when it had been sent. */}
+              {neg.offers && neg.offers.length > 1 ? (
+                <ul className="mt-2 grid gap-1 border-l-2 border-line-soft pl-2.5">
+                  {neg.offers.map((o, i) => (
+                    <li key={o.offer_id ?? i} className="text-xs text-ink-faint">
+                      <span className="font-medium text-ink-soft">
+                        {o.proposed_by === user?.user_id
+                          ? "You"
+                          : o.proposed_by_name || "They"}
+                      </span>{" "}
+                      offered{" "}
+                      <span className="tabular-nums">{money(o.amount_cents)}</span>
+                      {o.message ? <span> — “{o.message}”</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
           ) : null}
 
           {showOffer || !neg ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1">
-                <span className="text-ink-faint">$</span>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  placeholder={String(listedPrice)}
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="w-28 rounded-lg border border-card-edge bg-ground-2 px-2.5 py-1.5 text-sm text-ink outline-none focus:border-gold"
-                />
-              </div>
-              <Button size="md" disabled={busy} onClick={submitOffer}>
-                {busy ? "Sending…" : neg ? "Counter" : "Send offer"}
-              </Button>
-              {neg ? (
-                <Button variant="ghost" size="md" onClick={() => setShowOffer(false)}>
-                  Cancel
+            <div className="grid gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <span className="text-ink-faint">$</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder={String(listedPrice)}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="w-28 rounded-lg border border-card-edge bg-ground-2 px-2.5 py-1.5 text-sm text-ink outline-none focus:border-gold"
+                  />
+                </div>
+                <Button size="md" disabled={busy} onClick={submitOffer}>
+                  {busy ? "Sending…" : neg ? "Counter" : "Send offer"}
                 </Button>
-              ) : null}
+                {neg ? (
+                  <Button variant="ghost" size="md" onClick={() => setShowOffer(false)}>
+                    Cancel
+                  </Button>
+                ) : null}
+              </div>
+              <input
+                type="text"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Why? (optional) — e.g. we'd drop the second shooter"
+                className="w-full rounded-lg border border-card-edge bg-ground-2 px-2.5 py-1.5 text-sm text-ink outline-none focus:border-gold"
+              />
             </div>
           ) : mineIsCurrent ? (
             <p className="text-xs text-ink-faint">

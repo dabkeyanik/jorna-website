@@ -21,8 +21,24 @@ function timeAgo(iso?: string | null): string {
   return `${Math.round(hrs / 24)}d`;
 }
 
+/**
+ * What to call a chat.
+ *
+ * The backend names them "{bundle} — All Parties", so the fallback is rarely
+ * reached — but when it was, every plan's chat read "Group · 4 people" and you
+ * had to open them to tell a wedding from a birthday. Naming the people in it
+ * is at least about this conversation.
+ */
 function title(c: ConversationSummary): string {
   if (c.name) return c.name;
+  const names = (c.members ?? [])
+    .map((m) => m.name?.trim())
+    .filter((n): n is string => Boolean(n));
+  if (names.length > 0) {
+    return names.length <= 3
+      ? names.join(", ")
+      : `${names.slice(0, 2).join(", ")} and ${names.length - 2} others`;
+  }
   const n = c.member_count ?? c.members?.length ?? 0;
   return n ? `Group · ${n} people` : "Conversation";
 }
@@ -64,8 +80,11 @@ export default function MessagesPage() {
         <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold sm:text-5xl">
           Your chats
         </h1>
+        {/* "Confirmed" is the backend's word for a plan that has been sent, and
+            it appears nowhere else a client can see — so it named a condition
+            nobody could check. */}
         <p className="mt-2 text-ink-soft">
-          Each confirmed bundle has a group chat with its vendors.
+          Every plan you&apos;ve sent has a group chat with its vendors.
         </p>
       </header>
 
@@ -80,7 +99,8 @@ export default function MessagesPage() {
       ) : conversations.length === 0 ? (
         <div className="mt-10 text-center">
           <p className="text-ink-soft">
-            No chats yet. A group chat opens once a bundle is confirmed.
+            No chats yet. One opens for each plan when you send it to its
+            vendors.
           </p>
           <LinkButton href="/bundles" variant="ghost" className="mt-5">
             Dashboard

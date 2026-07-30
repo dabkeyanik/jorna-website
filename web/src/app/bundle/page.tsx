@@ -21,6 +21,7 @@ import {
   updateBooking,
   updateEvent,
   CARD_RETURN_KEY,
+  getBundleConversation,
   getSavedCard,
   startCardSetup,
   type SavedCard,
@@ -277,6 +278,7 @@ function BookingRow({
   booking,
   event,
   draft,
+  chatId,
   busyId,
   note,
   panel,
@@ -293,6 +295,8 @@ function BookingRow({
   booking: BundleBooking;
   event: BundleEventInfo | null | undefined;
   draft: boolean;
+  /** The plan's group chat, when it has one (sent plans only). */
+  chatId: string | null;
   busyId: string | null;
   /** The result of the last action taken on this booking, if it was this one. */
   note: Note | null;
@@ -451,6 +455,18 @@ function BookingRow({
           </div>
         ) : (
           <div className="mt-3 flex flex-wrap justify-end gap-2">
+            {/* On the row, because "I have a question about the photographer"
+                starts at the photographer — not at a tab listing every chat
+                you're in. */}
+            {chatId ? (
+              <LinkButton
+                href={`/conversation?id=${chatId}`}
+                variant="quiet"
+                size="md"
+              >
+                Message
+              </LinkButton>
+            ) : null}
             {booking.service_category && !awaiting ? (
               <Button variant="ghost" size="md" onClick={() => onSwap(booking)}>
                 Swap service
@@ -1023,6 +1039,10 @@ function BundleInner() {
   // watching nothing happen, with the reply — success or failure — scrolled out
   // of sight above.
   const [rowNote, setRowNote] = useState<(Note & { bookingId: string }) | null>(null);
+  // The plan's group chat. Created by the backend when the plan is sent, and
+  // until now reachable only by finding it in the Messages tab and guessing
+  // which of "Group · 4 people" was this wedding.
+  const [chatId, setChatId] = useState<string | null>(null);
   const [swapping, setSwapping] = useState<BundleBooking | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState("");
@@ -1045,6 +1065,12 @@ function BundleInner() {
       // is payable by hand exactly as it was before.
       void getSavedCard()
         .then(setCard)
+        .catch(() => {});
+
+      // Likewise the chat: a draft has none, and a failure just means the link
+      // doesn't appear. Nothing on this page depends on it.
+      void getBundleConversation(bundleId)
+        .then((c) => setChatId(c?.conversation_id ?? null))
         .catch(() => {});
 
       // There is no GET /events/{id}, so the list is the source of the event's
@@ -1252,6 +1278,7 @@ function BundleInner() {
       booking={b}
       event={bundle.event}
       draft={draft}
+      chatId={chatId}
       busyId={busyId}
       note={rowNote?.bookingId === b.booking_id ? rowNote : null}
       panel={panel}
@@ -1347,6 +1374,19 @@ function BundleInner() {
               >
                 Rename
               </Button>
+              {/* The group chat has existed since the moment this plan was
+                  sent — the backend opens one for every vendor on it — and the
+                  only way in was the Messages tab, where it appeared as "Group
+                  · 4 people" beside every other plan's. */}
+              {chatId ? (
+                <LinkButton
+                  href={`/conversation?id=${chatId}`}
+                  variant="ghost"
+                  size="md"
+                >
+                  Message vendors
+                </LinkButton>
+              ) : null}
               {/* Not offered at all once money is on the plan. The server
                   refuses (bundle_service.MONEY_MOVED_STATUSES), so a button
                   here could only ever produce an error — and a Delete that
