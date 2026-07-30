@@ -213,6 +213,47 @@ export function vendorJobs(bookings: VendorBooking[]): VendorJob[] {
     .sort((a, b) => a.dateIso.localeCompare(b.dateIso));
 }
 
+/**
+ * What's ahead, for the calendar's side list.
+ *
+ * Deliberately not `vendorJobs`, which drops anything still "pending" because
+ * the dashboard lists those separately under Requests. On the calendar that
+ * exclusion showed as a hole: a day tinted gold with "Tentative" in the legend
+ * beside it, and nothing in the list to click. Everything the grid marks is
+ * here, carrying which of the two it is so the list and the tint agree.
+ *
+ * Anchored on the last day, so a booking running across today is still ahead of
+ * you rather than behind.
+ */
+export function upcomingOnCalendar(
+  bookings: VendorBooking[],
+): { booking: VendorBooking; dateIso: string; status: DayStatus; isToday: boolean }[] {
+  return bookings
+    .filter((b) => !isDeadVendorBooking(b))
+    .map((b) => ({
+      booking: b,
+      dateIso: b.date_iso ?? "",
+      status: statusOfBooking(b),
+      isToday: daysUntil(b.date_iso) === 0,
+      lastDay: daysUntil(b.date_end || b.date_iso),
+    }))
+    .filter(
+      (j) =>
+        j.dateIso &&
+        j.dateIso !== "TBD" &&
+        j.status !== "free" &&
+        j.lastDay != null &&
+        j.lastDay >= 0,
+    )
+    .sort((a, b) => a.dateIso.localeCompare(b.dateIso))
+    .map(({ booking, dateIso, status, isToday }) => ({
+      booking,
+      dateIso,
+      status,
+      isToday,
+    }));
+}
+
 /** Requests awaiting an answer, soonest event first. */
 export function vendorRequests(bookings: VendorBooking[]): VendorBooking[] {
   return bookings

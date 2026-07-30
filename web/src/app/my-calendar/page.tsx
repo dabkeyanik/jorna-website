@@ -33,10 +33,9 @@ import {
 import {
   calendarMonth,
   dayStatus,
-  vendorJobs,
+  upcomingOnCalendar,
   type CalendarDay,
   type DayStatus,
-  type VendorJob,
 } from "@/lib/vendorPlan";
 import { WEEKDAYS, type AvailabilitySlot, type VendorBooking } from "@/lib/types";
 import { Button, Card, LinkButton } from "@/components/ui";
@@ -84,12 +83,19 @@ function prettyDate(iso: string): string {
     : d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
 }
 
-function Legend({ google }: { google: boolean }) {
-  const items: [string, string][] = [
-    ["Available", "bg-green/40"],
-    ["Tentative", "bg-gold"],
-    ["Booked", "bg-maroon"],
-  ];
+/**
+ * What the dots mean — and only the dots that are actually drawn.
+ *
+ * The month grid marks a day only when something is on it: a free day gets no
+ * dot at all. So "Available" was a legend entry with nothing on screen to point
+ * at, and in a shade (green/40) that didn't match the one the year view does
+ * draw (green/50). The year view puts a dot on every day, free ones included,
+ * which is where that entry belongs.
+ */
+function Legend({ google, view }: { google: boolean; view: "month" | "year" }) {
+  const items: [string, string][] = [];
+  if (view === "year") items.push(["Available", DOT.free]);
+  items.push(["Tentative", DOT.tentative], ["Booked", DOT.booked]);
   if (google) items.push(["Google", "bg-ink-faint"]);
   return (
     <div className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 border-t border-line-soft pt-4">
@@ -322,9 +328,38 @@ export default function VendorCalendarPage() {
         setGoogleConnected(Boolean(a.google_calendar_connected));
         const days = new Set<string>();
         for (const slot of a.google_busy_times ?? []) {
-          const s = slot as { start?: unknown; start_time?: unknown };
-          const start = typeof s.start === "string" ? s.start : s.start_time;
-          if (typeof start === "string" && start.length >= 10) days.add(start.slice(0, 10));
+          const s = slot as {
+            start?: unknown;
+            start_time?: unknown;
+            end?: unknown;
+            end_time?: unknown;
+          };
+          const rawStart = typeof s.start === "string" ? s.start : s.start_time;
+          const rawEnd = typeof s.end === "string" ? s.end : s.end_time;
+          if (typeof rawStart !== "string" || rawStart.length < 10) continue;
+          const from = rawStart.slice(0, 10);
+          days.add(from);
+          // A block spanning days marks all of them. Reading only the start put
+          // a three-day festival on the calendar as one busy morning, which is
+          // the opposite of what a busy marker is for. Capped, and only when the
+          // end genuinely parses — the shape of these is inferred from live
+          // responses (see lib/availability), so it fails back to the start day
+          // rather than guessing.
+          if (typeof rawEnd === "string" && rawEnd.length >= 10) {
+            const to = rawEnd.slice(0, 10);
+            const cursor = new Date(`${from}T00:00:00`);
+            const last = new Date(`${to}T00:00:00`);
+            if (!Number.isNaN(cursor.getTime()) && !Number.isNaN(last.getTime())) {
+              for (let n = 0; cursor < last && n < 62; n++) {
+                cursor.setDate(cursor.getDate() + 1);
+                days.add(
+                  `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(
+                    cursor.getDate(),
+                  ).padStart(2, "0")}`,
+                );
+              }
+            }
+          }
         }
         setGoogleBusy(days);
       })
@@ -338,7 +373,10 @@ export default function VendorCalendarPage() {
     () => calendarMonth(bookings, year, month, googleBusy),
     [bookings, year, month, googleBusy],
   );
-  const upcoming = useMemo(() => vendorJobs(bookings), [bookings]);
+  // Everything the grid marks, including the tentative days — see
+  // upcomingOnCalendar. vendorJobs drops those, which left gold days on the
+  // calendar with nothing in the list beside them to click.
+  const upcoming = useMemo(() => upcomingOnCalendar(bookings), [bookings]);
   const selectedDay = selected ? days.find((d) => d.dateIso === selected) : undefined;
 
   function step(by: number) {
@@ -346,6 +384,28 @@ export default function VendorCalendarPage() {
     setYear(d.getFullYear());
     setMonth(d.getMonth());
     setSelected(null);
+  }
+
+  /**
+   * Open a date from the list beside the calendar.
+   *
+   * Paging to the right month is the part that was missing — a date months out
+   * was a line of text with no way through to the day it names. Scrolls the
+   * grid into view because on a phone the list sits under it, and moving the
+   * month without showing it reads as nothing having happened.
+   */
+  function jumpTo(iso: string) {
+    const d = new Date(`${iso}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return;
+    setYear(d.getFullYear());
+    setMonth(d.getMonth());
+    setView("month");
+    setSelected(iso);
+    requestAnimationFrame(() => {
+      document
+        .getElementById("calendar-grid")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   if (authLoading || !user || loading) {
@@ -398,6 +458,14 @@ export default function VendorCalendarPage() {
         <VendorNav />
       </div>
 
+      {/* Calendar and what's ahead, side by side where there's room. The list
+          used to sit below the fold under the Google card and the weekly-hours
+          card, which is a long way from the grid it refers to. */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+      {/* The anchor is the wrapper, not the Card — Card takes className and
+          children only, and widening a shared component for one scroll target
+          is the wrong end to change. */}
+      <div id="calendar-grid" className="scroll-mt-4">
       <Card className="p-4 sm:p-5">
         <div className="flex items-center justify-between gap-3">
           <Button
@@ -528,53 +596,77 @@ export default function VendorCalendarPage() {
           </>
         )}
 
-        <Legend google={googleConnected} />
+        <Legend google={googleConnected} view={view} />
       </Card>
+      </div>
 
-      {vendorId ? <GoogleCalendarCard vendorId={vendorId} connected={googleConnected} /> : null}
-
-      <section className="mt-8">
+      {/* What's ahead, and a way into each of them. These were plain rows: a
+          date months out was a line of text with no route to the day it names,
+          so finding it meant paging the grid by hand. */}
+      <section className="lg:sticky lg:top-4">
         <h2 className="eyebrow mb-3">Upcoming</h2>
         {upcoming.length === 0 ? (
-          <p className="rounded-2xl border border-card-edge bg-panel p-5 text-center text-ink-soft">
+          <p className="rounded-2xl border border-card-edge bg-panel p-5 text-center text-sm text-ink-soft">
             Nothing booked yet.
           </p>
         ) : (
           <div className="grid gap-2">
-            {upcoming.slice(0, 8).map((job: VendorJob) => (
-              <div
-                key={job.booking.booking_id}
-                className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl border border-card-edge bg-card px-4 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-ink">
-                    {job.booking.service_name || "Service"}
-                    {job.booking.client_name ? (
-                      <span className="font-normal text-ink-soft">
-                        {" "}
-                        · {job.booking.client_name}
+            {upcoming.slice(0, 10).map((job) => {
+              const isSelected = selected === job.dateIso;
+              return (
+                <button
+                  key={job.booking.booking_id}
+                  type="button"
+                  onClick={() => jumpTo(job.dateIso)}
+                  aria-label={`Show ${prettyDate(job.dateIso)} on the calendar`}
+                  className={`w-full rounded-xl border px-3.5 py-3 text-left transition hover:border-gold/60 ${
+                    isSelected
+                      ? "border-gold bg-gold/[0.07]"
+                      : "border-card-edge bg-card"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="min-w-0 text-sm font-medium text-ink">
+                      {job.booking.service_name || "Service"}
+                    </p>
+                    {/* The same dot as the grid and the legend, so a gold day
+                        and a gold row are visibly the same fact. */}
+                    <span
+                      aria-hidden="true"
+                      className={`mt-1.5 size-2 shrink-0 rounded-full ${DOT[job.status]}`}
+                    />
+                  </div>
+                  {job.booking.client_name ? (
+                    <p className="truncate text-xs text-ink-soft">
+                      {job.booking.client_name}
+                    </p>
+                  ) : null}
+                  <p className="mt-1 text-xs text-ink-faint">
+                    {job.isToday ? (
+                      <span className="font-semibold text-maroon dark:text-gold">
+                        Today
                       </span>
-                    ) : null}
+                    ) : (
+                      prettyDate(job.dateIso)
+                    )}
+                    {clock(job.booking.time_start)
+                      ? ` · ${clock(job.booking.time_start)}`
+                      : null}
                   </p>
-                  {job.booking.location ? (
-                    <p className="text-xs text-ink-faint">{job.booking.location}</p>
+                  {job.status === "tentative" ? (
+                    <p className="mt-1 text-[0.68rem] font-medium text-gold">
+                      Awaiting your answer
+                    </p>
                   ) : null}
-                </div>
-                <p className="shrink-0 text-sm text-ink-soft">
-                  {job.isToday ? (
-                    <span className="font-semibold text-maroon dark:text-gold">Today</span>
-                  ) : (
-                    prettyDate(job.dateIso)
-                  )}
-                  {clock(job.booking.time_start) ? (
-                    <span className="text-ink-faint"> · {clock(job.booking.time_start)}</span>
-                  ) : null}
-                </p>
-              </div>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )}
       </section>
+      </div>
+
+      {vendorId ? <GoogleCalendarCard vendorId={vendorId} connected={googleConnected} /> : null}
 
       {/* Not in the nav any more, but still what a host filtering by a date is
           matched against, so it keeps a way in from here. */}
