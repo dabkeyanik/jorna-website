@@ -91,7 +91,7 @@ floor rather than the price.
 
 ---
 
-### 2. Deleting a plan destroys paid bookings and the escrow record with them
+### 2. Deleting a plan destroys paid bookings and the escrow record with them ✅ done
 
 **Backend:** `services/bundle_service.py:750-761` (`delete_bundle`) → `:697-746` (`_delete_bundle_cascade`) → `:273-297` (`_delete_booking_cascade`)
 **Frontend:** [`bundle/page.tsx:1173-1192`](web/src/app/bundle/page.tsx#L1173-L1192)
@@ -116,16 +116,31 @@ floor rather than the price.
 > The frontend offers Delete unconditionally, with a dialog that says "This can't
 > be undone" and never mentions money.
 
-- [ ] **Backend first:** guard `_delete_bundle_cascade` on
-      `_PROTECTED_PAYMENT_STATUSES`, raising the same 400 as
-      `remove_booking_from_bundle`. This is the actual fix.
-- [ ] Frontend: hide/disable Delete when any booking is `paid`/`released`/
-      `disputed`/`processing`, and name the amount in the dialog.
-- [ ] Audit for other cascade paths that skip the guard.
-- [ ] Add a test asserting a bundle with a paid booking cannot be deleted.
+- [x] Backend: the guard lives in `_delete_booking_cascade` — the one point
+      every delete path passes through — rather than at each caller, because the
+      bug *was* a caller that didn't have it. A rule stated once at the
+      chokepoint can't be skipped by the next path someone adds.
+- [x] Backend: `delete_bundle` also checks up front, so the refusal names the
+      amount, the services and what to do instead rather than reporting whichever
+      booking the cascade reached first. It re-raises `BundleError` instead of
+      burying a considered refusal in a 500.
+- [x] Backend: one `MONEY_MOVED_STATUSES` replaces three separate ideas of what
+      counts — the legacy `_PROTECTED_PAYMENT_STATUSES` (five states, used only
+      by the cleanup), `remove_booking_from_bundle`'s own list of three, and
+      `delete_bundle`'s nothing. The two the live path was missing matter most:
+      `processing` is money in flight, `refunded` is where the record *is* the
+      evidence it came back.
+- [x] Frontend: Delete isn't offered at all when money is on the plan, replaced
+      by a line saying how much and what to do instead. `heldOnPlan` mirrors the
+      server's set rather than reusing `isBeyondActionable`, which answers a
+      different question and omits `processing`.
+- [x] Tests: `TestPaidBookingsSurviveDeletion` — all five states across both
+      paths, the refusal naming the money, unpaid plans still deleting, an unpaid
+      sibling surviving a refusal, and the cascade refusing on its own.
 
-**Done when:** there is no route through the product that destroys a booking with
-money against it.
+**Verified:** 642 backend tests pass, 14 new. **With the guard disabled, 13 of
+the 14 fail** — the one that doesn't is the control asserting unpaid plans still
+delete. Web typechecks and builds.
 
 ---
 
@@ -387,7 +402,7 @@ visibly flagged as not one.
 
 ## 🟡 Medium
 
-### 12. The frontend bypasses the backend's own orphan guard when deleting
+### 12. The frontend bypasses the backend's own orphan guard when deleting ✅ mostly done
 
 **Frontend:** [`bundle/page.tsx:952-964`](web/src/app/bundle/page.tsx#L952-L964)
 **Backend:** `services/bundle_service.py:735-746` · `services/event_service.py:83-90`
@@ -399,7 +414,9 @@ visibly flagged as not one.
 > reference check — so the frontend destroys an event that sibling bundles still
 > point at, defeating a guard written to prevent exactly that.
 
-- [ ] Delete the `await deleteEvent(eventId)` line. The backend handles it.
+- [x] Deleted the `await deleteEvent(eventId)` line. The backend handles it.
+      Done alongside item 2 — it is the same function, and leaving a known bug
+      in code being actively edited is worse than the small scope expansion.
 - [ ] Backend (defence in depth): make `delete_event` refuse while a bundle
       references it.
 
