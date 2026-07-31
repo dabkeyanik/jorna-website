@@ -16,7 +16,7 @@ import {
   type StripeStatus,
   type VendorDetail,
 } from "@/lib/types";
-import { paymentsSetup } from "@/lib/vendorPlan";
+import { paymentsSetup, vendorMoney } from "@/lib/vendorPlan";
 import { Button, Card, LinkButton } from "@/components/ui";
 import { VendorNav } from "@/components/VendorNav";
 
@@ -129,6 +129,8 @@ function EarningsInner() {
   // Same reading the dashboard and the "Needs you" badge use, so a vendor can't
   // be told two different things about one account.
   const payments = paymentsSetup(status);
+  // Only for the derived fee rate; the tiles above read the API's own totals.
+  const cash = vendorMoney(earnings);
 
   return (
     <div className="mx-auto w-[min(880px,100%-2rem)] py-10">
@@ -209,13 +211,25 @@ function EarningsInner() {
             </div>
           ) : null}
 
+          {/* The rate is derived from what has actually been taken. The API
+              publishes no percentage — only a per-booking platform_fee_cents —
+              so a hardcoded one would be a guess that goes quietly wrong the
+              day it changes, and there's nothing to derive before the first
+              booking. */}
           <p className="mt-3 text-xs text-ink-faint">
             Amounts are what reaches you — Jorna&apos;s fee is already deducted
-            ({money(earnings.platform_fees_cents)} so far).
+            ({money(earnings.platform_fees_cents)} so far
+            {cash?.feePercent != null ? `, ${cash.feePercent}% of gross` : ""}).
           </p>
 
           <section className="mt-9">
-            <h2 className="serif text-2xl text-ink">History</h2>
+            <div className="flex flex-wrap items-baseline justify-between gap-3">
+              <h2 className="serif text-2xl text-ink">History</h2>
+              {/* Gross, fee, net — the decomposition was on the dashboard, in a
+                  card that repeated this list six rows at a time. It belongs on
+                  the ledger, and most marketplaces don't show it at all. */}
+              <p className="text-xs text-ink-faint">Gross · fee · net</p>
+            </div>
             {earnings.history.length === 0 ? (
               <p className="mt-3 text-ink-soft">
                 Nothing yet. Payments show up here once a client pays.
@@ -241,8 +255,18 @@ function EarningsInner() {
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="text-sm font-semibold text-ink">
-                        {money(h.net_cents)}
+                      <p className="flex items-baseline justify-end gap-1.5 text-sm tabular-nums">
+                        <span className="text-ink-faint">
+                          {money(h.amount_cents ?? 0)}
+                        </span>
+                        <span className="text-xs text-ink-faint">−</span>
+                        <span className="text-maroon dark:text-gold">
+                          {money(h.platform_fee_cents ?? 0)}
+                        </span>
+                        <span className="text-xs text-ink-faint">=</span>
+                        <span className="font-bold text-ink">
+                          {money(h.net_cents)}
+                        </span>
                       </p>
                       <p className="text-xs text-ink-faint">
                         {PAYMENT_STATUS_LABELS[h.payment_status ?? ""] ??

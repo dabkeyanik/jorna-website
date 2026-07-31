@@ -204,9 +204,6 @@ export default function VendorDashboardPage() {
   const [notVendor, setNotVendor] = useState(false);
   const [bookings, setBookings] = useState<VendorBooking[]>([]);
   const [cash, setCash] = useState<VendorMoney | null>(null);
-  const [feeHistory, setFeeHistory] = useState<
-    { label: string; gross: number; fee: number; net: number }[]
-  >([]);
   // The whole status, not just whether it's complete: what Stripe is waiting on
   // is the part a vendor can act on, and paymentsSetup needs it to say so.
   const [stripe, setStripe] = useState<StripeStatus | null>(null);
@@ -267,14 +264,6 @@ export default function VendorDashboardPage() {
     setVendor(snap.vendor);
     setBookings(snap.bookings ?? []);
     setCash(vendorMoney(snap.earnings ?? null));
-    setFeeHistory(
-      (snap.earnings?.history ?? []).map((h) => ({
-        label: h.event_name || h.client_name || "Booking",
-        gross: h.amount_cents ?? 0,
-        fee: h.platform_fee_cents ?? 0,
-        net: h.net_cents ?? 0,
-      })),
-    );
     setStripe(snap.stripe ?? null);
     setServices(snap.services ?? []);
     setAvailability(snap.availability ?? []);
@@ -527,10 +516,22 @@ export default function VendorDashboardPage() {
         </section>
       ) : null}
 
-      {/* ── Money ── */}
+      {/* ── Money ──
+          Three numbers and where they are in the pipeline. The per-booking
+          gross-fee-net breakdown was here too, six rows of the same list
+          /my-earnings prints in full — that page is the ledger, this is the
+          answer to "where is my money", and they are different questions. */}
       {cash ? (
         <section className="mt-10">
-          <SectionLabel>Money</SectionLabel>
+          <div className="flex items-baseline justify-between gap-3">
+            <SectionLabel>Money</SectionLabel>
+            <Link
+              href="/my-earnings"
+              className="mb-3 text-sm font-medium text-maroon transition hover:text-gold dark:text-gold"
+            >
+              Full ledger
+            </Link>
+          </div>
           <div className="flex flex-col gap-2.5 sm:flex-row">
             <Bucket
               label="Released"
@@ -565,40 +566,6 @@ export default function VendorDashboardPage() {
             </p>
           ) : null}
 
-          {feeHistory.length > 0 ? (
-            <Card className="mt-2.5 overflow-hidden">
-              <div className="flex items-center justify-between gap-3 px-4 py-3">
-                <p className="text-sm font-semibold text-ink">Per-booking breakdown</p>
-                <p className="text-xs text-ink-faint">Gross · fee · net</p>
-              </div>
-              {feeHistory.slice(0, 6).map((row, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between gap-3 border-t border-line-soft px-4 py-3"
-                >
-                  <p className="min-w-0 truncate text-sm text-ink">{row.label}</p>
-                  <div className="flex shrink-0 items-baseline gap-1.5 text-sm tabular-nums">
-                    <span className="text-ink-faint">{centsToMoney(row.gross)}</span>
-                    <span className="text-xs text-ink-faint">−</span>
-                    <span className="text-maroon dark:text-gold">
-                      {centsToMoney(row.fee)}
-                    </span>
-                    <span className="text-xs text-ink-faint">=</span>
-                    <span className="font-bold text-ink">{centsToMoney(row.net)}</span>
-                  </div>
-                </div>
-              ))}
-              <p className="border-t border-line-soft px-4 py-3 text-xs text-ink-faint">
-                {/* Derived, not asserted: the API publishes no rate, only what it
-                    took per booking. */}
-                {cash.feePercent != null
-                  ? `Jorna's fee has been ${cash.feePercent}% of gross so far. `
-                  : null}
-                Amounts are net to you. Money is held in escrow until you and the client
-                both confirm.
-              </p>
-            </Card>
-          ) : null}
         </section>
       ) : null}
 
