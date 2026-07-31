@@ -1,0 +1,21 @@
+# Cloudflare Pages rewrite rules. Order matters; first match wins.
+#
+# The root serves the app's own root route (src/app/page.tsx, which renders
+# Home) rather than redirecting to it. Status 200 is a rewrite, not a redirect:
+# the browser stays on jornaevents.com and gets that file's HTML.
+#
+# It has to be /app/index.html and not /app/home/index.html. The client router
+# resolves the path it was loaded at, and with basePath "/app" a pathname of "/"
+# resolves to the app's "/" route — so serving any other page's HTML here would
+# hydrate into a different page than the one that arrived.
+#
+# The target is /app/ and not /app/index.html. Pages normalises a served path by
+# stripping "/index" and ".html", so naming the file directly makes the rule
+# rewrite to something that matches itself — wrangler rejects it outright
+# ("Infinite loop detected"), which with no static index.html left behind would
+# mean the root 404s.
+#
+# The app itself is unchanged and still lives under /app; links from the root
+# lead there. Deep links, emailed check-in and RSVP links, Stripe return URLs
+# and the Supabase auth callback all keep working untouched.
+/    /app/    200

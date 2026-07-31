@@ -1,27 +1,33 @@
-"use client";
-
-// /app/ is not a page — it's the door the site's root opens.
+// The route the site's root serves.
 //
-// It used to repeat the marketing pitch, then briefly routed by auth state
-// (signed in → Home, signed out → sign-in). Both are gone: everyone lands on
-// Home. Browsing needs no account, so showing the product first and asking for
-// one only when someone tries to book beats a sign-in wall on arrival.
+// It used to be a door: a shim that rendered "Taking you in…" and immediately
+// replaced the URL with /app/home/. Two hops to reach the product — the static
+// root redirected here, and this redirected on — and a flash of nothing in
+// between.
 //
-// That also means no waiting on the session to load before deciding — this
-// redirects immediately. The root shim points straight at /app/home/, so this
-// only catches anyone arriving at /app/ directly.
+// Now it renders Home itself, which is what makes jornaevents.com able to *be*
+// Home rather than bounce to it. Cloudflare serves this route's HTML at the
+// root (see public/_redirects), and the client router agrees: with basePath
+// "/app", removeBasePath("/") resolves to "/" — this route — so the markup that
+// arrives and the markup React renders are the same page.
+//
+// The app still lives under /app, so following any link from here moves to
+// /app/…. The root is where you land, not a second copy of the app.
+//
+// A server component, unlike the client shim it replaces, because only a server
+// component can carry the canonical below. HomePage is still a client component
+// and is rendered as one.
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import type { Metadata } from "next";
+import HomePage from "./home/page";
 
-export default function AppEntry() {
-  const router = useRouter();
+// One page, three URLs: this file is served at "/" by the rewrite and at
+// "/app/" directly, and /app/home/ renders the same thing. Left alone they
+// compete with each other for the same search result. The root is the address
+// worth having, so it is the one they all point at — /app/home/ says the same
+// (see home/layout.tsx).
+export const metadata: Metadata = {
+  alternates: { canonical: "https://jornaevents.com/" },
+};
 
-  useEffect(() => {
-    // replace() so Back returns where they came from rather than bouncing
-    // forward through here again.
-    router.replace("/home");
-  }, [router]);
-
-  return <p className="py-24 text-center text-ink-soft">Taking you in…</p>;
-}
+export default HomePage;
