@@ -374,8 +374,8 @@ export default function VendorCalendarPage() {
     [bookings, year, month, googleBusy],
   );
   // Everything the grid marks, including the tentative days — see
-  // upcomingOnCalendar. vendorJobs drops those, which left gold days on the
-  // calendar with nothing in the list beside them to click.
+  // upcomingOnCalendar. Leaving them out left gold days on the calendar with
+  // nothing in the list beside them to click.
   const upcoming = useMemo(() => upcomingOnCalendar(bookings), [bookings]);
   const selectedDay = selected ? days.find((d) => d.dateIso === selected) : undefined;
 

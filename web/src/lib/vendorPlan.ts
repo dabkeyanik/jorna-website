@@ -392,14 +392,162 @@ export function vendorMoney(e: Earnings | null): VendorMoney | null {
 
 export { money as centsToMoney };
 
-// ── Jobs ─────────────────────────────────────────────────────────────
+// ── Events ───────────────────────────────────────────────────────────
+//
+// A vendor's work arrives as bookings, but it happens as celebrations. Booked
+// for a wedding weekend, they have three: mehndi on the Friday, sangeet on the
+// Saturday, reception on the Sunday — one client, one venue, one weekend, and
+// on a flat list three unrelated rows, potentially in three different sections
+// depending on what each one happened to need.
+//
+// Grouping needs nothing from the backend. create_booking makes a bundle when
+// the client doesn't name one, so every booking has a bundle_id, and the vendor
+// payload already carries it alongside event_name.
 
-export interface VendorJob {
-  booking: VendorBooking;
-  dateIso: string;
+export interface VendorEventMoney {
+  /** Approved, not yet paid. */
+  upcoming: number;
+  /** Paid, held by Jorna — not theirs yet. */
+  inEscrow: number;
+  released: number;
+  /** Priced per guest/hour/day with the quantity still unknown. Counted, not
+   *  summed: there is no honest total for a rate. */
+  unpricedCount: number;
+}
+
+export interface VendorEvent {
+  /** The bundle. Always present — see the note above. */
+  id: string;
+  name: string;
+  clientName: string | null;
+  /** First and last day across the bookings; null while everything is TBD. */
+  dateIso: string | null;
+  endIso: string | null;
+  /** Live bookings, in the order they happen. */
+  bookings: VendorBooking[];
+  /** Declined, cancelled or refunded — kept so a gap can be explained. */
+  closed: VendorBooking[];
+  /** This event's share of the vendor's task list. */
+  tasks: VendorTask[];
+  money: VendorEventMoney;
   isToday: boolean;
   isPast: boolean;
 }
+
+function eventMoney(bookings: VendorBooking[]): VendorEventMoney {
+  const sum: VendorEventMoney = {
+    upcoming: 0,
+    inEscrow: 0,
+    released: 0,
+    unpricedCount: 0,
+  };
+  for (const b of bookings) {
+    if (b.price_pending_quantity) {
+      sum.unpricedCount += 1;
+      continue;
+    }
+    const pay = b.payment_status ?? "unpaid";
+    const price = b.price ?? 0;
+    if (pay === "paid" || pay === "disputed") sum.inEscrow += price;
+    else if (pay === "released") sum.released += price;
+    else if (b.status === "approved" || b.status === "payment_confirmed") {
+      sum.upcoming += price;
+    }
+  }
+  return sum;
+}
+
+/** The real dates in a list, ISO-sorted. ISO strings compare correctly as text. */
+function realDates(values: (string | null | undefined)[]): string[] {
+  return values.filter((d): d is string => Boolean(d) && d !== "TBD").sort();
+}
+
+/**
+ * The vendor's bookings as the celebrations they belong to.
+ *
+ * Ordered by what it costs to miss: anything owing an action first, then by
+ * when it happens, with events already past at the end. A vendor opening this
+ * on a phone between jobs should find the thing that needs them at the top
+ * without reading past six cards that don't.
+ *
+ * `tasks` is threaded through rather than recomputed so the cards and the
+ * "Needs you" list can't disagree about what is outstanding — the same reason
+ * lib/attention reads vendorTasks instead of deriving its own.
+ */
+export function vendorEvents(
+  bookings: VendorBooking[],
+  tasks: VendorTask[] = [],
+): VendorEvent[] {
+  const byBooking = new Map<string, VendorTask[]>();
+  for (const t of tasks) {
+    if (!t.bookingId) continue;
+    const list = byBooking.get(t.bookingId);
+    if (list) list.push(t);
+    else byBooking.set(t.bookingId, [t]);
+  }
+
+  const groups = new Map<string, VendorBooking[]>();
+  for (const b of bookings) {
+    // A booking with no bundle shouldn't exist, but a null key would collapse
+    // every such booking into one imaginary shared event — far worse than
+    // giving each its own card.
+    const key = b.bundle_id || `booking:${b.booking_id}`;
+    const list = groups.get(key);
+    if (list) list.push(b);
+    else groups.set(key, [b]);
+  }
+
+  const events: VendorEvent[] = [];
+  for (const [id, all] of groups) {
+    const live = all.filter((b) => !isDeadVendorBooking(b));
+    const closed = all.filter((b) => isDeadVendorBooking(b));
+    // Everything dead is history, not an event they still have.
+    if (live.length === 0) continue;
+
+    live.sort((a, b) => {
+      const byDate = (a.date_iso ?? "").localeCompare(b.date_iso ?? "");
+      return byDate !== 0 ? byDate : (a.time_start ?? "").localeCompare(b.time_start ?? "");
+    });
+
+    // First day of the celebration, and the last day anything on it runs to —
+    // a marquee hired Friday-to-Sunday ends the event later than the reception
+    // that starts and finishes on the Saturday.
+    const starts = realDates(live.map((b) => b.date_iso));
+    const ends = realDates(live.map((b) => b.date_end || b.date_iso));
+    const dateIso = starts[0] ?? null;
+    const endIso = ends[ends.length - 1] ?? dateIso;
+    const last = daysUntil(endIso);
+
+    events.push({
+      id,
+      name: live.find((b) => b.event_name)?.event_name || "A celebration",
+      clientName: live.find((b) => b.client_name)?.client_name ?? null,
+      dateIso,
+      endIso,
+      bookings: live,
+      closed,
+      tasks: live.flatMap((b) => byBooking.get(b.booking_id) ?? []),
+      money: eventMoney(live),
+      isToday: live.some((b) => daysUntil(b.date_iso) === 0),
+      isPast: last != null && last < 0,
+    });
+  }
+
+  return events.sort((a, b) => {
+    if (a.isPast !== b.isPast) return a.isPast ? 1 : -1;
+    const aNeeds = a.tasks.length > 0;
+    const bNeeds = b.tasks.length > 0;
+    if (aNeeds !== bNeeds) return aNeeds ? -1 : 1;
+    // Undated last within its group: it can't be planned around.
+    if (!a.dateIso) return b.dateIso ? 1 : 0;
+    if (!b.dateIso) return -1;
+    return a.isPast
+      ? b.dateIso.localeCompare(a.dateIso)
+      : a.dateIso.localeCompare(b.dateIso);
+  });
+}
+
+// ── Dates ───────────────────────────────────────────────────────────
 
 /** Days until an ISO date; negative once past, null when unusable. */
 export function daysUntil(iso?: string | null): number | null {
@@ -412,33 +560,13 @@ export function daysUntil(iso?: string | null): number | null {
 }
 
 /**
- * Confirmed work, soonest first, with anything already past dropped — a vendor's
- * "next jobs" is a list of places to be, not a history.
- */
-export function vendorJobs(bookings: VendorBooking[]): VendorJob[] {
-  return bookings
-    .filter((b) => !isDeadVendorBooking(b) && b.status !== "pending")
-    .map((b) => {
-      const n = daysUntil(b.date_end || b.date_iso);
-      return {
-        booking: b,
-        dateIso: b.date_iso ?? "",
-        isToday: daysUntil(b.date_iso) === 0,
-        isPast: n != null && n < 0,
-      };
-    })
-    .filter((j) => j.dateIso && j.dateIso !== "TBD" && !j.isPast)
-    .sort((a, b) => a.dateIso.localeCompare(b.dateIso));
-}
-
-/**
  * What's ahead, for the calendar's side list.
  *
- * Deliberately not `vendorJobs`, which drops anything still "pending" because
- * the dashboard lists those separately under Requests. On the calendar that
- * exclusion showed as a hole: a day tinted gold with "Tentative" in the legend
- * beside it, and nothing in the list to click. Everything the grid marks is
- * here, carrying which of the two it is so the list and the tint agree.
+ * Deliberately its own thing rather than a filter over the dashboard's events:
+ * this one keeps "pending" bookings, and dropping them showed on the calendar
+ * as a hole — a day tinted gold with "Tentative" in the legend beside it, and
+ * nothing in the list to click. Everything the grid marks is here, carrying
+ * which of the two it is so the list and the tint agree.
  *
  * Anchored on the last day, so a booking running across today is still ahead of
  * you rather than behind.
@@ -470,13 +598,6 @@ export function upcomingOnCalendar(
       status,
       isToday,
     }));
-}
-
-/** Requests awaiting an answer, soonest event first. */
-export function vendorRequests(bookings: VendorBooking[]): VendorBooking[] {
-  return bookings
-    .filter((b) => b.status === "pending" && !isDeadVendorBooking(b))
-    .sort((a, b) => (a.date_iso ?? "").localeCompare(b.date_iso ?? ""));
 }
 
 // ── Listing health ───────────────────────────────────────────────────

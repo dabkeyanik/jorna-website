@@ -47,14 +47,12 @@ import { clearAttentionCache } from "@/lib/attention";
 import { checkInAtVenue, LocationError } from "@/lib/checkin";
 import {
   centsToMoney,
-  daysUntil,
   listingHealth,
-  vendorJobs,
   vendorMoney,
-  vendorRequests,
+  vendorEvents,
   vendorTasks,
   type HealthIssue,
-  type VendorJob,
+  type VendorEvent,
   type VendorMoney,
   type VendorTask,
 } from "@/lib/vendorPlan";
@@ -93,13 +91,6 @@ function clock(raw?: string | null): string | null {
   return Number.isNaN(d.getTime())
     ? null
     : d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
-function whenLabel(iso: string): string {
-  const n = daysUntil(iso);
-  if (n === 0) return "Today";
-  if (n === 1) return "Tomorrow";
-  return prettyDate(iso) ?? iso;
 }
 
 /** Everything the page reads, fetched in one pass. */
@@ -387,14 +378,17 @@ export default function VendorDashboardPage() {
     );
   }
 
-  // Everything vendorTasks knows, minus the requests. Their row here was a
-  // link to /my-bookings while the Requests section below — on this same page —
-  // has Accept and Decline on it, so the jump was a longer route to a button
-  // already on screen. They stay in vendorTasks for the "Needs you" badge,
-  // which has no Requests section to defer to.
-  const tasks = vendorTasks(bookings, stripe).filter((t) => t.kind !== "request");
-  const jobs = vendorJobs(bookings);
-  const requests = vendorRequests(bookings);
+  const allTasks = vendorTasks(bookings, stripe);
+  const events = vendorEvents(bookings, allTasks);
+  // "Needs you" now holds only what no event card can carry: the account-level
+  // alarm, and the two answers whose panels live on /my-bookings. Everything
+  // else — accept, decline, confirm, check in — is a button on the booking it
+  // belongs to, which is the whole point of grouping by event. Listing them
+  // here as well would put the same action on the page twice, which is what
+  // this pass exists to stop.
+  const tasks = allTasks.filter(
+    (t) => t.kind === "stripe" || t.kind === "negotiation" || t.kind === "date-change",
+  );
   const health = listingHealth({ vendor, services, availability });
   const name = [vendor?.f_name, vendor?.l_name].filter(Boolean).join(" ");
 
@@ -465,72 +459,36 @@ export default function VendorDashboardPage() {
         </p>
       )}
 
-      {/* ── Requests ──
-          Above the money, because it is the one section that is a decision
-          rather than a readout: a client is waiting, and the answer takes two
-          seconds if the button is in front of them. */}
-      {requests.length > 0 ? (
+      {/* ── Your events ──
+          One card per celebration, not one row per booking. A vendor booked for
+          a mehndi, a sangeet and a reception has three bookings and one client,
+          one venue and one weekend — as a flat list that read as three
+          unrelated jobs, and the sections split them further by whatever each
+          happened to need.
+
+          Ordered by what it costs to miss: anything owing an answer first, then
+          soonest, with finished events last. */}
+      {events.length > 0 ? (
         <section className="mt-10">
           <div className="flex items-baseline justify-between gap-3">
-            <SectionLabel>Requests</SectionLabel>
-            <span className="mb-3 text-sm font-semibold text-maroon dark:text-gold">
-              {requests.length} pending
-            </span>
+            <SectionLabel>Your events</SectionLabel>
+            <Link
+              href="/my-bookings"
+              className="mb-3 text-sm font-medium text-maroon transition hover:text-gold dark:text-gold"
+            >
+              All bookings
+            </Link>
           </div>
-          <div className="grid gap-2.5">
-            {requests.map((r) => {
-              const price = priceLine(r);
-              return (
-                <Card key={r.booking_id} className="p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="serif text-lg text-ink">
-                        {r.client_name || "A client"}
-                      </p>
-                      <p className="text-xs text-ink-faint">
-                        {[r.event_name, prettyDate(r.date_iso)]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold tabular-nums text-maroon dark:text-gold">
-                        {money(price.amount)}
-                      </p>
-                      {price.caption ? (
-                        <p className="text-xs text-ink-faint">{price.caption}</p>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-faint">
-                    {r.negotiable ? (
-                      <span className="rounded-full bg-gold/15 px-2 py-0.5 font-medium text-gold">
-                        Negotiable
-                      </span>
-                    ) : null}
-                    {r.guest_count ? <span>{r.guest_count} guests</span> : null}
-                    {r.location ? <span className="truncate">{r.location}</span> : null}
-                  </div>
-                  <div className="mt-3 flex gap-2">
-                    <Button
-                      size="md"
-                      disabled={busyId === r.booking_id}
-                      onClick={() => answer(r.booking_id, "approved")}
-                    >
-                      {busyId === r.booking_id ? "Working…" : "Accept"}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="md"
-                      disabled={busyId === r.booking_id}
-                      onClick={() => answer(r.booking_id, "rejected")}
-                    >
-                      Decline
-                    </Button>
-                  </div>
-                </Card>
-              );
-            })}
+          <div className="grid gap-3">
+            {events.slice(0, 8).map((e) => (
+              <EventCard
+                key={e.id}
+                event={e}
+                busyId={busyId}
+                onAct={act}
+                onAnswer={answer}
+              />
+            ))}
           </div>
         </section>
       ) : null}
@@ -607,26 +565,6 @@ export default function VendorDashboardPage() {
               </p>
             </Card>
           ) : null}
-        </section>
-      ) : null}
-
-      {/* ── Next jobs ── */}
-      {jobs.length > 0 ? (
-        <section className="mt-10">
-          <div className="flex items-baseline justify-between gap-3">
-            <SectionLabel>Next jobs</SectionLabel>
-            <Link
-              href="/my-bookings"
-              className="mb-3 text-sm font-medium text-maroon transition hover:text-gold dark:text-gold"
-            >
-              All bookings
-            </Link>
-          </div>
-          <div className="grid gap-2.5">
-            {jobs.slice(0, 6).map((job) => (
-              <JobRow key={job.booking.booking_id} job={job} />
-            ))}
-          </div>
         </section>
       ) : null}
 
@@ -740,56 +678,192 @@ export default function VendorDashboardPage() {
   );
 }
 
-function JobRow({ job }: { job: VendorJob }) {
-  const b = job.booking;
+// ── Events ───────────────────────────────────────────────────────────
+
+/** "Sat 16 Aug", or "14 – 16 Aug 2026" when it runs across days. */
+function dateSpan(event: VendorEvent): string | null {
+  const from = prettyDate(event.dateIso);
+  if (!from) return null;
+  const to = prettyDate(event.endIso);
+  return to && to !== from ? `${from} – ${to}` : from;
+}
+
+/**
+ * One booking inside its celebration, with whatever it owes attached.
+ *
+ * The action comes from the task list rather than being re-derived here, so a
+ * row can never offer a button the "Needs you" rules don't agree exists.
+ */
+function BookingRow({
+  booking,
+  tasks,
+  busyId,
+  onAct,
+  onAnswer,
+}: {
+  booking: VendorBooking;
+  tasks: VendorTask[];
+  busyId: string | null;
+  onAct: (task: VendorTask) => void;
+  onAnswer: (bookingId: string, status: "approved" | "rejected") => void;
+}) {
+  const b = booking;
   const start = clock(b.time_start);
   const end = clock(b.time_end);
+  const price = priceLine(b);
+  const pending = b.status === "pending";
   const here = Boolean(b.vendor_checked_in_at);
+
+  return (
+    <div className="border-t border-line-soft px-4 py-3">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+        <div className="min-w-0">
+          <p className="font-medium text-ink">{b.service_name || "Service"}</p>
+          <p className="mt-0.5 text-xs text-ink-faint">
+            {[
+              prettyDate(b.date_iso),
+              start ? `${start}${end ? `–${end}` : ""}` : null,
+              b.guest_count ? `${b.guest_count} guests` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+          {b.location ? (
+            <p className="mt-0.5 truncate text-xs text-ink-faint">{b.location}</p>
+          ) : null}
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="font-semibold tabular-nums text-ink">{money(price.amount)}</p>
+          {price.caption ? (
+            <p className="text-xs text-ink-faint">{price.caption}</p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {here ? (
+          <span className="rounded-full bg-green/12 px-2.5 py-0.5 text-xs font-medium text-green">
+            Checked in
+          </span>
+        ) : null}
+        {pending && b.negotiable ? (
+          <span className="rounded-full bg-gold/15 px-2 py-0.5 text-xs font-medium text-gold">
+            Negotiable
+          </span>
+        ) : null}
+
+        {/* Accept and decline live on the booking, not in a separate inbox —
+            the answer is about this job, on this day, at this price, and all
+            three are on the row. */}
+        {pending ? (
+          <>
+            <Button
+              size="md"
+              disabled={busyId === b.booking_id}
+              onClick={() => onAnswer(b.booking_id, "approved")}
+            >
+              {busyId === b.booking_id ? "Working…" : "Accept"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="md"
+              disabled={busyId === b.booking_id}
+              onClick={() => onAnswer(b.booking_id, "rejected")}
+            >
+              Decline
+            </Button>
+          </>
+        ) : null}
+
+        {tasks.map((task) => (
+          <Button
+            key={task.id}
+            variant={task.kind === "confirm" || task.kind === "check-in" ? "primary" : "ghost"}
+            size="md"
+            disabled={busyId === task.id}
+            onClick={() => onAct(task)}
+          >
+            {busyId === task.id ? "Working…" : task.cta}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EventCard({
+  event,
+  busyId,
+  onAct,
+  onAnswer,
+}: {
+  event: VendorEvent;
+  busyId: string | null;
+  onAct: (task: VendorTask) => void;
+  onAnswer: (bookingId: string, status: "approved" | "rejected") => void;
+}) {
+  const when = dateSpan(event);
+  const m = event.money;
+  const totals = [
+    m.upcoming > 0 ? `${money(m.upcoming)} upcoming` : null,
+    m.inEscrow > 0 ? `${money(m.inEscrow)} in escrow` : null,
+    m.released > 0 ? `${money(m.released)} released` : null,
+  ].filter(Boolean);
 
   return (
     <div
       className={`overflow-hidden rounded-2xl shadow-[var(--shadow-card)] ${
-        job.isToday
+        event.isToday
           ? "border border-maroon bg-maroon/[0.04] dark:border-gold dark:bg-gold/[0.06]"
           : "border border-card-edge bg-card"
       }`}
     >
-      {job.isToday ? (
+      {event.isToday ? (
         <p className="bg-maroon px-4 py-1 text-[0.68rem] font-bold uppercase tracking-[0.14em] text-ground dark:bg-gold">
           Today
         </p>
       ) : null}
-      <div className="p-4">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="serif text-lg text-ink">{b.client_name || "A client"}</p>
-            <p className="text-xs uppercase tracking-[0.1em] text-ink-faint">
-              {b.service_name || "Service"}
-            </p>
-          </div>
-          {here ? (
-            <span className="rounded-full bg-green/12 px-2.5 py-0.5 text-xs font-medium text-green">
-              Checked in
-            </span>
-          ) : null}
-        </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <div>
-            <p className="text-xs text-ink-faint">{whenLabel(job.dateIso)}</p>
-            <p className="text-sm font-semibold text-ink">
-              {start ? `${start}${end ? ` – ${end}` : ""}` : "Time not set"}
-            </p>
-          </div>
-          {b.location ? (
-            <p className="text-sm leading-relaxed text-ink-soft">{b.location}</p>
-          ) : null}
-        </div>
-        {b.guest_count && b.guest_count > 1 ? (
-          <p className="mt-3 border-t border-line-soft pt-2.5 text-xs text-ink-faint">
-            {b.guest_count} guests expected
+
+      <div className="flex flex-wrap items-start justify-between gap-3 p-4">
+        <div className="min-w-0">
+          <p className="serif text-lg text-ink">{event.name}</p>
+          <p className="mt-0.5 text-xs text-ink-faint">
+            {[event.clientName, when].filter(Boolean).join(" · ")}
+            {event.bookings.length > 1
+              ? ` · ${event.bookings.length} bookings`
+              : ""}
           </p>
+        </div>
+        {event.tasks.length > 0 ? (
+          <span className="shrink-0 rounded-full bg-maroon px-3 py-1 text-xs font-semibold text-ground dark:bg-gold dark:text-ground">
+            {event.tasks.length} needs you
+          </span>
         ) : null}
       </div>
+
+      {event.bookings.map((b) => (
+        <BookingRow
+          key={b.booking_id}
+          booking={b}
+          tasks={event.tasks.filter((t) => t.bookingId === b.booking_id)}
+          busyId={busyId}
+          onAct={onAct}
+          onAnswer={onAnswer}
+        />
+      ))}
+
+      {totals.length > 0 || m.unpricedCount > 0 ? (
+        <p className="border-t border-line-soft bg-panel px-4 py-2.5 text-xs text-ink-soft">
+          {totals.join(" · ")}
+          {m.unpricedCount > 0 ? (
+            <span className="text-ink-faint">
+              {totals.length > 0 ? " · " : ""}
+              {m.unpricedCount === 1 ? "1 booking isn't" : `${m.unpricedCount} bookings aren't`}{" "}
+              priced yet
+            </span>
+          ) : null}
+        </p>
+      ) : null}
     </div>
   );
 }
