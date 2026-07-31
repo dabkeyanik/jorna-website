@@ -41,11 +41,18 @@ function LoginInner() {
   // Set when we've come back from Google as a brand-new identity that needs to
   // finish creating a Jorna account (the callback routes here with ?google=1).
   const isGoogleSignup = params.get("google") === "1";
-  // ?mode=register opens straight on the sign-up form — what a "Get started"
-  // entry point promises. Completing a Google sign-up implies it too.
-  const startsOnRegister = isGoogleSignup || params.get("mode") === "register";
-
-  const [mode, setMode] = useState<"login" | "register">(startsOnRegister ? "register" : "login");
+  // ?mode=register opens the sign-up form — what a "Get started" entry point
+  // promises. Completing a Google sign-up implies it too.
+  //
+  // Read from the URL on every render, not seeded into state once. The header
+  // offers both doors at the same time — "Sign in" to /login, "Get started" to
+  // /login?mode=register — and they are the same route, so moving between them
+  // reconciles this component instead of remounting it. A useState initialiser
+  // runs on the first render and never again, so the query string changed and
+  // the form didn't: whichever door you came through was the only one that
+  // worked, in both directions, for as long as you stayed on the page.
+  const mode: "login" | "register" =
+    isGoogleSignup || params.get("mode") === "register" ? "register" : "login";
   // No default: the choice is required, the way iOS's two signup cards are.
   const [role, setRole] = useState<Role | null>(null);
   const [busy, setBusy] = useState(false);
@@ -84,6 +91,27 @@ function LoginInner() {
       }
     });
   }, [isGoogleSignup]);
+
+  /**
+   * Flip between signing in and signing up, by changing the URL.
+   *
+   * The mode is the query string now, so this has to move the query string —
+   * setting state would show one form at an address that names the other, and
+   * the header's two buttons would go on disagreeing with the page. Every other
+   * param is carried across, `next` above all: someone sent here from a booking
+   * must still land back on it whichever door they end up using.
+   *
+   * replace, not push, so flipping back and forth doesn't bury the page they
+   * came from under a stack of its own history.
+   */
+  function switchMode() {
+    setError(null);
+    const q = new URLSearchParams(params.toString());
+    if (mode === "login") q.set("mode", "register");
+    else q.delete("mode");
+    const qs = q.toString();
+    router.replace(qs ? `/login?${qs}` : "/login");
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -364,10 +392,7 @@ function LoginInner() {
           <button
             type="button"
             className="font-semibold text-gold underline-offset-2 hover:underline"
-            onClick={() => {
-              setMode(mode === "login" ? "register" : "login");
-              setError(null);
-            }}
+            onClick={switchMode}
           >
             {mode === "login" ? "Create an account" : "Sign in"}
           </button>
