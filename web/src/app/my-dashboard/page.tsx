@@ -441,9 +441,18 @@ export default function VendorDashboardPage() {
         </p>
       ) : null}
 
+      {/* Two columns from lg up: the left is what a vendor works through, the
+          right is what they refer to. Phones and tablets keep the single stack,
+          where a 320px rail beside a booking row would be neither.
+
+          minmax(0,1fr) rather than 1fr — a grid track is auto-sized by default,
+          so a long service name or address would push the column wider than its
+          share and squeeze the rail instead of wrapping. */}
+      <div className="mt-8 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-8">
+        <div className="min-w-0">
       {/* ── Needs you ── */}
       {tasks.length > 0 || unread > 0 ? (
-        <section className="mt-8">
+        <section>
           <SectionLabel>Needs you</SectionLabel>
           <div className="grid gap-2.5">
             {tasks.map((task) => (
@@ -474,7 +483,7 @@ export default function VendorDashboardPage() {
           </div>
         </section>
       ) : (
-        <p className="mt-8 rounded-2xl border border-card-edge bg-panel p-5 text-center text-ink-soft">
+        <p className="rounded-2xl border border-card-edge bg-panel p-5 text-center text-ink-soft">
           Nothing needs you right now.
         </p>
       )}
@@ -515,13 +524,18 @@ export default function VendorDashboardPage() {
         </section>
       ) : null}
 
+        </div>
+
+        {/* Sticky so the money stays put while a long list of events scrolls —
+            top-20 clears the sticky site header above it. */}
+        <div className="mt-10 lg:sticky lg:top-20 lg:mt-0">
       {/* ── Money ──
           Three numbers and where they are in the pipeline. The per-booking
           gross-fee-net breakdown was here too, six rows of the same list
           /my-earnings prints in full — that page is the ledger, this is the
           answer to "where is my money", and they are different questions. */}
       {cash ? (
-        <section className="mt-10">
+        <section>
           <div className="flex items-baseline justify-between gap-3">
             <SectionLabel>Money</SectionLabel>
             <Link
@@ -531,7 +545,7 @@ export default function VendorDashboardPage() {
               Full ledger
             </Link>
           </div>
-          <div className="flex flex-col gap-2.5 sm:flex-row">
+          <div className="flex flex-col gap-2.5 sm:flex-row lg:flex-col">
             <Bucket
               label="Released"
               cents={cash.releasedCents}
@@ -576,7 +590,7 @@ export default function VendorDashboardPage() {
 
       {/* ── Listing health ── */}
       {health.length > 0 ? (
-        <section className="mt-10">
+        <section className="mt-6">
           <SectionLabel>Why you might not be getting booked</SectionLabel>
           <div className="grid gap-2">
             {health.map((h) => (
@@ -585,6 +599,9 @@ export default function VendorDashboardPage() {
           </div>
         </section>
       ) : null}
+
+        </div>
+      </div>
 
       {/* No "all your bookings" footer. The same link is on the section above,
           where it's next to the six jobs it's offering to extend, and again in

@@ -1844,23 +1844,22 @@ function BundleInner() {
         </section>
       ) : null}
 
-      {/* Only on a sent plan. A draft's dates are still directly editable,
-          and the server refuses a proposal against one. */}
-      {!draft ? (
-        <DateChangePanel
-          bundleId={bundle.bundle_id}
-          bookings={bundle.bookings ?? []}
-          onChanged={load}
-        />
-      ) : null}
+      {/* Two columns from lg up: the plan on the left, the things you consult
+          about it on the right.
 
-      <RunSheet bundle={bundle} />
+          The run sheet is deliberately NOT in the rail. Its rows are an 80px
+          time column, a 32px avatar and then a service name, a vendor and an
+          address — inside a 320px rail that leaves about 144px for all three,
+          and a schedule is one of the few things here that genuinely reads
+          better wide. The two panels beside it are a sentence and a button
+          each, which is exactly what a rail is for. */}
+      <div className="mt-2 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-8">
+        <div className="min-w-0">
+          <RunSheet bundle={bundle} />
 
-      <VenueCheckIn bookings={bundle.bookings} onCheckedIn={load} />
-
-      {/* The team, split by where each vendor actually stands: on it, still
-          deciding, or gone. One flat list made a declined vendor look the same
-          as a booked one until you read its status pill. */}
+          {/* The team, split by where each vendor actually stands: on it, still
+              deciding, or gone. One flat list made a declined vendor look the
+              same as a booked one until you read its status pill. */}
       {plan.booked.length > 0 ? (
         <section className="mt-8">
           <h2 className="eyebrow mb-3">Booked · {plan.booked.length}</h2>
@@ -1897,6 +1896,23 @@ function BundleInner() {
           No vendors in this bundle yet.
         </p>
       ) : null}
+        </div>
+
+        {/* Sticky, so a plan with a dozen vendors doesn't scroll these away. */}
+        <div className="mt-6 grid gap-4 lg:sticky lg:top-20 lg:mt-0">
+          {/* Only on a sent plan. A draft's dates are still directly editable,
+              and the server refuses a proposal against one. */}
+          {!draft ? (
+            <DateChangePanel
+              bundleId={bundle.bundle_id}
+              bookings={bundle.bookings ?? []}
+              onChanged={load}
+            />
+          ) : null}
+
+          <VenueCheckIn bookings={bundle.bookings} onCheckedIn={load} />
+        </div>
+      </div>
 
       {swapping ? (
         <ServiceSwapPanel
