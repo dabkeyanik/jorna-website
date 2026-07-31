@@ -59,7 +59,6 @@ import {
 import {
   categoryLabel,
   priceLine,
-  WEEKDAYS,
   type AvailabilitySlot,
   type Earnings,
   type ServiceItem,
@@ -67,7 +66,7 @@ import {
   type VendorBooking,
   type VendorDetail,
 } from "@/lib/types";
-import { Avatar, Button, Card, LinkButton } from "@/components/ui";
+import { Avatar, Button, LinkButton } from "@/components/ui";
 import { VendorNav } from "@/components/VendorNav";
 import { NegotiationPanel } from "@/components/NegotiationPanel";
 import { DateChangeRequest } from "@/components/DateChangeRequest";
@@ -569,51 +568,11 @@ export default function VendorDashboardPage() {
         </section>
       ) : null}
 
-      {/* ── Availability ──
-          Only once there are hours to show. Empty, this was a card saying
-          "you haven't set any weekly hours" directly above a listing-health row
-          saying the same thing with the same button — and the health list is
-          where it belongs, next to the other reasons a vendor isn't getting
-          found. */}
-      {availability.length > 0 ? (
-        <section className="mt-10">
-          <SectionLabel>Availability</SectionLabel>
-          <Card className="overflow-hidden">
-            <>
-              {WEEKDAYS.map((day, i) => {
-                const slots = availability.filter((s) => s.day_of_week === i);
-                return (
-                  <div
-                    key={day}
-                    className="flex items-center justify-between gap-3 border-b border-line-soft px-4 py-2.5 last:border-b-0"
-                  >
-                    <span className="text-sm text-ink-soft">{day}</span>
-                    {slots.length === 0 ? (
-                      <span className="text-sm text-ink-faint">Unavailable</span>
-                    ) : (
-                      <span className="flex flex-wrap justify-end gap-1.5">
-                        {slots.map((s, n) => (
-                          <span
-                            key={n}
-                            className="rounded-full bg-panel px-2.5 py-0.5 text-xs tabular-nums text-ink"
-                          >
-                            {s.start_time} – {s.end_time}
-                          </span>
-                        ))}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-              <div className="px-4 py-3">
-                <LinkButton href="/my-availability" variant="ghost" size="md">
-                  Edit hours
-                </LinkButton>
-              </div>
-            </>
-          </Card>
-        </section>
-      ) : null}
+      {/* No weekly hours here. Whether they're set is a listing-health row
+          below — the consequence of not setting them is why a vendor would care
+          — and the hours themselves belong on /my-calendar, next to the grid
+          they constrain, rather than under a vendor's next jobs. That made
+          three places showing them and one place editing them. */}
 
       {/* ── Listing health ── */}
       {health.length > 0 ? (

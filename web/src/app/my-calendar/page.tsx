@@ -19,7 +19,6 @@
 // links through to them rather than dropping them.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
@@ -684,11 +683,9 @@ export default function VendorCalendarPage() {
         </Card>
       </section>
 
-      <p className="mt-8 text-center text-sm text-ink-faint">
-        <Link href="/my-bookings" className="text-gold hover:underline">
-          All your bookings
-        </Link>
-      </p>
+      {/* No "all your bookings" footer: VendorNav carries that link at the top
+          of every vendor page, and the upcoming list above already leads into
+          the individual ones. */}
     </div>
   );
 }
