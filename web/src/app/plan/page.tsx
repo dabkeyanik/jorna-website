@@ -50,14 +50,6 @@ const IconUsers = (
   </svg>
 );
 
-/** "2027-10-01" → "1 Oct 2027". Raw ISO reads like a database row. */
-function prettyDate(iso: string): string {
-  const d = new Date(`${iso}T00:00:00`);
-  return Number.isNaN(d.getTime())
-    ? iso
-    : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-}
-
 function SkeletonBundles() {
   return (
     <section className="mt-12">
@@ -128,12 +120,6 @@ function PlanInner() {
   // what the escrow gate treats as the last day.
   const [eventDateEnd, setEventDateEnd] = useState("");
   const [multiDay, setMultiDay] = useState(false);
-  // Or: the date isn't settled, and this is the window it falls inside. A
-  // different thing entirely — the backend takes its first day as a provisional
-  // date and drops the width, rather than booking a fortnight-long event.
-  const [dateMode, setDateMode] = useState<"on" | "between">("on");
-  const [windowStart, setWindowStart] = useState("");
-  const [windowEnd, setWindowEnd] = useState("");
   const [guests, setGuests] = useState(params.get("guests") ?? "");
   // Optional, and worth asking: a vendor's day isn't one booking, so knowing
   // the hours is what lets somebody with a morning ceremony be offered for an
@@ -246,17 +232,11 @@ function PlanInner() {
         location: (byZip ? zipPlaceLabel : location.trim()) || null,
         latitude: (byZip ? zipPlace?.point?.lat : coords?.lat) ?? null,
         longitude: (byZip ? zipPlace?.point?.lng : coords?.lng) ?? null,
-        // Exactly one of these two. A settled date can carry a last day; a
-        // window carries neither, and never reaches the booking's date_end —
-        // see DateRange. Sending both would make the backend choose, and the
-        // client would never learn which it picked.
-        event_date: dateMode === "on" ? eventDate || null : null,
-        event_date_end:
-          dateMode === "on" && multiDay ? eventDateEnd || null : null,
-        date_range:
-          dateMode === "between" && (windowStart || windowEnd)
-            ? { start: windowStart || null, end: windowEnd || null }
-            : null,
+        // A last day only when the celebration genuinely runs across days —
+        // it becomes the booking's date_end, which a per-day vendor bills for
+        // and the escrow gate waits out.
+        event_date: eventDate || null,
+        event_date_end: multiDay ? eventDateEnd || null : null,
         guest_count: guests ? Number(guests) : null,
         // Only as a pair. One half of a window says nothing an availability
         // check can use, and would be written onto the bookings as a start with
@@ -350,101 +330,57 @@ function PlanInner() {
         </div>
 
         {/* ── When ──────────────────────────────────────────────────────
-            Three different answers, and the difference matters downstream.
-            A settled day (optionally running into others) becomes the
+            A settled day, optionally running into others. It becomes the
             booking's first and last day: what a per-day vendor bills for,
-            what the escrow gate waits out, what the run sheet lays out. An
-            unsettled window is none of that — it's a hint for matching, and
-            its first day is pencilled in as somewhere to start.
+            what the escrow gate waits out, what the run sheet lays out.
 
             Kept out of the grid above because it now needs the room. */}
         <div className="mt-7">
-          <div className="mb-2.5 flex items-baseline justify-between gap-2">
-            <p className="text-sm font-medium text-ink-soft">When</p>
-            <button
-              type="button"
-              onClick={() => setDateMode((m) => (m === "on" ? "between" : "on"))}
-              className="shrink-0 text-xs font-semibold text-gold hover:underline"
-            >
-              {dateMode === "on" ? "Not sure of the date yet" : "I know the date"}
-            </button>
-          </div>
+          <p className="mb-2.5 text-sm font-medium text-ink-soft">When</p>
 
-          {dateMode === "on" ? (
-            <>
-              <div className="grid gap-2.5 sm:grid-cols-2">
-                <Field
-                  label={multiDay ? "First day" : "Event date"}
-                  type="date"
-                  icon={IconCalendar}
-                  value={eventDate}
-                  onChange={(e) => setEventDate(e.target.value)}
-                />
-                {multiDay ? (
-                  <Field
-                    label="Last day"
-                    type="date"
-                    icon={IconCalendar}
-                    min={eventDate || undefined}
-                    value={eventDateEnd}
-                    onChange={(e) => setEventDateEnd(e.target.value)}
-                  />
-                ) : (
-                  <div className="flex items-end">
-                    {/* Same affordance and wording as the booking form, so the
-                        two places you can say this say it the same way. */}
-                    <button
-                      type="button"
-                      className="pb-2.5 text-sm font-semibold text-gold hover:underline"
-                      onClick={() => setMultiDay(true)}
-                    >
-                      + Runs across multiple days
-                    </button>
-                  </div>
-                )}
-              </div>
-              {multiDay ? (
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <Field
+              label={multiDay ? "First day" : "Event date"}
+              type="date"
+              icon={IconCalendar}
+              value={eventDate}
+              onChange={(e) => setEventDate(e.target.value)}
+            />
+            {multiDay ? (
+              <Field
+                label="Last day"
+                type="date"
+                icon={IconCalendar}
+                min={eventDate || undefined}
+                value={eventDateEnd}
+                onChange={(e) => setEventDateEnd(e.target.value)}
+              />
+            ) : (
+              <div className="flex items-end">
+                {/* Same affordance and wording as the booking form, so the
+                    two places you can say this say it the same way. */}
                 <button
                   type="button"
-                  className="mt-2 text-xs text-ink-faint hover:text-ink"
-                  onClick={() => {
-                    setMultiDay(false);
-                    setEventDateEnd("");
-                  }}
+                  className="pb-2.5 text-sm font-semibold text-gold hover:underline"
+                  onClick={() => setMultiDay(true)}
                 >
-                  Single day instead
+                  + Runs across multiple days
                 </button>
-              ) : null}
-            </>
-          ) : (
-            <>
-              <div className="grid gap-2.5 sm:grid-cols-2">
-                <Field
-                  label="Sometime after"
-                  type="date"
-                  icon={IconCalendar}
-                  value={windowStart}
-                  onChange={(e) => setWindowStart(e.target.value)}
-                />
-                <Field
-                  label="And before"
-                  type="date"
-                  icon={IconCalendar}
-                  min={windowStart || undefined}
-                  value={windowEnd}
-                  onChange={(e) => setWindowEnd(e.target.value)}
-                />
               </div>
-              {/* Said before it happens. A date nobody chose, appearing on a
-                  plan as though they had, is the thing this window is most
-                  likely to cause. */}
-              <p className="mt-2 text-xs text-ink-faint">
-                {windowStart
-                  ? `We'll pencil your plan in for ${prettyDate(windowStart)} and look for vendors free around then. Change it on your plan before you send it.`
-                  : "We'll look for vendors free around then, and pencil your plan in for the first day."}
-              </p>
-            </>
-          )}
+            )}
+          </div>
+          {multiDay ? (
+            <button
+              type="button"
+              className="mt-2 text-xs text-ink-faint hover:text-ink"
+              onClick={() => {
+                setMultiDay(false);
+                setEventDateEnd("");
+              }}
+            >
+              Single day instead
+            </button>
+          ) : null}
         </div>
 
 
