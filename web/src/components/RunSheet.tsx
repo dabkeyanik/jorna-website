@@ -11,15 +11,23 @@
 // recorded (the vendor's GPS check-in) and was likewise invisible to the person
 // who most wants it — the host standing in a hall wondering who's turned up.
 //
-// It appears in the week before the first day and not until then. Both of those
-// jobs are same-week jobs; months out it was a second copy of the vendor list,
-// above the parts of the page a host can still do something about.
+// It shows whenever there is a schedule to show. Only the arrivals half waits
+// for the week of — see runSheetIsDue — because "who has turned up" answers
+// nothing in April, while "who is coming, when, and where" is exactly the thing
+// a host wants to check months out.
+//
+// Collapsible, and collapsed by default until that week. Always-on and always
+// open, it is a second copy of the vendor list sitting between the host and the
+// parts of the page they can act on; the summary line says what it holds so
+// opening it is a choice rather than a guess. Once the day is close it opens
+// itself, because that is when it stops being reference and starts being the
+// thing you are actually looking at.
 //
 // Times are shown when there are any to show — see ScheduleDay.timesKnown. A day
 // where nothing has hours yet lists its vendors without inventing clock times,
 // and says so.
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { resendCheckInEmail } from "@/lib/jorna";
 import { categoryLabel, formatCheckInTime, type BundleBooking } from "@/lib/types";
@@ -194,7 +202,6 @@ function Entry({
 
 export function RunSheet({ bundle }: { bundle: BundleDetail }) {
   const days = scheduleFor(bundle);
-  if (days.length === 0) return null;
 
   // Two jobs, and only one of them is a same-week job.
   //
@@ -210,16 +217,74 @@ export function RunSheet({ bundle }: { bundle: BundleDetail }) {
   // refused anyway.
   const onTheDay = runSheetIsDue(days);
 
+  // Null until the host says otherwise, so the default keeps tracking how close
+  // the day is rather than freezing whatever it was when this first rendered —
+  // a plan opened weeks out and left open would otherwise still be collapsed on
+  // the morning itself. One click and their choice wins from then on.
+  const [override, setOverride] = useState<boolean | null>(null);
+  const open = override ?? onTheDay;
+  const panelId = useId();
+
+  // After the hooks: they have to run in the same order every render, and an
+  // early return above them wouldn't.
+  if (days.length === 0) return null;
+
+  const vendorCount = new Set(
+    days.flatMap((day) => day.entries.map((entry) => entry.booking.booking_id)),
+  ).size;
+
   return (
     <section className="mt-8">
-      <h2 className="eyebrow mb-3">{onTheDay ? "The day" : "The order of the day"}</h2>
-      {!onTheDay ? (
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="eyebrow">{onTheDay ? "The day" : "The order of the day"}</h2>
+        <button
+          type="button"
+          onClick={() => setOverride(!open)}
+          aria-expanded={open}
+          aria-controls={panelId}
+          className="shrink-0 text-xs font-semibold text-gold transition hover:underline"
+        >
+          {open ? "Hide" : "Show"}
+        </button>
+      </div>
+
+      {!open ? (
+        // Enough to decide whether to open it. A collapsed section that says
+        // only "Show" asks the host to remember what it holds.
+        <button
+          type="button"
+          onClick={() => setOverride(true)}
+          aria-controls={panelId}
+          aria-expanded={false}
+          className="w-full rounded-2xl border border-card-edge bg-card p-4 text-left transition hover:border-gold/60"
+        >
+          <p className="text-sm text-ink">
+            {days.length === 1
+              ? dayLabel(days[0].dateIso)
+              : `${days.length} days from ${dayLabel(days[0].dateIso)}`}
+            {relative(days[0].dateIso) ? (
+              <span className="text-ink-faint"> · {relative(days[0].dateIso)}</span>
+            ) : null}
+          </p>
+          <p className="mt-0.5 text-xs text-ink-faint">
+            {vendorCount} {vendorCount === 1 ? "vendor" : "vendors"} · who&apos;s
+            coming, when, and where
+            {onTheDay ? "" : ". Check-ins appear here in the week before."}
+          </p>
+        </button>
+      ) : null}
+
+      {!onTheDay && open ? (
         <p className="mb-3 text-sm text-ink-soft">
           Who&apos;s coming, when, and where. Check-ins appear here in the week
           before.
         </p>
       ) : null}
-      <div className="grid gap-4">
+      {/* The `hidden` attribute beats the `grid` display utility here — preflight
+          emits [hidden]:where(:not([hidden=until-found])){display:none!important}
+          — so the two don't fight. Kept mounted rather than unmounted so
+          aria-controls always resolves to something. */}
+      <div id={panelId} hidden={!open} className="grid gap-4">
         {days.map((day) => (
           <div
             key={day.dateIso}
