@@ -413,7 +413,7 @@ export default function VendorDashboardPage() {
   const name = [vendor?.f_name, vendor?.l_name].filter(Boolean).join(" ");
 
   return (
-    <div className="mx-auto w-[min(1080px,100%-2rem)] py-10">
+    <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-10">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <Avatar src={vendor?.pfp_url} name={name} size={48} />

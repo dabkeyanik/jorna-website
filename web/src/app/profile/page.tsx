@@ -125,7 +125,7 @@ export default function ProfilePage() {
   const name = [user.f_name, user.l_name].filter(Boolean).join(" ") || user.username;
 
   return (
-    <div className="mx-auto w-[min(680px,100%-2rem)] py-10">
+    <div className="mx-auto w-[min(var(--container-page),100%-2rem)] py-10">
       <header className="flex items-center gap-4">
         {user.pfp_url ? (
           // eslint-disable-next-line @next/next/no-img-element

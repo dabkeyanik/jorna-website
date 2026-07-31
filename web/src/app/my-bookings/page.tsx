@@ -201,7 +201,7 @@ export default function MyBookingsPage() {
   const pendingCount = bookings.filter((b) => matches("pending", b)).length;
 
   return (
-    <div className="mx-auto w-[min(880px,100%-2rem)] py-10">
+    <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-10">
       <VendorNav />
       <header>
         <span className="eyebrow">Selling</span>

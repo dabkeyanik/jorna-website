@@ -237,7 +237,7 @@ export default function HomePage() {
     <div>
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <section className="border-b border-line-soft bg-gradient-to-b from-ground to-panel px-5 pb-16 pt-16 md:pb-24 md:pt-24">
-        <div className="mx-auto w-[min(1080px,100%)]">
+        <div className="mx-auto w-[min(var(--container-wide),100%)]">
           <div className="max-w-2xl">
             <Eyebrow>South Asian celebrations, expertly planned</Eyebrow>
             <h1 className="serif text-4xl text-maroon dark:text-gold md:text-6xl">
@@ -297,7 +297,7 @@ export default function HomePage() {
       {/* ── How it works ─────────────────────────────────────────────── */}
       {/* id: the signed-out header links here. */}
       <section id="how" className="scroll-mt-20 bg-ground-2 px-5 py-20 md:py-28">
-        <div className="mx-auto w-[min(1080px,100%)]">
+        <div className="mx-auto w-[min(var(--container-wide),100%)]">
           <Eyebrow>How it works</Eyebrow>
           <h2 className="serif text-3xl text-maroon dark:text-gold md:text-4xl">
             Plan your entire celebration in three steps.
@@ -324,7 +324,7 @@ export default function HomePage() {
 
       {/* ── The bundle builder ───────────────────────────────────────── */}
       <section className="px-5 py-20 md:py-28">
-        <div className="mx-auto w-[min(1080px,100%)]">
+        <div className="mx-auto w-[min(var(--container-wide),100%)]">
           <Eyebrow>The Jorna difference</Eyebrow>
           <h2 className="serif text-3xl text-maroon dark:text-gold md:text-4xl">
             Three complete vendor teams. Compare, choose, book.
@@ -453,7 +453,7 @@ export default function HomePage() {
 
       {/* ── Plan by celebration ──────────────────────────────────────── */}
       <section className="bg-panel px-5 py-14">
-        <div className="mx-auto w-[min(1080px,100%)]">
+        <div className="mx-auto w-[min(var(--container-wide),100%)]">
           <p className="eyebrow mb-6 text-ink-faint">Plan by celebration</p>
           <div className="grid grid-cols-4 gap-3 md:grid-cols-8">
             {CELEBRATIONS.map((c) => (
@@ -477,7 +477,7 @@ export default function HomePage() {
       {/* ── Real vendors ─────────────────────────────────────────────── */}
       {!vendorsFailed ? (
         <section className="bg-ground-2 px-5 py-20 md:py-28">
-          <div className="mx-auto w-[min(1080px,100%)]">
+          <div className="mx-auto w-[min(var(--container-wide),100%)]">
             <div className="mb-10 flex flex-col justify-between gap-6 md:flex-row md:items-end">
               <div>
                 <Eyebrow>Browse vendors</Eyebrow>
@@ -508,7 +508,7 @@ export default function HomePage() {
 
       {/* ── For vendors ──────────────────────────────────────────────── */}
       <section id="vendors" className="scroll-mt-20 px-5 py-20 md:py-28">
-        <div className="mx-auto w-[min(1080px,100%)]">
+        <div className="mx-auto w-[min(var(--container-wide),100%)]">
           <div className="overflow-hidden rounded-2xl bg-maroon shadow-[0_32px_64px_-20px_rgba(74,11,26,0.4)] md:grid md:grid-cols-2">
             <div className="h-56 bg-maroon-deep md:h-auto md:min-h-[320px]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -553,7 +553,7 @@ export default function HomePage() {
 
       {/* ── Escrow / trust ───────────────────────────────────────────── */}
       <section className="bg-panel px-5 py-20 md:py-28">
-        <div className="mx-auto w-[min(1080px,100%)]">
+        <div className="mx-auto w-[min(var(--container-wide),100%)]">
           <div className="mx-auto mb-12 max-w-lg text-center">
             <Eyebrow>Protected by escrow</Eyebrow>
             <h2 className="serif text-3xl text-maroon dark:text-gold md:text-4xl">
@@ -665,7 +665,7 @@ export default function HomePage() {
 
       {/* ── Closing CTA ──────────────────────────────────────────────── */}
       <section className="px-5 py-20">
-        <div className="mx-auto w-[min(1080px,100%)]">
+        <div className="mx-auto w-[min(var(--container-wide),100%)]">
           <div className="rounded-2xl border border-card-edge bg-panel px-8 py-14 text-center">
             <h2 className="serif text-3xl text-maroon dark:text-gold md:text-4xl">
               Ready to plan your celebration?

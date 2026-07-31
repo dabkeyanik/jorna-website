@@ -495,7 +495,7 @@ function DashboardInner() {
   const totalTasks = (celebrations ?? []).reduce((n, c) => n + c.tasks.length, 0);
 
   return (
-    <div className="mx-auto w-[min(880px,100%-2rem)] py-10">
+    <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-10">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <span className="eyebrow">Your celebrations</span>

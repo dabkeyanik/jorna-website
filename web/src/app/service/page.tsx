@@ -397,7 +397,7 @@ function ServiceInner() {
     : null;
 
   return (
-    <div className="mx-auto w-[min(1100px,100%-2rem)] py-8">
+    <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-8">
       <Link href="/marketplace" className="text-sm text-ink-soft hover:text-ink">
         ← Back to marketplace
       </Link>

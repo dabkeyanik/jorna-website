@@ -132,7 +132,7 @@ export default function VendorProfilePage() {
   }
 
   return (
-    <div className="mx-auto w-[min(680px,100%-2rem)] py-10">
+    <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-10">
       <VendorNav />
       {/* Everything a client sees, in one place: what you sell, who you are,
           and what people have said. Services used to be a page of their own,

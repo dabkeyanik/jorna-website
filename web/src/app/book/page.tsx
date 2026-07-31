@@ -264,7 +264,7 @@ function BookInner() {
   const total = estimate();
 
   return (
-    <div className="mx-auto w-[min(680px,100%-2rem)] py-10">
+    <div className="mx-auto w-[min(var(--container-page),100%-2rem)] py-10">
       <Link
         href={`/vendor?id=${service.vendor_id}`}
         className="text-sm text-ink-soft hover:text-ink"

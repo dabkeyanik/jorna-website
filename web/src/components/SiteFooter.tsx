@@ -15,7 +15,7 @@
 export function SiteFooter() {
   return (
     <footer className="mt-16 border-t border-line-soft py-8">
-      <div className="mx-auto flex w-[min(1080px,100%-2rem)] flex-wrap items-center justify-between gap-3 text-sm">
+      <div className="mx-auto flex w-[min(var(--container-wide),100%-2rem)] flex-wrap items-center justify-between gap-3 text-sm">
         <a href="/help/" className="text-ink-soft transition hover:text-ink">
           ← About Jorna
         </a>

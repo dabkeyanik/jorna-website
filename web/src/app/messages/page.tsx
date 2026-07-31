@@ -74,7 +74,7 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="mx-auto w-[min(680px,100%-2rem)] py-10">
+    <div className="mx-auto w-[min(var(--container-page),100%-2rem)] py-10">
       <header>
         <span className="eyebrow">Messages</span>
         <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold sm:text-5xl">

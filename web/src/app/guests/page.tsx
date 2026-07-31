@@ -860,7 +860,7 @@ function GuestsInner() {
   const backHref = bundleId ? `/bundle?id=${bundleId}` : "/bundles";
 
   return (
-    <div className="mx-auto w-[min(880px,100%-2rem)] py-10">
+    <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-10">
       <Link href={backHref} className="text-sm text-ink-soft hover:text-ink">
         ← Back to the plan
       </Link>

@@ -21,7 +21,7 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-20 border-b border-line-soft bg-ground/85 backdrop-blur">
-      <div className="mx-auto flex w-[min(1080px,100%-2rem)] items-center justify-between gap-3 py-3 md:gap-6">
+      <div className="mx-auto flex w-[min(var(--container-wide),100%-2rem)] items-center justify-between gap-3 py-3 md:gap-6">
         {/* The wordmark goes Home — the ordinary thing a logo does. It points at
             /home rather than "/", which is the app entry that only redirects
             here anyway; for a vendor, home is their dashboard. */}

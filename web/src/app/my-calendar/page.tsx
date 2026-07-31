@@ -428,7 +428,7 @@ export default function VendorCalendarPage() {
   const withWork = days.filter((d) => d.inMonth && d.status !== "free").length;
 
   return (
-    <div className="mx-auto w-[min(880px,100%-2rem)] py-10">
+    <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-10">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <span className="eyebrow">Vendor</span>

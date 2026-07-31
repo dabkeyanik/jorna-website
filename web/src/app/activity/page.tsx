@@ -51,7 +51,7 @@ export default function ActivityPage() {
   }
 
   return (
-    <div className="mx-auto w-[min(680px,100%-2rem)] py-10">
+    <div className="mx-auto w-[min(var(--container-page),100%-2rem)] py-10">
       <h1 className="serif text-4xl text-maroon dark:text-gold">Needs you</h1>
       <p className="mt-2 mb-6 text-ink-soft">Everything waiting on you, in one place.</p>
 

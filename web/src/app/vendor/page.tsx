@@ -240,7 +240,7 @@ function VendorInner() {
   if (vendor.open_to_price_negotiation) tiles.push({ value: "Open", label: "To offers" });
 
   return (
-    <div className="mx-auto w-[min(1080px,100%-2rem)] py-10">
+    <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-10">
       <Link href="/marketplace" className="text-sm text-ink-soft hover:text-ink">
         ← Back to marketplace
       </Link>

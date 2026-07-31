@@ -270,7 +270,7 @@ function MarketplaceInner() {
   const placeUnrecognised = place.trim() !== "" && !state;
 
   return (
-    <div className="mx-auto w-[min(1080px,100%-2rem)] py-10">
+    <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-10">
       {/* Adding a service as a draft lands back here, because assembling a plan
           means adding the next thing. The confirmation names what went where so
           the return doesn't read as the click having failed. */}
