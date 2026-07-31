@@ -303,7 +303,11 @@ function PlanInner() {
 
             Where subgrid isn't supported the column falls back to a plain
             grid — unaligned, but laid out and usable. */}
-        <div className="lg:grid lg:grid-cols-2 lg:grid-rows-4 lg:gap-x-9 lg:gap-y-6">
+        {/* auto rows, not grid-rows-4 — that one means repeat(4,minmax(0,1fr)),
+            four EQUAL rows, so the height of the tallest was handed to all of
+            them and the heading row grew a field's worth of empty space under
+            it. Each row should be as tall as its own content. */}
+        <div className="lg:grid lg:grid-cols-2 lg:grid-rows-[auto_auto_auto_auto] lg:gap-x-9 lg:gap-y-6">
           <div className="grid gap-6 lg:row-span-4 lg:grid-rows-subgrid">
             <p className="eyebrow">The event</p>
 
