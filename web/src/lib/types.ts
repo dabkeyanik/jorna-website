@@ -561,7 +561,10 @@ export interface TaxonomyCategory extends TaxonomyOption {
 
 export interface VendorCreateInput {
   bio: string;
-  category: string;
+  /** Optional. What a vendor sells is each service's own category — signing up
+   *  no longer asks, and an unset one is stored as "other" until a service says
+   *  otherwise. Search reads the services (see the backend's search_vendors). */
+  category?: string;
   subcategory?: string | null;
 }
 

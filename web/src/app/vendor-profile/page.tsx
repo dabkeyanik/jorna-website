@@ -88,11 +88,9 @@ export default function VendorProfilePage() {
         });
         setVendor(updated);
       } else {
-        const created = await createVendor({
-          bio,
-          category,
-          subcategory: subcategory || null,
-        });
+        // No category. Signing up is about who you are; what you sell is each
+        // service's own category, chosen when the service is added.
+        const created = await createVendor({ bio });
         setVendor(created);
       }
       setSaved(true);
@@ -123,45 +121,48 @@ export default function VendorProfilePage() {
         <p className="mt-3 text-ink-soft">
           {vendor
             ? "This is what clients see when they find you in search or an AI bundle."
-            : "Who you are, so clients know who they're booking. Your services and prices come next."}
+            : "Who you are, so clients know who they're booking. What you sell — and the category each one is in — comes next, one service at a time."}
         </p>
       </header>
 
       <Card className="mt-7 p-6">
         <form onSubmit={submit} className="grid gap-4">
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-ink-soft">
-              Your main category
-            </span>
-            <select
-              required
-              value={category}
-              onChange={(e) => {
-                setCategory(e.target.value);
-                setSubcategory("");
-              }}
-              className="w-full rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5 text-ink outline-none focus:border-gold"
-            >
-              <option value="" disabled>
-                Choose a category
-              </option>
-              {categories.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
+          {/* Only once they exist. Signing up asks who you are; what you sell
+              is decided per service, where it can differ per service — a DJ who
+              also does lighting had to pick one here and was findable under
+              only that one. Kept on the edit form because it still seeds a new
+              service's category and still reads as a headline on the profile. */}
+          {vendor ? (
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-ink-soft">
+                Your main category
+              </span>
+              <select
+                required
+                value={category}
+                onChange={(e) => {
+                  setCategory(e.target.value);
+                  setSubcategory("");
+                }}
+                className="w-full rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5 text-ink outline-none focus:border-gold"
+              >
+                <option value="" disabled>
+                  Choose a category
                 </option>
-              ))}
-            </select>
-            {/* Said here because it isn't obvious, and because the old heading
-                implied the opposite: this is how you're listed, not what any
-                one service is. A DJ who also does lighting sets that per
-                service — this one only decides what a new service starts as. */}
-            <span className="mt-1 block text-xs text-ink-faint">
-              How you&apos;re listed. Each service you add gets its own category,
-              and starts from this one.
-            </span>
-          </label>
+                {categories.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs text-ink-faint">
+                How you&apos;re listed. Each service you add gets its own
+                category, and starts from this one.
+              </span>
+            </label>
+          ) : null}
 
-          {subOptions.length > 0 ? (
+          {vendor && subOptions.length > 0 ? (
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium text-ink-soft">
                 Speciality
