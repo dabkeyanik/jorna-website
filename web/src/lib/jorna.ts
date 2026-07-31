@@ -308,6 +308,23 @@ export function updateMe(updates: MeUpdate): Promise<User> {
   return apiFetch<User>("/me", { method: "PATCH", body: updates });
 }
 
+/**
+ * Delete the signed-in account, permanently.
+ *
+ * The backend removes the user, their vendor profile if they have one, its
+ * services and availability, and every booking on either side of the account.
+ * There is no undo and no soft-delete to recover from.
+ *
+ * It does not check escrow. A booking holding money is deleted like any other,
+ * and deleting it doesn't return the money — it removes the record of where the
+ * money went, which is why deleting a *plan* is refused while any of its
+ * bookings hold funds. Callers should apply that same rule here; the profile
+ * page does.
+ */
+export function deleteMe(): Promise<void> {
+  return apiFetch<void>("/me", { method: "DELETE" });
+}
+
 /** Upload a profile picture (multipart, field `file`). Returns the updated user. */
 export function uploadAvatar(file: File): Promise<User> {
   const form = new FormData();
