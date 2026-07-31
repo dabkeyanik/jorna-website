@@ -1682,6 +1682,32 @@ function BundleInner() {
             </>
           ) : null}
         </div>
+
+        {/* Date, place, headcount and budget, directly under the money they
+            decide. These were most of a page apart — the figure at the top, the
+            facts behind it below the send banner, the vendor list and the run
+            sheet — so answering "what is this plan, and what is it costing me"
+            meant scrolling between two halves of one answer. Together they are
+            the top of the page, and everything below is detail. */}
+        {bundle.event ? (
+          <CelebrationPanel
+            key={venueKey}
+            summary={bundle.event}
+            full={event}
+            bookings={bundle.bookings}
+            bundleId={bundle.bundle_id}
+            onSaved={load}
+          />
+        ) : null}
+
+        {/* The card that gets charged, on any sent plan. It used to live inside
+            the "waiting on your vendors" banner, which only appeared while a
+            vendor hadn't answered — so the moment the last one did, the card
+            being charged automatically became unnamed and unchangeable. It
+            belongs with the rest of the money. */}
+        {!draft ? (
+          <CardOnFile card={card} busy={addingCard} onAdd={addCard} sent />
+        ) : null}
       </header>
 
       {draft ? (
@@ -1731,44 +1757,19 @@ function BundleInner() {
           </div>
         </section>
       ) : (
-        // Sent. These two are deliberately not a chain — a plan can be waiting
-        // on vendors and still short of a detail at the same time, and if the
-        // receipt hid the editor then the "add that above" link on a booking
-        // card would point at a section that wasn't rendered.
+        // Sent.
+        //
+        // There was a banner here saying how many vendors hadn't answered yet.
+        // It's gone: the task list below already names each waiting service and
+        // its vendor, one row each, and repeating the count in a coloured box at
+        // the top said the same thing less specifically and further from
+        // anything you could do about it. The status pill on every booking card
+        // says it a third time.
+        //
+        // What the banner did carry that nothing else did — the card on file —
+        // has moved up beside the money, where it is no longer conditional on a
+        // vendor being slow to reply.
         <>
-          {plan.awaiting.length > 0 ? (
-            // Sending used to be the moment the page went quiet: the draft
-            // banner was the only thing saying where the plan stood, and it
-            // disappears the instant you succeed — leaving a host to work out
-            // from a row of status pills whether anything had happened at all.
-            <section className="mt-6 rounded-2xl border border-gold/50 bg-gold/[0.07] p-5">
-              <h2 className="serif text-lg text-ink">
-                {plan.booked.length > 0
-                  ? `Waiting on ${plan.awaiting.length} of your vendors`
-                  : "Sent — waiting on your vendors"}
-              </h2>
-              <p className="mt-1 max-w-[60ch] text-sm text-ink-soft">
-                {plan.awaiting.length === 1
-                  ? `${plan.awaiting[0].vendor_name || "One vendor"} has your request and hasn't answered yet.`
-                  : `${plan.awaiting.length} vendors have your request and haven't answered yet.`}{" "}
-                Their answers appear here. You can cancel a request while
-                it&apos;s still open.{" "}
-                {/* "nothing is charged until one accepts and you pay" was true
-                    before the card on file existed. With one, accepting IS the
-                    charge — and a client told they'd be asked first is being
-                    told the wrong thing about their own money. */}
-                {card?.has_card
-                  ? "When one accepts, your card is charged for that booking."
-                  : "Nothing is charged until one accepts and you pay."}
-              </p>
-
-              {/* The card lives here too now. It used to be inside the draft
-                  banner, which vanishes on send — leaving the card that gets
-                  charged automatically unnamed and unchangeable from then on. */}
-              <CardOnFile card={card} busy={addingCard} onAdd={addCard} sent />
-            </section>
-          ) : null}
-
           {readiness.blocked.length > 0 ? (
             // Sent, and still short of something. Until this existed it was a
             // dead end: the editor above only ever appeared on drafts, so a
@@ -1783,17 +1784,6 @@ function BundleInner() {
           ) : null}
         </>
       )}
-
-      {bundle.event ? (
-        <CelebrationPanel
-          key={venueKey}
-          summary={bundle.event}
-          full={event}
-          bookings={bundle.bookings}
-          bundleId={bundle.bundle_id}
-          onSaved={load}
-        />
-      ) : null}
 
       {/* The dashboard opens the first bundle, so any others under the same
           event would otherwise be unreachable from here. Rare: the builder
