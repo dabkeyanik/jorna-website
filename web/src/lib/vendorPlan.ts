@@ -22,6 +22,10 @@ export type VendorTaskKind =
   | "stripe"
   /** A client is waiting on a yes or no. */
   | "request"
+  /** A client has offered a different price and nobody has answered. */
+  | "negotiation"
+  /** A client wants to move the date and it's the vendor's turn to say. */
+  | "date-change"
   /** Their own payout is blocked on this. */
   | "confirm"
   | "check-in";
@@ -279,6 +283,47 @@ export function vendorTasks(
       continue;
     }
 
+    // An offer on the table. The client has named a different price and the
+    // booking is stuck until somebody answers — it was reachable only from
+    // /my-bookings, so a vendor who never opened that tab had a sale sitting
+    // unanswered with nothing anywhere telling them.
+    if (b.status === "negotiation_ongoing") {
+      tasks.push({
+        id: `offer-${b.booking_id}`,
+        kind: "negotiation",
+        title: `${client} made an offer on ${service}`,
+        detail: niceDate(b.date_iso)
+          ? `For ${niceDate(b.date_iso)} · listed at ${plainMoney(b.price)}`
+          : `Listed at ${plainMoney(b.price)}`,
+        cta: "Review offer",
+        tone: "urgent",
+        bookingId: b.booking_id,
+      });
+      continue;
+    }
+
+    // A date move waiting on this vendor. Deliberately not `continue`d: a paid
+    // booking can owe both an answer on the new date and a confirmation, and
+    // they are different jobs.
+    //
+    // Whose turn it is has no flag of its own — a repriced amount means the
+    // vendor has already answered and the client is being asked to accept the
+    // new total, which is exactly what awaitingClientConsent reads.
+    const cr = b.change_request;
+    if (cr && cr.status === "pending" && cr.repriced_amount_cents == null) {
+      tasks.push({
+        id: `move-${cr.change_request_id}`,
+        kind: "date-change",
+        title: `${client} wants to move ${service}`,
+        detail: niceDate(cr.date_iso)
+          ? `To ${niceDate(cr.date_iso)}${niceDate(b.date_iso) ? ` — was ${niceDate(b.date_iso)}` : ""}`
+          : "They've proposed a new date.",
+        cta: "Answer",
+        tone: "urgent",
+        bookingId: b.booking_id,
+      });
+    }
+
     // Paid, but the vendor's half of the release is outstanding — this is their
     // own money waiting. Mirrors lib/attention, which had these rules first.
     if ((b.payment_status ?? "unpaid") === "paid" && !b.vendor_confirmed_at) {
@@ -454,23 +499,15 @@ export function listingHealth(opts: {
   vendor: VendorDetail | null;
   services: ServiceItem[];
   availability: AvailabilitySlot[];
-  stripe: StripeStatus | null;
 }): HealthIssue[] {
-  const { vendor, services, availability, stripe } = opts;
+  const { vendor, services, availability } = opts;
   const issues: HealthIssue[] = [];
 
-  const payments = paymentsSetup(stripe);
-  if (stripe && !payments.ready) {
-    issues.push({
-      id: "stripe",
-      issue: payments.title,
-      consequence: "Clients can book you, but no payment can reach you.",
-      cta: payments.cta,
-      href: "/my-earnings",
-      // Waiting on Stripe's own review isn't something they're failing at.
-      severity: payments.tone === "alarm" ? "critical" : "warning",
-    });
-  }
+  // No Stripe row. It was here and in vendorTasks, both worded by paymentsSetup
+  // — so the dashboard printed the same sentence twice, once as an alarm at the
+  // top and again in a list further down. The alarm is the one worth keeping:
+  // being unable to be paid at all is not the same kind of problem as a listing
+  // with no photo, and burying it among those flattened it.
 
   if (services.length === 0) {
     issues.push({
