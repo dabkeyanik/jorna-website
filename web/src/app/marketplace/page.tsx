@@ -1,9 +1,13 @@
 "use client";
 
-// Marketplace — every vendor on Jorna: search, category chips, filters,
-// pagination. This used to be an in-place "expanded" state of the Home tab's
-// search bar; it's its own tab now, so Home's search bar, tiles, and "Browse
-// every vendor" button link straight here instead of expanding in place.
+// Marketplace — every service on Jorna: search, category chips, filters,
+// pagination. Service, not vendor: /vendors/search returns one row per
+// vendor+listing pair (see VendorSearchItem), so a vendor selling three things
+// is three rows here, and the page says so.
+//
+// This used to be an in-place "expanded" state of the Home tab's search bar;
+// it's its own tab now, so Home's search bar, tiles, and "Browse every vendor"
+// button link straight here instead of expanding in place.
 //
 // A category (and, for a few tiles, subcategory) can arrive via ?category=
 // &subcategory= — that's how Home's tiles hand off into a preset filter.
@@ -288,7 +292,7 @@ function MarketplaceInner() {
       <header className="text-center">
         <span className="eyebrow">Marketplace</span>
         <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold sm:text-5xl">
-          Every vendor on Jorna
+          Every service on Jorna
         </h1>
         <p className="mx-auto mt-3 max-w-[52ch] text-ink-soft">
           Search by name or service, or filter by city, date, category, rating, and price.
