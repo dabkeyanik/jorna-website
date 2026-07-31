@@ -3,8 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// The seller-side pages, linked from each other so a vendor isn't hunting
-// through the header. basePath is applied by next/link, so hrefs stay app-relative.
+// The seller-side pages, on phones only.
+//
+// The desktop header carries all of these now (VENDOR_DESKTOP_TABS) — this
+// strip sat directly beneath it with "Dashboard" in both, a hand's width apart.
+// A phone tab bar can't hold nine, so there this survives: the bar is at the
+// bottom of the screen and this is at the top of the content, which doesn't
+// read as the same row twice.
+//
+// basePath is applied by next/link, so hrefs stay app-relative.
 //
 // Bookings used to also be a tab in the main nav; it isn't any more — the
 // dashboard is the way into the seller side, and this row is how you move
@@ -24,7 +31,7 @@ export function VendorNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="mb-7 flex flex-wrap gap-2 border-b border-line-soft pb-3">
+    <nav className="mb-7 flex flex-wrap gap-2 border-b border-line-soft pb-3 md:hidden">
       {TABS.map((t) => {
         const active = pathname?.startsWith(t.href);
         return (

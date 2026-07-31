@@ -122,11 +122,78 @@ export const VENDOR_TABS: NavItem[] = [
 ];
 
 /**
+ * Every seller destination, for the desktop header only.
+ *
+ * A vendor page used to carry two navigations: this bar with one Dashboard tab
+ * in it, and a second strip of six directly underneath — the same word twice,
+ * a hand's width apart. The header has room for the lot on a desktop, so it
+ * takes the lot, and VendorNav drops to phones (see VendorNav, md:hidden).
+ *
+ * Phones keep VENDOR_TABS. Nine icons across 390px is 43px each, and the tab
+ * bar's own note puts the floor at about 68 — there, the two navigations are at
+ * opposite ends of the screen and don't read as a repetition anyway.
+ *
+ * Their work first, then the account. "Listing" rather than a second "Profile":
+ * the two went to different pages under one word, and which one you got
+ * depended on which bar you happened to click.
+ */
+export const VENDOR_DESKTOP_TABS: NavItem[] = [
+  {
+    href: "/my-dashboard",
+    label: "Dashboard",
+    icon: icon(I.dashboard),
+    // Just itself here. The phone bar's Dashboard stands in for every seller
+    // page because it's the only seller tab there; up here each page has a tab
+    // of its own to light.
+    match: ["/my-dashboard", "/home", "/browse"],
+  },
+  {
+    href: "/my-bookings",
+    label: "Bookings",
+    icon: icon(I.dashboard),
+    match: ["/my-bookings"],
+  },
+  {
+    href: "/my-services",
+    label: "Services",
+    icon: icon(I.marketplace),
+    match: ["/my-services"],
+  },
+  {
+    href: "/my-calendar",
+    label: "Calendar",
+    icon: icon(I.dashboard),
+    match: ["/my-calendar", "/my-availability"],
+  },
+  {
+    href: "/my-earnings",
+    label: "Earnings",
+    icon: icon(I.dashboard),
+    match: ["/my-earnings"],
+  },
+  {
+    href: "/vendor-profile",
+    label: "Listing",
+    icon: icon(I.profile),
+    // "/vendor" is the public listing view — the same thing a client sees, so
+    // it belongs to this tab rather than leaving the bar unlit.
+    match: ["/vendor-profile", "/vendor", "/marketplace"],
+  },
+  NEEDS_YOU,
+  { href: "/messages", label: "Messages", icon: icon(I.messages), match: ["/messages"] },
+  { href: "/profile", label: "Profile", icon: icon(I.profile), match: ["/profile"] },
+];
+
+/**
  * The items to show, the badge count, and which one is current.
  * `items` is null for a signed-out visitor — browsing, "Get started", login.
+ *
+ * `desktopItems` differs only for a vendor, and only because the header has
+ * room the phone bar doesn't.
  */
 export function useAppNav(): {
   items: NavItem[] | null;
+  desktopItems: NavItem[] | null;
   attention: number;
   home: string;
   isActive: (item: NavItem) => boolean;
@@ -165,8 +232,10 @@ export function useAppNav(): {
     };
   }, [user, pathname]);
 
+  const signedOut = loading || !user;
   return {
-    items: loading || !user ? null : isVendor ? VENDOR_TABS : CLIENT_TABS,
+    items: signedOut ? null : isVendor ? VENDOR_TABS : CLIENT_TABS,
+    desktopItems: signedOut ? null : isVendor ? VENDOR_DESKTOP_TABS : CLIENT_TABS,
     attention,
     // Where the wordmark goes. A logo goes home, and home for a seller is their
     // dashboard — not the page selling the builder to everyone else.

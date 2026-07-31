@@ -17,7 +17,7 @@ import { Button, LinkButton } from "./ui";
 // as clutter in a header.
 export function SiteHeader() {
   const { user, loading, logout } = useAuth();
-  const { items, attention, home, isActive } = useAppNav();
+  const { desktopItems: items, attention, home, isActive } = useAppNav();
 
   return (
     <header className="sticky top-0 z-20 border-b border-line-soft bg-ground/85 backdrop-blur">
@@ -56,7 +56,10 @@ export function SiteHeader() {
 
         {items ? (
           <nav
-            className="hidden min-w-0 flex-1 items-center justify-end gap-5 md:flex lg:gap-6"
+            // gap-x tightens and the row is allowed to wrap: a vendor gets
+            // nine links here, and a header that overflows would put the
+            // last of them off the side of the page.
+            className="hidden min-w-0 flex-1 flex-wrap items-center justify-end gap-x-4 gap-y-1 md:flex lg:gap-x-5"
             aria-label="Primary"
           >
             {items.map((item) => {
