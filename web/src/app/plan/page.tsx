@@ -338,8 +338,6 @@ function PlanInner() {
             ) : null}
           </div>
           <Field
-            // Named so the results below can send someone back to it — without
-            // a headcount their per-person slots have no total to compare.
             id="plan-guests"
             label="Guests"
             type="number"
@@ -562,31 +560,6 @@ function PlanInner() {
           <p className="mt-2 text-center text-sm text-ink-soft">
             Compare, tweak, and choose — you can edit any bundle after picking it.
           </p>
-          {/* Three totals can only be compared if all three are totals. Without
-              a headcount every per-person service is carried at its rate, so the
-              cheapest-looking bundle may simply be the one with the most
-              unpriced catering — and one number fixes it. */}
-          {!guests && options.some((o) => (o.bundle.pending_quantity_count ?? 0) > 0) ? (
-            <div className="mx-auto mt-6 flex max-w-2xl flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/40 bg-gold/[0.08] px-4 py-3">
-              <p className="text-sm text-ink-soft">
-                Some of these charge per guest, so the totals below don&apos;t
-                include them yet.{" "}
-                <span className="text-ink">Add a guest count to compare properly.</span>
-              </p>
-              <Button
-                variant="ghost"
-                size="md"
-                onClick={() => {
-                  const field = document.getElementById("plan-guests");
-                  field?.scrollIntoView({ behavior: "smooth", block: "center" });
-                  (field as HTMLInputElement | null)?.focus({ preventScroll: true });
-                }}
-              >
-                Add guests
-              </Button>
-            </div>
-          ) : null}
-
           {options.every((o) => o.bundle.items.length === 0) ? (
             <p className="mt-8 text-center text-ink-soft">
               We couldn&apos;t find available vendors for those categories and date yet. Try a

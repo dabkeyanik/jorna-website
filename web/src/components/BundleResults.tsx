@@ -13,7 +13,6 @@
 import {
   categoryLabel,
   priceLine,
-  priceUnitLabel,
   type BundleOption,
   type BundleItem,
 } from "@/lib/types";
@@ -64,8 +63,10 @@ function BundleCard({
   const avg = rated.length ? rated.reduce((s, i) => s + i.rating, 0) / rated.length : 0;
 
   // Items whose total still can't be worked out. The bundle's total carries
-  // them at their rate, so it's a floor rather than an estimate — and the
-  // client has to be told which of the two they're reading.
+  // them at their rate, so it's a floor rather than an estimate — which is what
+  // the heading says, and all it needs to say. A boxed note repeating it under
+  // every card told the client three times over something each row already
+  // shows in its own caption ("$175 per hour").
   const pending =
     bundle.pending_quantity_count ??
     bundle.items.filter((i) => i.price_pending_quantity).length;
@@ -190,24 +191,6 @@ function BundleCard({
           );
         })}
       </ul>
-
-      {pending > 0 ? (
-        <p className="mt-4 rounded-lg border border-gold/40 bg-gold/[0.08] px-3 py-2 text-xs leading-relaxed text-ink-soft">
-          {pending === 1 ? "One service is" : `${pending} services are`} priced{" "}
-          {/* Named rather than described in the abstract: the row above says
-              "per person", and this says what to do about it. */}
-          {[
-            ...new Set(
-              bundle.items
-                .filter((i) => i.price_pending_quantity)
-                .map((i) => priceUnitLabel(i.price_unit) || "per unit"),
-            ),
-          ].join(" / ")}
-          , so the total above doesn&apos;t include{" "}
-          {pending === 1 ? "it" : "them"} yet. Add a guest count and times above
-          to price {pending === 1 ? "it" : "them"}.
-        </p>
-      ) : null}
 
       {unfilled.length > 0 ? (
         <p className="mt-4 rounded-lg bg-gold/10 px-3 py-2 text-xs leading-relaxed text-ink-soft">
