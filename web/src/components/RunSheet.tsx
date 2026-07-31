@@ -16,12 +16,10 @@
 // nothing in April, while "who is coming, when, and where" is exactly the thing
 // a host wants to check months out.
 //
-// Collapsible, and collapsed by default until that week. Always-on and always
-// open, it is a second copy of the vendor list sitting between the host and the
-// parts of the page they can act on; the summary line says what it holds so
-// opening it is a choice rather than a guess. Once the day is close it opens
-// itself, because that is when it stops being reference and starts being the
-// thing you are actually looking at.
+// Collapsible, and always collapsed to start. Always-on and always open, it is
+// a second copy of the vendor list sitting between the host and the parts of the
+// page they can act on; the summary line says what it holds so opening it is a
+// choice rather than a guess.
 //
 // Times are shown when there are any to show — see ScheduleDay.timesKnown. A day
 // where nothing has hours yet lists its vendors without inventing clock times,
@@ -217,12 +215,11 @@ export function RunSheet({ bundle }: { bundle: BundleDetail }) {
   // refused anyway.
   const onTheDay = runSheetIsDue(days);
 
-  // Null until the host says otherwise, so the default keeps tracking how close
-  // the day is rather than freezing whatever it was when this first rendered —
-  // a plan opened weeks out and left open would otherwise still be collapsed on
-  // the morning itself. One click and their choice wins from then on.
-  const [override, setOverride] = useState<boolean | null>(null);
-  const open = override ?? onTheDay;
+  // Always collapsed to start, however close the day is. The summary line says
+  // what's inside, so opening it is one click and a decision — and a section
+  // that decides for you when to unfold is one you have to fold back every time
+  // it guesses wrong.
+  const [open, setOpen] = useState(false);
   const panelId = useId();
 
   // After the hooks: they have to run in the same order every render, and an
@@ -239,7 +236,7 @@ export function RunSheet({ bundle }: { bundle: BundleDetail }) {
         <h2 className="eyebrow">{onTheDay ? "The day" : "The order of the day"}</h2>
         <button
           type="button"
-          onClick={() => setOverride(!open)}
+          onClick={() => setOpen(!open)}
           aria-expanded={open}
           aria-controls={panelId}
           className="shrink-0 text-xs font-semibold text-gold transition hover:underline"
@@ -253,7 +250,7 @@ export function RunSheet({ bundle }: { bundle: BundleDetail }) {
         // only "Show" asks the host to remember what it holds.
         <button
           type="button"
-          onClick={() => setOverride(true)}
+          onClick={() => setOpen(true)}
           aria-controls={panelId}
           aria-expanded={false}
           className="w-full rounded-2xl border border-card-edge bg-card p-4 text-left transition hover:border-gold/60"
