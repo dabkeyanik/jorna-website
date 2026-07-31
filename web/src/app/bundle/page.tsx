@@ -1010,7 +1010,7 @@ function CelebrationPanel({
 
   if (editing) {
     return (
-      <div className="mt-4 rounded-2xl border border-card-edge bg-card p-4">
+      <div className="mt-4 border-t border-line-soft pt-4">
         <p className="mb-3 text-sm font-medium text-ink-soft">Event details</p>
         <div className="grid gap-3 sm:grid-cols-2">
           {!committed ? (
@@ -1092,7 +1092,10 @@ function CelebrationPanel({
   }
 
   return (
-    <div className="mt-4 rounded-2xl border border-card-edge bg-card p-4">
+    // No card of its own: this renders inside the plan's summary card, whose
+    // border is the one the reader sees. A second border here drew a seam
+    // through one answer.
+    <div className="mt-4 border-t border-line-soft pt-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
           <Detail
@@ -1584,8 +1587,12 @@ function BundleInner() {
           {bundle.booking_count} {bundle.booking_count === 1 ? "vendor" : "vendors"}
         </p>
 
-        {/* Where the money is. "2 of 5 paid" was a count; the question is how
-            much is committed, how much has gone, and what's still to come. */}
+        {/* The plan at a glance: what it costs, what it is, and who's coming.
+            One card, because they are one answer — as two, the figure sat in a
+            box of its own above a second box holding the date and place that
+            produced it, and the seam between them implied a distinction that
+            doesn't exist. "2 of 5 paid" was a count; the question is how much is
+            committed, how much has gone, and what's still to come. */}
         <div className="mt-4 rounded-2xl border border-card-edge bg-panel p-4">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -1681,33 +1688,32 @@ function BundleInner() {
               </dl>
             </>
           ) : null}
+
+          {/* Date, place, headcount, budget and the guest list, under the money
+              they decide. These were most of a page apart — the figure at the
+              top, the facts behind it below the send banner, past the vendor
+              list — so "what is this plan, and what is it costing me" meant
+              scrolling between two halves of one answer. */}
+          {bundle.event ? (
+            <CelebrationPanel
+              key={venueKey}
+              summary={bundle.event}
+              full={event}
+              bookings={bundle.bookings}
+              bundleId={bundle.bundle_id}
+              onSaved={load}
+            />
+          ) : null}
+
+          {/* The card that gets charged, on any sent plan. It used to live
+              inside the "waiting on your vendors" banner, which only appeared
+              while a vendor hadn't answered — so the moment the last one did,
+              the card being charged automatically became unnamed and
+              unchangeable. It belongs with the rest of the money. */}
+          {!draft ? (
+            <CardOnFile card={card} busy={addingCard} onAdd={addCard} sent />
+          ) : null}
         </div>
-
-        {/* Date, place, headcount and budget, directly under the money they
-            decide. These were most of a page apart — the figure at the top, the
-            facts behind it below the send banner, the vendor list and the run
-            sheet — so answering "what is this plan, and what is it costing me"
-            meant scrolling between two halves of one answer. Together they are
-            the top of the page, and everything below is detail. */}
-        {bundle.event ? (
-          <CelebrationPanel
-            key={venueKey}
-            summary={bundle.event}
-            full={event}
-            bookings={bundle.bookings}
-            bundleId={bundle.bundle_id}
-            onSaved={load}
-          />
-        ) : null}
-
-        {/* The card that gets charged, on any sent plan. It used to live inside
-            the "waiting on your vendors" banner, which only appeared while a
-            vendor hadn't answered — so the moment the last one did, the card
-            being charged automatically became unnamed and unchangeable. It
-            belongs with the rest of the money. */}
-        {!draft ? (
-          <CardOnFile card={card} busy={addingCard} onAdd={addCard} sent />
-        ) : null}
       </header>
 
       {draft ? (
