@@ -298,7 +298,11 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
         <div className="mt-4">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 text-xs">
             <span className="text-ink-soft">
-              {money(celebration.money.committed)} committed
+              {/* A draft has committed to nothing — no vendor has been asked,
+                  and the figure is a sum of listed rates the client can still
+                  change. "Estimated" is what it is until the plan is sent. */}
+              {money(celebration.money.committed)}{" "}
+              {stage === "draft" ? "estimated" : "committed"}
               {unpriced > 0 ? <span className="text-ink-faint"> so far</span> : null}
               {celebration.budget ? (
                 <span className={overBudget ? "text-maroon dark:text-gold" : "text-ink-faint"}>

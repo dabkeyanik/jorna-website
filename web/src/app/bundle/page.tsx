@@ -1591,8 +1591,19 @@ function BundleInner() {
             <div>
               <p className="text-[0.68rem] uppercase tracking-[0.16em] text-ink-faint">
                 {/* A total that excludes some of the plan is not the plan's
-                    total, and shouldn't be labelled as one. */}
-                {cash.unpricedCount > 0 ? "Committed so far" : "Committed"}
+                    total, and shouldn't be labelled as one.
+
+                    Nothing on a draft is committed either. No vendor has been
+                    asked, every figure is still the listed rate, and the whole
+                    plan is the client's to change — calling that "committed"
+                    described an obligation that doesn't exist yet. */}
+                {draft
+                  ? cash.unpricedCount > 0
+                    ? "Estimate so far"
+                    : "Estimate"
+                  : cash.unpricedCount > 0
+                    ? "Committed so far"
+                    : "Committed"}
               </p>
               <p className="serif text-3xl text-ink">{money(cash.committed)}</p>
             </div>
