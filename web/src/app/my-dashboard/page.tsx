@@ -37,9 +37,9 @@ import {
   getMyVendor,
   getStripeStatus,
   getUnreadCount,
-  getVendorReviews,
   listServices,
   listVendorBookings,
+  respondToChange,
   setBookingStatus,
   startStripeOnboarding,
 } from "@/lib/jorna";
@@ -62,14 +62,15 @@ import {
   WEEKDAYS,
   type AvailabilitySlot,
   type Earnings,
-  type Review,
   type ServiceItem,
   type StripeStatus,
   type VendorBooking,
   type VendorDetail,
 } from "@/lib/types";
-import { Avatar, Button, Card, LinkButton, Stars } from "@/components/ui";
+import { Avatar, Button, Card, LinkButton } from "@/components/ui";
 import { VendorNav } from "@/components/VendorNav";
+import { NegotiationPanel } from "@/components/NegotiationPanel";
+import { DateChangeRequest } from "@/components/DateChangeRequest";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -101,7 +102,6 @@ interface Snapshot {
   stripe?: StripeStatus | null;
   services?: ServiceItem[];
   availability?: AvailabilitySlot[];
-  reviews?: Review[];
   unread?: number;
 }
 
@@ -212,7 +212,6 @@ export default function VendorDashboardPage() {
   const [stripe, setStripe] = useState<StripeStatus | null>(null);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
-  const [reviews, setReviews] = useState<Review[]>([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -234,7 +233,7 @@ export default function VendorDashboardPage() {
 
     // Each of these is a section of the page; one failing should cost that
     // section, not the dashboard.
-    const [bookings, earnings, stripe, services, availability, reviews, unread] =
+    const [bookings, earnings, stripe, services, availability, unread] =
       await Promise.all([
         listVendorBookings(me.vendor_id, { limit: 100 })
           .then((r) => r.items)
@@ -245,9 +244,6 @@ export default function VendorDashboardPage() {
           .then((r) => r.items)
           .catch(() => [] as ServiceItem[]),
         getMyAvailability().catch(() => [] as AvailabilitySlot[]),
-        getVendorReviews(me.vendor_id)
-          .then((r) => r.items)
-          .catch(() => [] as Review[]),
         // Not a vendorTasks item: lib/attention already emits its own unread
         // row for the badge, and adding one there would count every message
         // twice. The dashboard was simply missing it.
@@ -257,7 +253,7 @@ export default function VendorDashboardPage() {
       ]);
 
     return {
-      vendor: me, bookings, earnings, stripe, services, availability, reviews, unread,
+      vendor: me, bookings, earnings, stripe, services, availability, unread,
     };
   }, [user]);
 
@@ -282,7 +278,6 @@ export default function VendorDashboardPage() {
     setStripe(snap.stripe ?? null);
     setServices(snap.services ?? []);
     setAvailability(snap.availability ?? []);
-    setReviews(snap.reviews ?? []);
     setUnread(snap.unread ?? 0);
     setLoading(false);
   }, []);
@@ -342,6 +337,43 @@ export default function VendorDashboardPage() {
     }
   }
 
+  /** Settling an offer changes the booking's price and status, so re-read. */
+  async function afterAction() {
+    clearAttentionCache();
+    await reload();
+  }
+
+  /**
+   * Answer a date move. The server re-runs the double-booking check on accept
+   * and names the clashing booking when it refuses, which is the one thing that
+   * makes the refusal actionable — so its message is shown as-is.
+   */
+  async function moveDate(
+    booking: VendorBooking,
+    accept: boolean,
+    message?: string,
+  ) {
+    const cr = booking.change_request;
+    if (!cr) return;
+    setBusyId(cr.change_request_id);
+    setNotice(null);
+    try {
+      await respondToChange(cr.change_request_id, accept, message);
+      setNotice(
+        accept
+          ? "Moved. Your client has been told."
+          : "Declined. Your booking stays as it was.",
+      );
+      await afterAction();
+    } catch (err) {
+      setNotice(
+        err instanceof ApiError ? err.message : "That didn't work. Try again.",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function answer(bookingId: string, status: "approved" | "rejected") {
     setBusyId(bookingId);
     setNotice(null);
@@ -380,15 +412,15 @@ export default function VendorDashboardPage() {
 
   const allTasks = vendorTasks(bookings, stripe);
   const events = vendorEvents(bookings, allTasks);
-  // "Needs you" now holds only what no event card can carry: the account-level
-  // alarm, and the two answers whose panels live on /my-bookings. Everything
-  // else — accept, decline, confirm, check in — is a button on the booking it
-  // belongs to, which is the whole point of grouping by event. Listing them
-  // here as well would put the same action on the page twice, which is what
-  // this pass exists to stop.
-  const tasks = allTasks.filter(
-    (t) => t.kind === "stripe" || t.kind === "negotiation" || t.kind === "date-change",
-  );
+  // "Needs you" is now only what belongs to the account rather than to any one
+  // celebration — which, once the offer and date-move panels came onto the
+  // booking rows, is Stripe and unread messages and nothing else. Every other
+  // action is a button on the booking it concerns.
+  //
+  // The tasks themselves still exist and still count: each event card shows how
+  // many of them it holds, and the cards are ordered so the ones owing an
+  // answer come first.
+  const tasks = allTasks.filter((t) => t.kind === "stripe");
   const health = listingHealth({ vendor, services, availability });
   const name = [vendor?.f_name, vendor?.l_name].filter(Boolean).join(" ");
 
@@ -487,6 +519,8 @@ export default function VendorDashboardPage() {
                 busyId={busyId}
                 onAct={act}
                 onAnswer={answer}
+                onMoveDate={moveDate}
+                onSettled={afterAction}
               />
             ))}
           </div>
@@ -626,51 +660,6 @@ export default function VendorDashboardPage() {
         </section>
       ) : null}
 
-      {/* ── Reputation ── */}
-      {vendor?.rating || reviews.length > 0 ? (
-        <section className="mt-10">
-          <SectionLabel>Reputation</SectionLabel>
-          <Card className="p-5">
-            <div className="flex flex-wrap items-baseline gap-6">
-              {vendor?.rating ? (
-                <div>
-                  <p className="serif text-4xl text-maroon dark:text-gold">
-                    {vendor.rating.toFixed(1)}
-                  </p>
-                  <Stars rating={vendor.rating} />
-                </div>
-              ) : null}
-              <div>
-                <p className="text-xl font-bold text-ink">{reviews.length}</p>
-                <p className="text-xs text-ink-faint">Reviews</p>
-              </div>
-              {vendor?.num_events ? (
-                <div>
-                  <p className="text-xl font-bold text-ink">{vendor.num_events}</p>
-                  <p className="text-xs text-ink-faint">Events</p>
-                </div>
-              ) : null}
-            </div>
-
-            {reviews.slice(0, 3).map((r) => (
-              <div key={r.review_id} className="mt-4 border-t border-line-soft pt-4">
-                <div className="flex items-center justify-between gap-3">
-                  <Stars rating={r.rating} />
-                  <span className="text-xs text-ink-faint">
-                    {r.created_at ? prettyDate(r.created_at.slice(0, 10)) : null}
-                  </span>
-                </div>
-                {r.comment ? (
-                  <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
-                    {r.comment}
-                  </p>
-                ) : null}
-              </div>
-            ))}
-          </Card>
-        </section>
-      ) : null}
-
       {/* No "all your bookings" footer. The same link is on the section above,
           where it's next to the six jobs it's offering to extend, and again in
           VendorNav at the top of the page. Three routes to one list. */}
@@ -700,12 +689,16 @@ function BookingRow({
   busyId,
   onAct,
   onAnswer,
+  onMoveDate,
+  onSettled,
 }: {
   booking: VendorBooking;
   tasks: VendorTask[];
   busyId: string | null;
   onAct: (task: VendorTask) => void;
   onAnswer: (bookingId: string, status: "approved" | "rejected") => void;
+  onMoveDate: (booking: VendorBooking, accept: boolean, message?: string) => void;
+  onSettled: () => void;
 }) {
   const b = booking;
   const start = clock(b.time_start);
@@ -713,6 +706,16 @@ function BookingRow({
   const price = priceLine(b);
   const pending = b.status === "pending";
   const here = Boolean(b.vendor_checked_in_at);
+  const negotiating = b.status === "negotiation_ongoing";
+  // Behind a button, not open on arrival: NegotiationPanel fetches the offer
+  // thread when it mounts, so rendering one per negotiating booking would cost
+  // a request each on every dashboard load for a panel most visits never read.
+  const [showOffer, setShowOffer] = useState(false);
+
+  // Confirm and check in are plain mutations, so the row can drive them off the
+  // task list. The other two have panels of their own below — listing them here
+  // as well would put two buttons on the row for one answer.
+  const simple = tasks.filter((t) => t.kind === "confirm" || t.kind === "check-in");
 
   return (
     <div className="border-t border-line-soft px-4 py-3">
@@ -775,10 +778,9 @@ function BookingRow({
           </>
         ) : null}
 
-        {tasks.map((task) => (
+        {simple.map((task) => (
           <Button
             key={task.id}
-            variant={task.kind === "confirm" || task.kind === "check-in" ? "primary" : "ghost"}
             size="md"
             disabled={busyId === task.id}
             onClick={() => onAct(task)}
@@ -786,7 +788,35 @@ function BookingRow({
             {busyId === task.id ? "Working…" : task.cta}
           </Button>
         ))}
+
+        {negotiating ? (
+          <Button variant="ghost" size="md" onClick={() => setShowOffer((v) => !v)}>
+            {showOffer ? "Hide offer" : "Review offer"}
+          </Button>
+        ) : null}
       </div>
+
+      {/* An offer, answered here. It used to be a link to /my-bookings — the
+          only page that could settle one — so the dashboard could say a client
+          was waiting but not let the vendor answer them. */}
+      {negotiating && showOffer ? (
+        <NegotiationPanel
+          bookingId={b.booking_id}
+          listedPrice={b.price}
+          onSettled={onSettled}
+        />
+      ) : null}
+
+      {/* Same story for a date move, minus the toggle: this one reads the
+          change request off the booking we already have and fetches nothing, so
+          hiding it would only cost a click. */}
+      {b.change_request ? (
+        <DateChangeRequest
+          booking={b}
+          busy={busyId === b.change_request.change_request_id}
+          onAnswer={(accept, message) => onMoveDate(b, accept, message)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -796,11 +826,15 @@ function EventCard({
   busyId,
   onAct,
   onAnswer,
+  onMoveDate,
+  onSettled,
 }: {
   event: VendorEvent;
   busyId: string | null;
   onAct: (task: VendorTask) => void;
   onAnswer: (bookingId: string, status: "approved" | "rejected") => void;
+  onMoveDate: (booking: VendorBooking, accept: boolean, message?: string) => void;
+  onSettled: () => void;
 }) {
   const when = dateSpan(event);
   const m = event.money;
@@ -849,6 +883,8 @@ function EventCard({
           busyId={busyId}
           onAct={onAct}
           onAnswer={onAnswer}
+          onMoveDate={onMoveDate}
+          onSettled={onSettled}
         />
       ))}
 

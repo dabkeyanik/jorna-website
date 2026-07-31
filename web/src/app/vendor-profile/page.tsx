@@ -7,12 +7,21 @@ import { ApiError } from "@/lib/api";
 import {
   createVendor,
   getMyVendor,
+  getVendorReviews,
   listVendorCategories,
   updateMyVendor,
 } from "@/lib/jorna";
-import type { TaxonomyCategory, VendorDetail } from "@/lib/types";
-import { Button, Card, Field, LinkButton } from "@/components/ui";
+import type { Review, TaxonomyCategory, VendorDetail } from "@/lib/types";
+import { Button, Card, Field, LinkButton, Stars } from "@/components/ui";
 import { VendorNav } from "@/components/VendorNav";
+
+function prettyDate(iso?: string | null): string | null {
+  if (!iso || iso === "TBD") return null;
+  const d = new Date(`${iso}T00:00:00`);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
 
 export default function VendorProfilePage() {
   const { user, loading: authLoading } = useAuth();
@@ -20,6 +29,7 @@ export default function VendorProfilePage() {
 
   const [vendor, setVendor] = useState<VendorDetail | null>(null);
   const [categories, setCategories] = useState<TaxonomyCategory[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +52,7 @@ export default function VendorProfilePage() {
     if (!user) return;
     let cancelled = false;
     Promise.all([listVendorCategories(), getMyVendor()])
-      .then(([tax, mine]) => {
+      .then(async ([tax, mine]) => {
         if (cancelled) return;
         setCategories(tax.categories);
         setVendor(mine);
@@ -54,6 +64,10 @@ export default function VendorProfilePage() {
           setLongDistance(Boolean(mine.open_to_long_distance));
           setLocationNegotiable(Boolean(mine.open_to_price_negotiation));
           setInstagram(mine.instagram_username ?? "");
+          // Their own record, on the page it's a record of. Best-effort: the
+          // profile stays editable when the reviews can't be read.
+          const r = await getVendorReviews(mine.vendor_id).catch(() => null);
+          if (!cancelled && r) setReviews(r.items);
         }
       })
       .catch((err) =>
@@ -262,6 +276,53 @@ export default function VendorProfilePage() {
           </Button>
         </form>
       </Card>
+
+      {/* Reputation, beside the bio and photos it's a consequence of. It was on
+          the dashboard, which is otherwise entirely operational — what needs me,
+          what's coming, where's my money — and a star rating is none of those.
+          Here it sits next to the things a vendor would change in response to
+          it. */}
+      {vendor && (vendor.rating || reviews.length > 0) ? (
+        <div className="mt-6 rounded-2xl border border-card-edge bg-card p-5">
+          <p className="eyebrow mb-3">How clients rate you</p>
+          <div className="flex flex-wrap items-baseline gap-6">
+            {vendor.rating ? (
+              <div>
+                <p className="serif text-4xl text-maroon dark:text-gold">
+                  {vendor.rating.toFixed(1)}
+                </p>
+                <Stars rating={vendor.rating} />
+              </div>
+            ) : null}
+            <div>
+              <p className="text-xl font-bold text-ink">{reviews.length}</p>
+              <p className="text-xs text-ink-faint">Reviews</p>
+            </div>
+            {vendor.num_events ? (
+              <div>
+                <p className="text-xl font-bold text-ink">{vendor.num_events}</p>
+                <p className="text-xs text-ink-faint">Events</p>
+              </div>
+            ) : null}
+          </div>
+
+          {reviews.slice(0, 3).map((r) => (
+            <div key={r.review_id} className="mt-4 border-t border-line-soft pt-4">
+              <div className="flex items-center justify-between gap-3">
+                <Stars rating={r.rating} />
+                <span className="text-xs text-ink-faint">
+                  {r.created_at ? prettyDate(r.created_at.slice(0, 10)) : null}
+                </span>
+              </div>
+              {r.comment ? (
+                <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
+                  {r.comment}
+                </p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {vendor ? (
         <div className="mt-6 rounded-2xl border border-card-edge bg-panel p-5">
