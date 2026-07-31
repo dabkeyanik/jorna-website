@@ -106,7 +106,6 @@ export const VENDOR_TABS: NavItem[] = [
       "/my-dashboard",
       "/my-bookings",
       "/my-calendar",
-      "/my-services",
       "/my-availability",
       "/my-earnings",
       "/vendor-profile",
@@ -154,12 +153,6 @@ export const VENDOR_DESKTOP_TABS: NavItem[] = [
     match: ["/my-bookings"],
   },
   {
-    href: "/my-services",
-    label: "Services",
-    icon: icon(I.marketplace),
-    match: ["/my-services"],
-  },
-  {
     href: "/my-calendar",
     label: "Calendar",
     icon: icon(I.dashboard),
@@ -175,8 +168,9 @@ export const VENDOR_DESKTOP_TABS: NavItem[] = [
     href: "/vendor-profile",
     label: "Listing",
     icon: icon(I.profile),
+    // Services live on this page now, so there is no separate tab for them.
     // "/vendor" is the public listing view — the same thing a client sees, so
-    // it belongs to this tab rather than leaving the bar unlit.
+    // it belongs here rather than leaving the bar unlit.
     match: ["/vendor-profile", "/vendor", "/marketplace"],
   },
   NEEDS_YOU,

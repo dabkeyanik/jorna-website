@@ -21,10 +21,9 @@ import { usePathname } from "next/navigation";
 const TABS = [
   { href: "/my-dashboard", label: "Dashboard" },
   { href: "/my-bookings", label: "All bookings" },
-  { href: "/my-services", label: "Services" },
   { href: "/my-calendar", label: "Calendar" },
   { href: "/my-earnings", label: "Earnings" },
-  { href: "/vendor-profile", label: "Profile" },
+  { href: "/vendor-profile", label: "Listing" },
 ];
 
 export function VendorNav() {

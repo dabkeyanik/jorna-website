@@ -8,12 +8,19 @@ import {
   createVendor,
   getMyVendor,
   getVendorReviews,
+  listServices,
   listVendorCategories,
   updateMyVendor,
 } from "@/lib/jorna";
-import type { Review, TaxonomyCategory, VendorDetail } from "@/lib/types";
+import type {
+  Review,
+  ServiceItem,
+  TaxonomyCategory,
+  VendorDetail,
+} from "@/lib/types";
 import { Button, Card, Field, LinkButton, Stars } from "@/components/ui";
 import { VendorNav } from "@/components/VendorNav";
+import { ServicesManager } from "@/components/ServicesManager";
 
 function prettyDate(iso?: string | null): string | null {
   if (!iso || iso === "TBD") return null;
@@ -30,6 +37,7 @@ export default function VendorProfilePage() {
   const [vendor, setVendor] = useState<VendorDetail | null>(null);
   const [categories, setCategories] = useState<TaxonomyCategory[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [services, setServices] = useState<ServiceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,10 +72,14 @@ export default function VendorProfilePage() {
           setLongDistance(Boolean(mine.open_to_long_distance));
           setLocationNegotiable(Boolean(mine.open_to_price_negotiation));
           setInstagram(mine.instagram_username ?? "");
-          // Their own record, on the page it's a record of. Best-effort: the
-          // profile stays editable when the reviews can't be read.
-          const r = await getVendorReviews(mine.vendor_id).catch(() => null);
-          if (!cancelled && r) setReviews(r.items);
+          // Both best-effort: the profile stays editable when either fails.
+          const [r, svc] = await Promise.all([
+            getVendorReviews(mine.vendor_id).catch(() => null),
+            listServices({ vendor_id: mine.vendor_id, limit: 100 }).catch(() => null),
+          ]);
+          if (cancelled) return;
+          if (r) setReviews(r.items);
+          if (svc) setServices(svc.items);
         }
       })
       .catch((err) =>
@@ -122,24 +134,48 @@ export default function VendorProfilePage() {
   return (
     <div className="mx-auto w-[min(680px,100%-2rem)] py-10">
       <VendorNav />
-      <header>
-        <span className="eyebrow">{vendor ? "Vendor profile" : "Become a vendor"}</span>
-        {/* Not "List your services on Jorna". No service is created here and
-            none can be until this exists — the page collects who you are, and
-            the category on it is the vendor's own. A heading promising services
-            over a form asking for one category read as though that category
-            were the service's. */}
-        <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold">
-          {vendor ? "Your vendor profile" : "Create your vendor profile"}
-        </h1>
-        <p className="mt-3 text-ink-soft">
-          {vendor
-            ? "This is what clients see when they find you in search or an AI bundle."
-            : "Who you are, so clients know who they're booking. What you sell — and the category each one is in — comes next, one service at a time."}
-        </p>
+      {/* Everything a client sees, in one place: what you sell, who you are,
+          and what people have said. Services used to be a page of their own,
+          so setting up meant finding two — and neither was the whole listing. */}
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <span className="eyebrow">{vendor ? "Selling" : "Become a vendor"}</span>
+          <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold">
+            {vendor ? "Your listing" : "Create your vendor profile"}
+          </h1>
+          <p className="mt-3 text-ink-soft">
+            {vendor
+              ? "What clients see when they find you in search or an AI bundle."
+              : "Who you are, so clients know who they're booking. What you sell comes next, one service at a time."}
+          </p>
+        </div>
+        {vendor ? (
+          <LinkButton
+            href={`/vendor?id=${vendor.vendor_id}`}
+            variant="ghost"
+            size="md"
+            className="shrink-0"
+          >
+            See what clients see
+          </LinkButton>
+        ) : null}
       </header>
 
-      <Card className="mt-7 p-6">
+      {/* Services first: a price change or a new photo is a weekly job, and the
+          details below are set once. It also puts the listing-health "add a
+          service" link on the page's main content rather than under a form. */}
+      {vendor ? (
+        <ServicesManager
+          vendor={vendor}
+          categories={categories}
+          initial={services}
+        />
+      ) : null}
+
+      {vendor ? (
+        <h2 className="serif mt-10 text-2xl text-ink">About your business</h2>
+      ) : null}
+      <Card className="mt-5 p-6">
         <form onSubmit={submit} className="grid gap-4">
           {/* Only once they exist. Signing up asks who you are; what you sell
               is decided per service, where it can differ per service — a DJ who
@@ -324,20 +360,11 @@ export default function VendorProfilePage() {
         </div>
       ) : null}
 
-      {vendor ? (
-        <div className="mt-6 rounded-2xl border border-card-edge bg-panel p-5">
-          <p className="text-sm text-ink-soft">
-            Next: list what you offer and set your prices. Clients can&apos;t book
-            you until you have at least one service.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <LinkButton href="/my-services">Manage services</LinkButton>
-            <LinkButton href={`/vendor?id=${vendor.vendor_id}`} variant="ghost">
-              View public profile
-            </LinkButton>
-          </div>
-        </div>
-      ) : null}
+      {/* No "next steps" card. It pointed at the services page and the public
+          view — one of which is now this page's own first section, and the
+          other a button in the header. Its warning that clients can't book you
+          without a service is the services list's empty state, said where the
+          service would go. */}
     </div>
   );
 }

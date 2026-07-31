@@ -636,7 +636,7 @@ export function listingHealth(opts: {
       issue: "You have no services listed",
       consequence: "There's nothing for a host to book, so you won't appear in search.",
       cta: "Add a service",
-      href: "/my-services",
+      href: "/vendor-profile#services",
       severity: "critical",
     });
   }
@@ -664,7 +664,7 @@ export function listingHealth(opts: {
           : `${noPhotos.length} services have no photos`,
       consequence: "A listing with no photo is the one people scroll past.",
       cta: "Add photos",
-      href: "/my-services",
+      href: "/vendor-profile#services",
       severity: "warning",
     });
   }

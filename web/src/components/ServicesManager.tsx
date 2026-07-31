@@ -1,16 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth";
+// What clients can book, managed where the rest of the listing is.
+//
+// This was /my-services, a page of its own beside /vendor-profile — so a vendor
+// setting up had to find both, and "why am I not getting booked" had half its
+// answers on each. Neither was the whole of what a client sees. It's a
+// component now, and the listing page is the one place that owns the outward
+// face of a business.
+//
+// Takes the vendor and the taxonomy rather than fetching them: the page above
+// already has both, and a second copy of either could disagree with the first.
+
+import { useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
 import {
   createService,
   deleteService,
   deleteServiceImage,
-  getMyVendor,
   listServices,
-  listVendorCategories,
   updateService,
   uploadServiceImages,
   type ServiceInput,
@@ -22,8 +29,7 @@ import {
   type VendorDetail,
 } from "@/lib/types";
 import { geocodeUsAddress } from "@/lib/geocode";
-import { Button, Card, Field, LinkButton } from "@/components/ui";
-import { VendorNav } from "@/components/VendorNav";
+import { Button, Card, Field } from "./ui";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -52,14 +58,17 @@ const blank: ServiceInput = {
   negotiable: false,
 };
 
-export default function MyServicesPage() {
-  const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
-
-  const [vendor, setVendor] = useState<VendorDetail | null>(null);
-  const [categories, setCategories] = useState<TaxonomyCategory[]>([]);
-  const [services, setServices] = useState<ServiceItem[]>([]);
-  const [loading, setLoading] = useState(true);
+export function ServicesManager({
+  vendor,
+  categories,
+  initial,
+}: {
+  vendor: VendorDetail;
+  categories: TaxonomyCategory[];
+  /** Fetched by the page in its own pass, so this doesn't add a request. */
+  initial: ServiceItem[];
+}) {
+  const [services, setServices] = useState<ServiceItem[]>(initial);
   const [error, setError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   /** The address as the Census matched it, shown back after a successful pin. */
@@ -77,34 +86,10 @@ export default function MyServicesPage() {
   const [newPhotos, setNewPhotos] = useState<File[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!authLoading && !user) router.replace("/login?next=/my-services");
-  }, [authLoading, user, router]);
-
-  async function refresh(vendorId: string) {
-    const res = await listServices({ vendor_id: vendorId, limit: 100 });
+  async function refresh() {
+    const res = await listServices({ vendor_id: vendor.vendor_id, limit: 100 });
     setServices(res.items);
   }
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    Promise.all([getMyVendor(), listVendorCategories()])
-      .then(async ([mine, tax]) => {
-        if (cancelled) return;
-        setVendor(mine);
-        setCategories(tax.categories);
-        if (mine) await refresh(mine.vendor_id);
-      })
-      .catch((err) =>
-        !cancelled &&
-        setError(err instanceof ApiError ? err.message : "Couldn't load your services."),
-      )
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
 
   const subOptions =
     categories.find((c) => c.value === form.category)?.subcategories ?? [];
@@ -113,7 +98,7 @@ export default function MyServicesPage() {
 
   function startNew() {
     // Default to what this vendor does, so most services need no category fiddling.
-    setForm({ ...blank, category: vendor?.category ?? "", subcategory: vendor?.subcategory ?? "" });
+    setForm({ ...blank, category: vendor.category ?? "", subcategory: vendor.subcategory ?? "" });
     setNewPhotos([]);
     setEditing("new");
     setError(null);
@@ -193,7 +178,6 @@ export default function MyServicesPage() {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (!vendor) return;
     if (isVenue && (form.venue_latitude == null || form.venue_longitude == null)) {
       setError(
         "A venue needs its map coordinates — that's what vendor check-in is measured against.",
@@ -223,7 +207,7 @@ export default function MyServicesPage() {
       } else if (editing) {
         await updateService(editing, payload);
       }
-      await refresh(vendor.vendor_id);
+      await refresh();
       setNewPhotos([]);
       setEditing(null);
     } catch (err) {
@@ -234,11 +218,10 @@ export default function MyServicesPage() {
   }
 
   async function remove(serviceId: string) {
-    if (!vendor) return;
     setBusy(true);
     try {
       await deleteService(serviceId);
-      await refresh(vendor.vendor_id);
+      await refresh();
       setConfirmDelete(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't delete that service.");
@@ -248,12 +231,12 @@ export default function MyServicesPage() {
   }
 
   async function addPhotos(serviceId: string, files: FileList | null) {
-    if (!files?.length || !vendor) return;
+    if (!files?.length) return;
     setUploadingFor(serviceId);
     setError(null);
     try {
       await uploadServiceImages(serviceId, Array.from(files));
-      await refresh(vendor.vendor_id);
+      await refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't upload those photos.");
     } finally {
@@ -263,64 +246,37 @@ export default function MyServicesPage() {
   }
 
   async function removePhoto(serviceId: string, url: string) {
-    if (!vendor) return;
     try {
       await deleteServiceImage(serviceId, url);
-      await refresh(vendor.vendor_id);
+      await refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't remove that photo.");
     }
   }
 
-  if (authLoading || !user || loading) {
-    return <p className="py-20 text-center text-ink-soft">Loading…</p>;
-  }
-
-  // Services hang off a vendor profile, so that has to exist first.
-  if (!vendor) {
-    return (
-      <div className="mx-auto w-[min(560px,100%-2rem)] py-20 text-center">
-        <h1 className="serif text-3xl text-maroon dark:text-gold">
-          Set up your vendor profile first
-        </h1>
-        <p className="mt-3 text-ink-soft">
-          Your services live under your vendor profile — tell us what you do, then
-          list what you offer.
-        </p>
-        <LinkButton href="/vendor-profile" className="mt-6">
-          Create vendor profile
-        </LinkButton>
-      </div>
-    );
-  }
-
   return (
-    <div className="mx-auto w-[min(880px,100%-2rem)] py-10">
-      <VendorNav />
-      <header className="flex flex-wrap items-start justify-between gap-3">
+    <section id="services" className="mt-9 scroll-mt-20">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <span className="eyebrow">Selling</span>
-          <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold sm:text-5xl">
-            Your services
-          </h1>
-          <p className="mt-2 text-ink-soft">
+          <h2 className="serif text-2xl text-ink">Services</h2>
+          <p className="mt-1 text-sm text-ink-soft">
             What clients can book. Each one has its own price and terms.
           </p>
         </div>
         {editing === null ? <Button onClick={startNew}>Add a service</Button> : null}
-      </header>
+      </div>
 
       {error ? (
-        <p className="mt-6 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
+        <p className="mt-4 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
           {error}
         </p>
       ) : null}
 
       {editing !== null ? (
-        <Card className="mt-7 p-6">
-          <h2 className="serif text-xl text-ink">
+        <Card className="mt-5 p-6">
+          <h3 className="serif text-xl text-ink">
             {editing === "new" ? "New service" : "Edit service"}
-          </h2>
+          </h3>
           <form onSubmit={save} className="mt-4 grid gap-4">
             <Field
               label="Service name"
@@ -565,11 +521,11 @@ export default function MyServicesPage() {
       ) : null}
 
       {services.length === 0 && editing === null ? (
-        <p className="mt-12 text-center text-ink-soft">
+        <p className="mt-8 text-center text-ink-soft">
           No services yet. Clients can&apos;t book you until you list at least one.
         </p>
       ) : (
-        <div className="mt-8 grid gap-3">
+        <div className="mt-5 grid gap-3">
           {services.map((s) => {
             const unit = priceUnitLabel(s.price_unit);
             return (
@@ -661,6 +617,6 @@ export default function MyServicesPage() {
           })}
         </div>
       )}
-    </div>
+    </section>
   );
 }
