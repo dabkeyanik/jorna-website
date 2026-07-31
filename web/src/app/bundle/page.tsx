@@ -596,9 +596,17 @@ function BookingRow({
       {held ? (
         <div className="mt-3 border-t border-line-soft pt-3">
           {youConfirmed ? (
+            // Which half is outstanding, rather than an assumption about it.
+            // Written unconditionally, this named the vendor as the holdup on a
+            // booking whose vendor had confirmed thirty seconds earlier — their
+            // GPS check-in is their confirmation, so on the day it is routinely
+            // the first of the two to land. What holds the money then is the
+            // transfer itself, and telling the client to wait on someone who is
+            // already done sends them to chase the wrong person.
             <p className="text-xs text-ink-soft">
-              You&apos;ve confirmed. The vendor still needs to confirm before the
-              payment is released.
+              {booking.vendor_confirmed_at
+                ? `Confirmed by both of you. ${booking.vendor_name || "Your vendor"}'s payment is on its way — it can take a little while to land.`
+                : "You've confirmed. The vendor still needs to confirm before the payment is released."}
             </p>
           ) : !canConfirm ? (
             // The date named is the one being waited for — the last day, for a
@@ -1422,7 +1430,13 @@ function BundleInner() {
         run(
           bk,
           () => confirmBookingEvent(bk.booking_id),
-          "Thanks — your confirmation is recorded. The payment releases once the vendor confirms too.",
+          // A vendor who has checked in has already confirmed, so pressing this
+          // is often the second of the two, not the first. Promising a release
+          // "once the vendor confirms" in that case names a step that happened
+          // before the client even opened the page.
+          bk.vendor_confirmed_at
+            ? "Thanks — that's both of you. The payment is on its way to the vendor."
+            : "Thanks — your confirmation is recorded. The payment releases once the vendor confirms too.",
           "Couldn't confirm this booking. Please try again.",
         )
       }
