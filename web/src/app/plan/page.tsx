@@ -53,8 +53,10 @@ const IconUsers = (
 function SkeletonBundles() {
   return (
     <section className="mt-12">
-      <h2 className="serif text-center text-3xl text-ink">Assembling three vendor teams…</h2>
-      <p className="mt-2 text-center text-sm text-ink-soft">
+      {/* Left, matching the results this stands in for — otherwise the heading
+          jumps from centre to left the moment the bundles arrive. */}
+      <h2 className="serif text-3xl text-ink">Assembling three vendor teams…</h2>
+      <p className="mt-2 text-sm text-ink-soft">
         Matching services to your date, budget, and vibe.
       </p>
       <div className="mt-6 grid gap-4 pt-4 md:grid-cols-3">
@@ -262,12 +264,15 @@ function PlanInner() {
 
   return (
     <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-10">
-      <header className="text-center">
+      {/* Left-aligned, like the rest of the app. Centred, it floated in the
+          middle of a 1248px page above a 768px card — the page was mostly
+          margin, which is the thing this layout exists to stop. */}
+      <header>
         <span className="eyebrow">AI bundle builder</span>
         <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold sm:text-5xl">
           {celebration ? `Build your ${celebration.label.toLowerCase()}` : "Build your celebration"}
         </h1>
-        <p className="mx-auto mt-3 max-w-[52ch] text-ink-soft">
+        <p className="mt-3 max-w-[60ch] text-ink-soft">
           Tell us about your event and we&apos;ll assemble three complete vendor teams —
           Budget, Balanced, and Top Rated — to compare and book.
         </p>
@@ -276,177 +281,208 @@ function PlanInner() {
         </div>
       </header>
 
-      <Card className="mx-auto mt-8 max-w-3xl p-6 sm:p-7">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <div className="mb-1.5 flex items-baseline justify-between gap-2">
-              <span className="text-sm font-medium text-ink-soft">
-                {byZip ? "ZIP code" : "City & state"}
-              </span>
-              <button
-                type="button"
-                onClick={() => setByZip((v) => !v)}
-                className="shrink-0 text-xs font-semibold text-gold hover:underline"
-              >
-                {byZip ? "Use a city" : "Use a ZIP"}
-              </button>
-            </div>
-            {byZip ? (
-              <Field
-                inputMode="numeric"
-                maxLength={5}
-                placeholder="60201"
-                icon={IconPin}
-                value={zip}
-                onChange={(e) => setZip(e.target.value.replace(/[^0-9]/g, ""))}
-              />
-            ) : (
-              <CityCombobox
-                placeholder="Start typing a city…"
-                icon={IconPin}
-                value={location}
-                onChange={(v, c) => {
-                  setLocation(v);
-                  setCoords(c);
-                }}
-              />
-            )}
-            {/* Say what a ZIP resolved to. A field that quietly decides where
-                you're searching is worse than one that tells you. */}
-            {byZip && zipPlaceLabel ? (
-              <p className="mt-1 text-xs text-ink-faint">Looking near {zipPlaceLabel}.</p>
-            ) : null}
-          </div>
-          <Field
-            id="plan-guests"
-            label="Guests"
-            type="number"
-            min={1}
-            placeholder="200"
-            icon={IconUsers}
-            value={guests}
-            onChange={(e) => setGuests(e.target.value)}
-          />
-        </div>
+      <Card className="mt-8 p-6 sm:p-7">
+        {/* Two columns from lg: where and when on the left, how big and how
+            much on the right.
 
-        {/* ── When ──────────────────────────────────────────────────────
-            A settled day, optionally running into others. It becomes the
-            booking's first and last day: what a per-day vendor bills for,
-            what the escrow gate waits out, what the run sheet lays out.
+            grid-rows-subgrid is what makes them line up. Each column spans the
+            parent's four rows and inherits them, so a group sits on the same
+            row as its opposite number — heading beside heading, Where beside
+            Guests — and both columns end on the same line because they are
+            built from the same rows. Without it each column packs its own
+            content and the two bottom edges land wherever they happen to.
 
-            Kept out of the grid above because it now needs the room. */}
-        <div className="mt-7">
-          <p className="mb-2.5 text-sm font-medium text-ink-soft">When</p>
+            A row is as tall as the taller of its pair, so some slack under the
+            shorter one is the deal. Slack under an aligned row reads as
+            deliberate; a ragged bottom edge reads as an accident.
 
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            <Field
-              label={multiDay ? "First day" : "Event date"}
-              type="date"
-              icon={IconCalendar}
-              value={eventDate}
-              onChange={(e) => setEventDate(e.target.value)}
-            />
-            {multiDay ? (
-              <Field
-                label="Last day"
-                type="date"
-                icon={IconCalendar}
-                min={eventDate || undefined}
-                value={eventDateEnd}
-                onChange={(e) => setEventDateEnd(e.target.value)}
-              />
-            ) : (
-              <div className="flex items-end">
-                {/* Same affordance and wording as the booking form, so the
-                    two places you can say this say it the same way. */}
+            Where subgrid isn't supported the column falls back to a plain
+            grid — unaligned, but laid out and usable. */}
+        <div className="lg:grid lg:grid-cols-2 lg:grid-rows-4 lg:gap-x-9 lg:gap-y-7">
+          <div className="grid gap-7 lg:row-span-4 lg:grid-rows-subgrid">
+            <p className="eyebrow">The event</p>
+
+            <div>
+              <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                <span className="text-sm font-medium text-ink-soft">
+                  {byZip ? "ZIP code" : "City & state"}
+                </span>
                 <button
                   type="button"
-                  className="pb-2.5 text-sm font-semibold text-gold hover:underline"
-                  onClick={() => setMultiDay(true)}
+                  onClick={() => setByZip((v) => !v)}
+                  className="shrink-0 text-xs font-semibold text-gold hover:underline"
                 >
-                  + Runs across multiple days
+                  {byZip ? "Use a city" : "Use a ZIP"}
                 </button>
               </div>
-            )}
-          </div>
-          {multiDay ? (
-            <button
-              type="button"
-              className="mt-2 text-xs text-ink-faint hover:text-ink"
-              onClick={() => {
-                setMultiDay(false);
-                setEventDateEnd("");
-              }}
-            >
-              Single day instead
-            </button>
-          ) : null}
-        </div>
+              {byZip ? (
+                <Field
+                  inputMode="numeric"
+                  maxLength={5}
+                  placeholder="60201"
+                  icon={IconPin}
+                  value={zip}
+                  onChange={(e) => setZip(e.target.value.replace(/[^0-9]/g, ""))}
+                />
+              ) : (
+                <CityCombobox
+                  placeholder="Start typing a city…"
+                  icon={IconPin}
+                  value={location}
+                  onChange={(v, c) => {
+                    setLocation(v);
+                    setCoords(c);
+                  }}
+                />
+              )}
+              {/* Say what a ZIP resolved to. A field that quietly decides where
+                  you're searching is worse than one that tells you. */}
+              {byZip && zipPlaceLabel ? (
+                <p className="mt-1 text-xs text-ink-faint">Looking near {zipPlaceLabel}.</p>
+              ) : null}
+            </div>
 
+            {/* ── When ──────────────────────────────────────────────────
+                A settled day, optionally running into others. It becomes the
+                booking's first and last day: what a per-day vendor bills for,
+                what the escrow gate waits out, what the run sheet lays out. */}
+            <div>
+              <p className="mb-2.5 text-sm font-medium text-ink-soft">When</p>
 
-        <div className="mt-7">
-          <p className="mb-2.5 text-sm font-medium text-ink-soft">Time</p>
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            <Field
-              label="Starts"
-              type="time"
-              icon={IconClock}
-              value={timeStart}
-              onChange={(e) => setTimeStart(e.target.value)}
-            />
-            <Field
-              label="Ends"
-              type="time"
-              icon={IconClock}
-              value={timeEnd}
-              onChange={(e) => setTimeEnd(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="mt-7">
-          <p className="mb-2.5 text-sm font-medium text-ink-soft">Budget</p>
-          <div className="grid grid-cols-3 gap-2.5">
-            {BUDGETS.map((b) => {
-              const active = budget === b.value;
-              return (
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                <Field
+                  label={multiDay ? "First day" : "Event date"}
+                  type="date"
+                  icon={IconCalendar}
+                  value={eventDate}
+                  onChange={(e) => setEventDate(e.target.value)}
+                />
+                {multiDay ? (
+                  <Field
+                    label="Last day"
+                    type="date"
+                    icon={IconCalendar}
+                    min={eventDate || undefined}
+                    value={eventDateEnd}
+                    onChange={(e) => setEventDateEnd(e.target.value)}
+                  />
+                ) : (
+                  <div className="flex items-end">
+                    {/* Same affordance and wording as the booking form, so the
+                        two places you can say this say it the same way. */}
+                    <button
+                      type="button"
+                      className="pb-2.5 text-sm font-semibold text-gold hover:underline"
+                      onClick={() => setMultiDay(true)}
+                    >
+                      + Runs across multiple days
+                    </button>
+                  </div>
+                )}
+              </div>
+              {multiDay ? (
                 <button
-                  key={b.value}
                   type="button"
-                  aria-pressed={active}
-                  onClick={() => setBudget(b.value)}
-                  className={`rounded-xl border px-3 py-3 text-center transition ${
-                    active
-                      ? "border-gold bg-gold/12 ring-1 ring-gold/40"
-                      : "border-card-edge bg-ground-2 hover:border-gold/50"
-                  }`}
+                  className="mt-2 text-xs text-ink-faint hover:text-ink"
+                  onClick={() => {
+                    setMultiDay(false);
+                    setEventDateEnd("");
+                  }}
                 >
-                  <span
-                    className={`block text-sm font-semibold ${active ? "text-maroon dark:text-gold" : "text-ink"}`}
-                  >
-                    {b.label}
-                  </span>
-                  <span className="mt-0.5 block text-[0.7rem] text-ink-faint">{b.hint}</span>
+                  Single day instead
                 </button>
-              );
-            })}
+              ) : null}
+            </div>
+
+            <div>
+              <p className="mb-2.5 text-sm font-medium text-ink-soft">Time</p>
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                <Field
+                  label="Starts"
+                  type="time"
+                  icon={IconClock}
+                  value={timeStart}
+                  onChange={(e) => setTimeStart(e.target.value)}
+                />
+                <Field
+                  label="Ends"
+                  type="time"
+                  icon={IconClock}
+                  value={timeEnd}
+                  onChange={(e) => setTimeEnd(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Right column. Guests moves here from beside the city: three groups
+              each balances better than four and two, and it reads as how big
+              and how much rather than a stray field. */}
+          <div className="mt-7 grid gap-7 lg:row-span-4 lg:mt-0 lg:grid-rows-subgrid">
+            <p className="eyebrow">Size and budget</p>
+
+            <Field
+              id="plan-guests"
+              label="Guests"
+              type="number"
+              min={1}
+              placeholder="200"
+              icon={IconUsers}
+              value={guests}
+              onChange={(e) => setGuests(e.target.value)}
+            />
+
+            <div>
+              <p className="mb-2.5 text-sm font-medium text-ink-soft">Budget</p>
+              <div className="grid grid-cols-3 gap-2.5">
+                {BUDGETS.map((b) => {
+                  const active = budget === b.value;
+                  return (
+                    <button
+                      key={b.value}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setBudget(b.value)}
+                      className={`rounded-xl border px-3 py-3 text-center transition ${
+                        active
+                          ? "border-gold bg-gold/12 ring-1 ring-gold/40"
+                          : "border-card-edge bg-ground-2 hover:border-gold/50"
+                      }`}
+                    >
+                      <span
+                        className={`block text-sm font-semibold ${active ? "text-maroon dark:text-gold" : "text-ink"}`}
+                      >
+                        {b.label}
+                      </span>
+                      <span className="mt-0.5 block text-[0.7rem] text-ink-faint">{b.hint}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2.5 text-sm font-medium text-ink-soft">
+                Vibe <span className="text-ink-faint">(optional)</span>
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {STYLES.map((s) => (
+                  <Chip
+                    key={s}
+                    active={styles.includes(s)}
+                    onClick={() => toggle(styles, setStyles, s)}
+                  >
+                    {s[0].toUpperCase() + s.slice(1)}
+                  </Chip>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="mt-7">
-          <p className="mb-2.5 text-sm font-medium text-ink-soft">
-            Vibe <span className="text-ink-faint">(optional)</span>
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {STYLES.map((s) => (
-              <Chip key={s} active={styles.includes(s)} onClick={() => toggle(styles, setStyles, s)}>
-                {s[0].toUpperCase() + s.slice(1)}
-              </Chip>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-7">
+        {/* Full width, under both columns: the categories are the longest
+            control on the form and the only one that wants the whole card. */}
+        <div className="mt-8 border-t border-line-soft pt-7">
           <div className="mb-2.5 flex items-center justify-between">
             <p className="text-sm font-medium text-ink-soft">
               What you need{" "}
@@ -467,33 +503,51 @@ function PlanInner() {
               {allSelected ? "Clear all" : "Select all"}
             </button>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {ALL_CATEGORIES.map((c) => (
-              <Chip key={c} active={needed.includes(c)} onClick={() => toggle(needed, setNeeded, c)}>
-                {categoryLabel(c)}
-              </Chip>
-            ))}
+          {/* The chips and the button share this row from lg. Below that the
+              button drops beneath them at full width, which is also the
+              fallback if nine categories beside a button ever reads tight. */}
+          <div className="lg:flex lg:items-end lg:justify-between lg:gap-8">
+            <div className="flex flex-wrap gap-2 lg:flex-1">
+              {ALL_CATEGORIES.map((c) => (
+                <Chip
+                  key={c}
+                  active={needed.includes(c)}
+                  onClick={() => toggle(needed, setNeeded, c)}
+                >
+                  {categoryLabel(c)}
+                </Chip>
+              ))}
+            </div>
+
+            <Button
+              size="lg"
+              className="mt-7 w-full lg:mt-0 lg:w-auto lg:shrink-0"
+              disabled={busy}
+              onClick={generate}
+            >
+              <span aria-hidden="true">✦</span>
+              {busy ? "Building your bundles…" : "Build my bundles"}
+            </Button>
           </div>
         </div>
 
+        {/* Above the row rather than beside the button — in the flex it would
+            be a third item competing with the chips for width. */}
         {error ? (
           <p className="mt-5 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
             {error}
           </p>
         ) : null}
-
-        <Button size="lg" className="mt-7 w-full" disabled={busy} onClick={generate}>
-          <span aria-hidden="true">✦</span>
-          {busy ? "Building your bundles…" : "Build my bundles"}
-        </Button>
       </Card>
 
       {busy ? (
         <SkeletonBundles />
       ) : options ? (
         <section className="mt-12">
-          <h2 className="serif text-center text-3xl text-ink">Your three teams</h2>
-          <p className="mt-2 text-center text-sm text-ink-soft">
+          {/* Left, with the rest of the page. Centred here they'd be the only
+              centred thing left on it. */}
+          <h2 className="serif text-3xl text-ink">Your three teams</h2>
+          <p className="mt-2 text-sm text-ink-soft">
             Compare, tweak, and choose — you can edit any bundle after picking it.
           </p>
           {options.every((o) => o.bundle.items.length === 0) ? (
