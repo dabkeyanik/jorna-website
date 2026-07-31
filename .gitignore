@@ -9,6 +9,12 @@ web/next-env.d.ts
 # by the Worker at /app. Built by `npm run build`, so it isn't committed.
 public/app/
 
+# Also generated: the app's icon, mirrored to the site root so /favicon.ico
+# resolves. The real one lives in web/src/app — change it there.
+public/favicon.ico
+public/icon.png
+public/icon.svg
+
 # Local env (values are public, but keep them out of git by convention)
 .env
 .env.local
