@@ -16,6 +16,7 @@ import {
   type StripeStatus,
   type VendorDetail,
 } from "@/lib/types";
+import { paymentsSetup } from "@/lib/vendorPlan";
 import { Button, Card, LinkButton } from "@/components/ui";
 import { VendorNav } from "@/components/VendorNav";
 
@@ -125,7 +126,9 @@ function EarningsInner() {
     );
   }
 
-  const onboarded = Boolean(status?.stripe_onboarding_complete);
+  // Same reading the dashboard and the "Needs you" badge use, so a vendor can't
+  // be told two different things about one account.
+  const payments = paymentsSetup(status);
 
   return (
     <div className="mx-auto w-[min(880px,100%-2rem)] py-10">
@@ -144,22 +147,18 @@ function EarningsInner() {
       ) : null}
 
       {/* Payments setup — the gate on getting paid at all */}
-      {!onboarded ? (
+      {!payments.ready ? (
         <Card className="mt-7 p-6">
           <h2 className="serif text-xl text-ink">
-            {justOnboarded ? "Finishing payment setup…" : "Set up payments"}
+            {justOnboarded ? "Finishing payment setup…" : payments.title}
           </h2>
           <p className="mt-2 text-ink-soft">
             {justOnboarded
               ? "Stripe hasn't confirmed your details yet. If you left anything incomplete, pick up where you left off."
-              : "Clients can't pay you until Stripe has your details — a booking can be accepted, but checkout will refuse. It takes a few minutes."}
+              : payments.detail}
           </p>
           <Button className="mt-4" disabled={busy} onClick={onboard}>
-            {busy
-              ? "Opening Stripe…"
-              : status?.stripe_account_id
-                ? "Continue payment setup"
-                : "Set up payments"}
+            {busy ? "Opening Stripe…" : payments.cta}
           </Button>
         </Card>
       ) : (

@@ -794,7 +794,20 @@ export interface VendorBooking {
 
 export interface StripeStatus {
   stripe_account_id?: string | null;
+  /** Whether money can actually reach this vendor — see the backend's
+   *  _onboarding_complete. Not "did they fill the form in". */
   stripe_onboarding_complete: boolean;
+  /** They reached the end of Stripe's form once. Says nothing about whether
+   *  Stripe has since asked for more. */
+  details_submitted?: boolean;
+  payouts_enabled?: boolean;
+  /** Stripe's own word for why, e.g. "requirements.past_due". */
+  disabled_reason?: string | null;
+  /** Raw Stripe field names the vendor still owes, e.g. "individual.id_number".
+   *  Render through `requirementLabel` — these are API keys, not English. */
+  requirements_due?: string[];
+  /** Stripe is checking something it already has. Nothing for the vendor to do. */
+  pending_verification?: boolean;
 }
 
 export interface EarningsEntry {

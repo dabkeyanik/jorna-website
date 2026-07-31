@@ -12,6 +12,7 @@ import {
   type AvailabilitySlot,
   type Earnings,
   type ServiceItem,
+  type StripeStatus,
   type VendorBooking,
   type VendorDetail,
 } from "./types";
@@ -52,6 +53,175 @@ function niceDate(iso?: string | null): string | null {
     : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
+// ── Getting paid at all ──────────────────────────────────────────────
+
+/**
+ * Stripe's field names, in words a vendor standing in their kitchen can act on.
+ *
+ * Several keys are one real-world errand — a date of birth arrives as three
+ * separate fields, an address as four — so they map to the same phrase and the
+ * caller dedupes. Anything unmapped degrades to a readable version of the key
+ * rather than being dropped: a vendor told "Stripe still needs your
+ * business_profile.mcc" can at least search for it, where a vendor told nothing
+ * has to guess.
+ */
+const REQUIREMENT_LABELS: Record<string, string> = {
+  "individual.id_number": "your ID number",
+  "individual.ssn_last_4": "the last 4 digits of your SSN",
+  "individual.verification.document": "a photo of your ID",
+  "individual.verification.additional_document": "a second form of ID",
+  "individual.dob.day": "your date of birth",
+  "individual.dob.month": "your date of birth",
+  "individual.dob.year": "your date of birth",
+  "individual.first_name": "your name",
+  "individual.last_name": "your name",
+  "individual.email": "your email address",
+  "individual.phone": "your phone number",
+  "individual.address.line1": "your address",
+  "individual.address.city": "your address",
+  "individual.address.state": "your address",
+  "individual.address.postal_code": "your address",
+  external_account: "your bank account",
+  "business_profile.url": "your website",
+  "business_profile.mcc": "your business category",
+  "company.tax_id": "your tax ID",
+  "tos_acceptance.date": "your acceptance of Stripe's terms",
+  "tos_acceptance.ip": "your acceptance of Stripe's terms",
+};
+
+export function requirementLabel(key: string): string {
+  return REQUIREMENT_LABELS[key] ?? key.split(".").pop()!.replace(/_/g, " ");
+}
+
+/** "a", "a and b", "a, b and c" — a sentence, not a bullet list. */
+function sentenceList(parts: string[]): string {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+export type PaymentsState =
+  /** Couldn't be read. An unknown isn't an alarm. */
+  | "unknown"
+  | "ready"
+  /** No Stripe account at all. */
+  | "not-started"
+  /** They opened Stripe's form and didn't reach the end. */
+  | "unfinished"
+  /** They finished it, and Stripe has since asked for more. */
+  | "needs-more"
+  /** Stripe is verifying. Nothing for them to do but wait. */
+  | "under-review";
+
+export interface PaymentsSetup {
+  state: PaymentsState;
+  /** Whether money can reach them right now. */
+  ready: boolean;
+  title: string;
+  detail: string;
+  cta: string;
+  /** "needs-more" and a lapsed account are alarms; waiting on Stripe isn't. */
+  tone: "alarm" | "normal";
+}
+
+/**
+ * The one reading of a vendor's payment setup, for every screen that mentions it.
+ *
+ * There were four, and they all assumed the only way to be unpayable was never
+ * to have finished — because that was the only way the old completeness flag
+ * could be false. It can now go false on an account that was live for months,
+ * when Stripe withdraws a payout capability and asks for something new. Told
+ * "payment setup incomplete", that vendor goes looking for a setup step they
+ * finished long ago and finds nothing wrong.
+ */
+export function paymentsSetup(status: StripeStatus | null): PaymentsSetup {
+  if (!status) {
+    return {
+      state: "unknown",
+      ready: false,
+      title: "Payment setup",
+      detail: "We couldn't reach Stripe just now.",
+      cta: "Check payment setup",
+      tone: "normal",
+    };
+  }
+
+  if (status.stripe_onboarding_complete) {
+    return {
+      state: "ready",
+      ready: true,
+      title: "Payments are set up",
+      detail: "You're ready to be booked and paid.",
+      cta: "Manage payments",
+      tone: "normal",
+    };
+  }
+
+  if (!status.stripe_account_id) {
+    return {
+      state: "not-started",
+      ready: false,
+      title: "Set up payments",
+      detail:
+        "Clients can't pay you until Stripe has your details — a booking can be accepted, but checkout will refuse. It takes a few minutes.",
+      cta: "Set up payments",
+      tone: "alarm",
+    };
+  }
+
+  if (!status.details_submitted) {
+    return {
+      state: "unfinished",
+      ready: false,
+      title: "Finish your payment setup",
+      detail:
+        "You started with Stripe but didn't get to the end. Until you do, a client can book you and checkout will refuse.",
+      cta: "Continue payment setup",
+      tone: "alarm",
+    };
+  }
+
+  const owed = Array.from(
+    new Set((status.requirements_due ?? []).map(requirementLabel)),
+  );
+
+  if (owed.length) {
+    return {
+      state: "needs-more",
+      ready: false,
+      title: "Stripe needs one more thing",
+      detail: `Your details are in, but Stripe still wants ${sentenceList(owed)}. Until it has that, nothing can be paid out to you.`,
+      cta: "Give Stripe what it needs",
+      tone: "alarm",
+    };
+  }
+
+  if (status.pending_verification) {
+    return {
+      state: "under-review",
+      ready: false,
+      title: "Stripe is checking your details",
+      // Nothing is asked of them, because nothing they can do would help. A
+      // vendor sent to press a button would come back to the same screen.
+      detail:
+        "Nothing for you to do — payouts open when Stripe finishes. Bookings you accept in the meantime can't be paid for yet.",
+      cta: "Check with Stripe",
+      tone: "normal",
+    };
+  }
+
+  // Payouts are off and Stripe hasn't named a reason we can act on. Say the
+  // consequence, which is the part that's certainly true.
+  return {
+    state: "needs-more",
+    ready: false,
+    title: "Payouts are on hold",
+    detail:
+      "Stripe isn't paying out on your account at the moment. Opening it will show you what it needs.",
+    cta: "Open Stripe",
+    tone: "alarm",
+  };
+}
+
 /** A booking that no longer counts toward anything. */
 export function isDeadVendorBooking(b: VendorBooking): boolean {
   return (
@@ -63,25 +233,28 @@ export function isDeadVendorBooking(b: VendorBooking): boolean {
 /**
  * What the vendor still has to do.
  *
- * Stripe comes first and alone in its tone: every other task is a job to get
- * on with, that one is money quietly not arriving. Pass `stripeComplete` as
- * null when it couldn't be checked — an unknown isn't an alarm.
+ * Stripe comes first and usually alone in its tone: every other task is a job
+ * to get on with, that one is money quietly not arriving. Pass `stripe` as null
+ * when it couldn't be checked — an unknown isn't an alarm, and isn't a task.
+ *
+ * The wording is paymentsSetup's, not this function's, so the badge, the
+ * dashboard and the earnings page can't describe the same account differently.
  */
 export function vendorTasks(
   bookings: VendorBooking[],
-  stripeComplete: boolean | null,
+  stripe: StripeStatus | null,
 ): VendorTask[] {
   const tasks: VendorTask[] = [];
 
-  if (stripeComplete === false) {
+  const payments = paymentsSetup(stripe);
+  if (stripe && !payments.ready) {
     tasks.push({
       id: "stripe",
       kind: "stripe",
-      title: "Finish your payment setup",
-      detail:
-        "Clients can book you now, but nothing can be paid out until this is done.",
-      cta: "Set up payments",
-      tone: "alarm",
+      title: payments.title,
+      detail: payments.detail,
+      cta: payments.cta,
+      tone: payments.tone,
     });
   }
 
@@ -281,19 +454,21 @@ export function listingHealth(opts: {
   vendor: VendorDetail | null;
   services: ServiceItem[];
   availability: AvailabilitySlot[];
-  stripeComplete: boolean | null;
+  stripe: StripeStatus | null;
 }): HealthIssue[] {
-  const { vendor, services, availability, stripeComplete } = opts;
+  const { vendor, services, availability, stripe } = opts;
   const issues: HealthIssue[] = [];
 
-  if (stripeComplete === false) {
+  const payments = paymentsSetup(stripe);
+  if (stripe && !payments.ready) {
     issues.push({
       id: "stripe",
-      issue: "Payment setup incomplete",
+      issue: payments.title,
       consequence: "Clients can book you, but no payment can reach you.",
-      cta: "Set up payments",
+      cta: payments.cta,
       href: "/my-earnings",
-      severity: "critical",
+      // Waiting on Stripe's own review isn't something they're failing at.
+      severity: payments.tone === "alarm" ? "critical" : "warning",
     });
   }
 

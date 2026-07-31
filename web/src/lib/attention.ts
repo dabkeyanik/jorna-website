@@ -17,7 +17,7 @@ import {
   listBundles,
   listVendorBookings,
 } from "@/lib/jorna";
-import type { BundleDetail, VendorBooking } from "@/lib/types";
+import type { BundleDetail, StripeStatus, VendorBooking } from "@/lib/types";
 import { ATTENTION_KINDS, planForBundle, taskDetail } from "@/lib/planning";
 import { vendorTasks } from "@/lib/vendorPlan";
 
@@ -77,8 +77,8 @@ function clientItems(bundles: BundleDetail[]): AttentionItem[] {
  * the badge and the dashboard's action list can't disagree. Stripe is derived
  * there too, which is why it no longer needs adding separately below.
  */
-function vendorItems(bookings: VendorBooking[], stripeComplete: boolean | null): AttentionItem[] {
-  return vendorTasks(bookings, stripeComplete).map((task) => ({
+function vendorItems(bookings: VendorBooking[], stripe: StripeStatus | null): AttentionItem[] {
+  return vendorTasks(bookings, stripe).map((task) => ({
     id: task.id,
     title: task.title,
     detail: task.detail,
@@ -104,7 +104,7 @@ async function derive(): Promise<AttentionItem[]> {
         .then((r) => r.items)
         .catch(() => [] as VendorBooking[]),
     ]);
-    found.push(...vendorItems(bookings, stripe ? stripe.stripe_onboarding_complete : null));
+    found.push(...vendorItems(bookings, stripe));
   }
 
   // Only for a client. A vendor's own plans — if the account made any back when

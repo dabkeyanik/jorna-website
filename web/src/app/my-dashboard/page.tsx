@@ -65,6 +65,7 @@ import {
   type Earnings,
   type Review,
   type ServiceItem,
+  type StripeStatus,
   type VendorBooking,
   type VendorDetail,
 } from "@/lib/types";
@@ -105,7 +106,7 @@ interface Snapshot {
   vendor: VendorDetail | null;
   bookings?: VendorBooking[];
   earnings?: Earnings | null;
-  stripe?: boolean | null;
+  stripe?: StripeStatus | null;
   services?: ServiceItem[];
   availability?: AvailabilitySlot[];
   reviews?: Review[];
@@ -213,7 +214,9 @@ export default function VendorDashboardPage() {
   const [feeHistory, setFeeHistory] = useState<
     { label: string; gross: number; fee: number; net: number }[]
   >([]);
-  const [stripeComplete, setStripeComplete] = useState<boolean | null>(null);
+  // The whole status, not just whether it's complete: what Stripe is waiting on
+  // is the part a vendor can act on, and paymentsSetup needs it to say so.
+  const [stripe, setStripe] = useState<StripeStatus | null>(null);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -243,9 +246,7 @@ export default function VendorDashboardPage() {
           .then((r) => r.items)
           .catch(() => [] as VendorBooking[]),
         getEarnings(me.vendor_id).catch(() => null),
-        getStripeStatus(me.vendor_id)
-          .then((s) => s.stripe_onboarding_complete)
-          .catch(() => null),
+        getStripeStatus(me.vendor_id).catch(() => null),
         listServices({ vendor_id: me.vendor_id, limit: 100 })
           .then((r) => r.items)
           .catch(() => [] as ServiceItem[]),
@@ -276,7 +277,7 @@ export default function VendorDashboardPage() {
         net: h.net_cents ?? 0,
       })),
     );
-    setStripeComplete(snap.stripe ?? null);
+    setStripe(snap.stripe ?? null);
     setServices(snap.services ?? []);
     setAvailability(snap.availability ?? []);
     setReviews(snap.reviews ?? []);
@@ -366,10 +367,10 @@ export default function VendorDashboardPage() {
     );
   }
 
-  const tasks = vendorTasks(bookings, stripeComplete);
+  const tasks = vendorTasks(bookings, stripe);
   const jobs = vendorJobs(bookings);
   const requests = vendorRequests(bookings);
-  const health = listingHealth({ vendor, services, availability, stripeComplete });
+  const health = listingHealth({ vendor, services, availability, stripe });
   const name = [vendor?.f_name, vendor?.l_name].filter(Boolean).join(" ");
 
   return (
