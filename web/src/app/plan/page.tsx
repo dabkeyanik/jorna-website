@@ -8,7 +8,7 @@ import { celebrationByKey } from "@/lib/celebrations";
 import { deleteBundle, generateBundles } from "@/lib/jorna";
 import { CATEGORY_LABELS, categoryLabel, type BundleOption } from "@/lib/types";
 import { unchosenBundleIds } from "@/lib/planning";
-import { Button, Card, Chip, Field, Rule } from "@/components/ui";
+import { Button, Card, Chip, Field } from "@/components/ui";
 import { BundleResults } from "@/components/BundleResults";
 import { ClientOnlyRoute } from "@/components/ClientOnlyRoute";
 import { CityCombobox, type Coords } from "@/components/CityCombobox";
@@ -52,7 +52,7 @@ const IconUsers = (
 
 function SkeletonBundles() {
   return (
-    <section className="mt-12">
+    <section className="mt-10">
       {/* Left, matching the results this stands in for — otherwise the heading
           jumps from centre to left the moment the bundles arrive. */}
       <h2 className="serif text-3xl text-ink">Assembling three vendor teams…</h2>
@@ -263,25 +263,30 @@ function PlanInner() {
   const allSelected = needed.length === ALL_CATEGORIES.length;
 
   return (
-    <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-10">
-      {/* Left-aligned, like the rest of the app. Centred, it floated in the
-          middle of a 1248px page above a 768px card — the page was mostly
-          margin, which is the thing this layout exists to stop. */}
-      <header>
-        <span className="eyebrow">AI bundle builder</span>
-        <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold sm:text-5xl">
-          {celebration ? `Build your ${celebration.label.toLowerCase()}` : "Build your celebration"}
-        </h1>
-        <p className="mt-3 max-w-[60ch] text-ink-soft">
-          Tell us about your event and we&apos;ll assemble three complete vendor teams —
-          Budget, Balanced, and Top Rated — to compare and book.
-        </p>
-        <div className="mt-7">
-          <Rule />
+    <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-8">
+      {/* The title and the explanation sit side by side rather than stacked.
+          Centred and stacked — eyebrow, a 5xl heading, two lines of prose and a
+          rule — this was about 240px of chrome before the form began, on a page
+          whose whole complaint was height. The same horizontal move as the rest
+          of the refactor, applied to its own header.
+
+          The rule is gone with it: the card below draws its own edge, and a
+          divider between a title and the thing it titles was separating two
+          things that belong together. */}
+      <header className="lg:flex lg:items-end lg:justify-between lg:gap-12">
+        <div className="min-w-0">
+          <span className="eyebrow">AI bundle builder</span>
+          <h1 className="serif mt-2 text-3xl text-maroon dark:text-gold sm:text-4xl">
+            {celebration ? `Build your ${celebration.label.toLowerCase()}` : "Build your celebration"}
+          </h1>
         </div>
+        <p className="mt-3 max-w-[52ch] text-sm text-ink-soft lg:mt-0 lg:shrink-0 lg:text-right">
+          Tell us about your event and we&apos;ll assemble three complete vendor
+          teams — Budget, Balanced, and Top Rated — to compare and book.
+        </p>
       </header>
 
-      <Card className="mt-8 p-6 sm:p-7">
+      <Card className="mt-6 p-5 sm:p-6">
         {/* Two columns from lg: where and when on the left, how big and how
             much on the right.
 
@@ -298,8 +303,8 @@ function PlanInner() {
 
             Where subgrid isn't supported the column falls back to a plain
             grid — unaligned, but laid out and usable. */}
-        <div className="lg:grid lg:grid-cols-2 lg:grid-rows-4 lg:gap-x-9 lg:gap-y-7">
-          <div className="grid gap-7 lg:row-span-4 lg:grid-rows-subgrid">
+        <div className="lg:grid lg:grid-cols-2 lg:grid-rows-4 lg:gap-x-9 lg:gap-y-6">
+          <div className="grid gap-6 lg:row-span-4 lg:grid-rows-subgrid">
             <p className="eyebrow">The event</p>
 
             <div>
@@ -347,7 +352,7 @@ function PlanInner() {
                 booking's first and last day: what a per-day vendor bills for,
                 what the escrow gate waits out, what the run sheet lays out. */}
             <div>
-              <p className="mb-2.5 text-sm font-medium text-ink-soft">When</p>
+              <p className="mb-2 text-sm font-medium text-ink-soft">When</p>
 
               <div className="grid gap-2.5 sm:grid-cols-2">
                 <Field
@@ -395,7 +400,7 @@ function PlanInner() {
             </div>
 
             <div>
-              <p className="mb-2.5 text-sm font-medium text-ink-soft">Time</p>
+              <p className="mb-2 text-sm font-medium text-ink-soft">Time</p>
               <div className="grid gap-2.5 sm:grid-cols-2">
                 <Field
                   label="Starts"
@@ -418,7 +423,7 @@ function PlanInner() {
           {/* Right column. Guests moves here from beside the city: three groups
               each balances better than four and two, and it reads as how big
               and how much rather than a stray field. */}
-          <div className="mt-7 grid gap-7 lg:row-span-4 lg:mt-0 lg:grid-rows-subgrid">
+          <div className="mt-6 grid gap-6 lg:row-span-4 lg:mt-0 lg:grid-rows-subgrid">
             <p className="eyebrow">Size and budget</p>
 
             <Field
@@ -433,7 +438,7 @@ function PlanInner() {
             />
 
             <div>
-              <p className="mb-2.5 text-sm font-medium text-ink-soft">Budget</p>
+              <p className="mb-2 text-sm font-medium text-ink-soft">Budget</p>
               <div className="grid grid-cols-3 gap-2.5">
                 {BUDGETS.map((b) => {
                   const active = budget === b.value;
@@ -462,7 +467,7 @@ function PlanInner() {
             </div>
 
             <div>
-              <p className="mb-2.5 text-sm font-medium text-ink-soft">
+              <p className="mb-2 text-sm font-medium text-ink-soft">
                 Vibe <span className="text-ink-faint">(optional)</span>
               </p>
               <div className="flex flex-wrap gap-2">
@@ -482,8 +487,8 @@ function PlanInner() {
 
         {/* Full width, under both columns: the categories are the longest
             control on the form and the only one that wants the whole card. */}
-        <div className="mt-8 border-t border-line-soft pt-7">
-          <div className="mb-2.5 flex items-center justify-between">
+        <div className="mt-6 border-t border-line-soft pt-6">
+          <div className="mb-2 flex items-center justify-between">
             <p className="text-sm font-medium text-ink-soft">
               What you need{" "}
               <span className="text-ink-faint">
@@ -521,7 +526,7 @@ function PlanInner() {
 
             <Button
               size="lg"
-              className="mt-7 w-full lg:mt-0 lg:w-auto lg:shrink-0"
+              className="mt-6 w-full lg:mt-0 lg:w-auto lg:shrink-0"
               disabled={busy}
               onClick={generate}
             >
@@ -543,7 +548,7 @@ function PlanInner() {
       {busy ? (
         <SkeletonBundles />
       ) : options ? (
-        <section className="mt-12">
+        <section className="mt-10">
           {/* Left, with the rest of the page. Centred here they'd be the only
               centred thing left on it. */}
           <h2 className="serif text-3xl text-ink">Your three teams</h2>
