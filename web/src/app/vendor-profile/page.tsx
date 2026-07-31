@@ -112,13 +112,18 @@ export default function VendorProfilePage() {
       <VendorNav />
       <header>
         <span className="eyebrow">{vendor ? "Vendor profile" : "Become a vendor"}</span>
+        {/* Not "List your services on Jorna". No service is created here and
+            none can be until this exists — the page collects who you are, and
+            the category on it is the vendor's own. A heading promising services
+            over a form asking for one category read as though that category
+            were the service's. */}
         <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold">
-          {vendor ? "Your vendor profile" : "List your services on Jorna"}
+          {vendor ? "Your vendor profile" : "Create your vendor profile"}
         </h1>
         <p className="mt-3 text-ink-soft">
           {vendor
             ? "This is what clients see when they find you in search or an AI bundle."
-            : "Tell clients what you do. You can add your services and prices next."}
+            : "Who you are, so clients know who they're booking. Your services and prices come next."}
         </p>
       </header>
 
@@ -126,7 +131,7 @@ export default function VendorProfilePage() {
         <form onSubmit={submit} className="grid gap-4">
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-ink-soft">
-              What do you do?
+              Your main category
             </span>
             <select
               required
@@ -146,6 +151,14 @@ export default function VendorProfilePage() {
                 </option>
               ))}
             </select>
+            {/* Said here because it isn't obvious, and because the old heading
+                implied the opposite: this is how you're listed, not what any
+                one service is. A DJ who also does lighting sets that per
+                service — this one only decides what a new service starts as. */}
+            <span className="mt-1 block text-xs text-ink-faint">
+              How you&apos;re listed. Each service you add gets its own category,
+              and starts from this one.
+            </span>
           </label>
 
           {subOptions.length > 0 ? (
