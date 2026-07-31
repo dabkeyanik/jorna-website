@@ -20,11 +20,18 @@ import {
 } from "./types";
 import { isCompleteLocation } from "./address";
 
+// Every kind here is something the client can go and do. There used to be one
+// that wasn't — "vendor-reply", a sent request the vendor hadn't answered — and
+// it read "nothing to do until they answer" inside a list headed "6 things need
+// you". Six rows, six vendors, not one of them an action. A checklist that
+// counts things you cannot act on is a checklist people stop opening.
+//
+// Nothing is lost by dropping it: a plan page lists those bookings under
+// "Awaiting the vendor", each with its own status, which is where someone
+// looking for them would look.
 export type TaskKind =
   /** The event itself is missing a date, place, or headcount. */
   | "event-detail"
-  /** Sent to the vendor; they haven't answered. Waiting on them, not you. */
-  | "vendor-reply"
   /** Priced per guest/day, so the total isn't known yet and can't be charged. */
   | "quantity"
   | "payment"
@@ -33,10 +40,9 @@ export type TaskKind =
 /**
  * The kinds lib/attention surfaces as "Needs you".
  *
- * Not every task belongs there. "vendor-reply" is waiting on the vendor, and
- * putting event-detail gaps in the badge would make it count things that were
- * never in it — this list is what the badge already meant, held steady while
- * the rules themselves moved here.
+ * Narrower than TaskKind still: putting event-detail gaps in the badge would
+ * make it count things that were never in it — this list is what the badge
+ * already meant, held steady while the rules themselves moved here.
  */
 export const ATTENTION_KINDS: TaskKind[] = ["quantity", "payment", "confirm"];
 
@@ -183,7 +189,6 @@ export function compareByDate(aIso?: string | null, bIso?: string | null): numbe
 const URGENT_WITHIN_DAYS: Partial<Record<TaskKind, number>> = {
   payment: 21,
   quantity: 30,
-  "vendor-reply": 14,
   "event-detail": 45,
 };
 
@@ -256,19 +261,9 @@ function bookingTask(b: BundleBooking): PlanTask | null {
     };
   }
 
-  if (b.status === "pending") {
-    return {
-      id: `reply-${b.booking_id}`,
-      kind: "vendor-reply",
-      title: `${service} is awaiting a reply`,
-      vendor,
-      note: "nothing to do until they answer.",
-      tone: "normal",
-      cta: "View",
-      bookingId: b.booking_id,
-    };
-  }
-
+  // A sent request the vendor hasn't answered is deliberately not a task. It is
+  // theirs to act on, not the client's, and the plan page already lists it under
+  // "Awaiting the vendor".
   return null;
 }
 
@@ -286,17 +281,12 @@ export function planForBundle(bundle: BundleDetail): BundlePlan {
   }
 
   const days = daysUntil(bundle.event?.date_iso);
-  // On a draft nothing has been sent, so nothing is waiting on a vendor. The
-  // bookings exist and carry status "pending", but that's the shape they're
-  // stored in — /chatbot/bundles holds the notifications until /select.
-  const draft = isDraftBundle(bundle);
   const tasks = [
     ...eventTasks(bundle.event, bookings),
     ...bookings
       .filter((b) => !isDeadBooking(b))
       .map(bookingTask)
-      .filter((t): t is PlanTask => t !== null)
-      .filter((t) => !(draft && t.kind === "vendor-reply")),
+      .filter((t): t is PlanTask => t !== null),
   ].map((t) => sharpen(t, days));
   // Urgent first; otherwise the order they were derived in.
   tasks.sort((a, b) => (a.tone === b.tone ? 0 : a.tone === "urgent" ? -1 : 1));

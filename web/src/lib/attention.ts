@@ -42,7 +42,7 @@ export interface AttentionItem {
  * The rules themselves live in lib/planning, which the dashboard and the bundle
  * page also read — one set of rules, so the badge and the planning checklist
  * can't disagree. Only ATTENTION_KINDS are surfaced here: planning also derives
- * event-detail gaps and vendor-reply waits, and neither was ever in this badge.
+ * event-detail gaps, which were never in this badge.
  */
 function clientItems(bundles: BundleDetail[]): AttentionItem[] {
   const items: AttentionItem[] = [];
