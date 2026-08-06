@@ -560,6 +560,49 @@ export function getUnreadCount(): Promise<{ unread_count: number }> {
   return apiFetch<{ unread_count: number }>("/conversations/unread-count");
 }
 
+/** One conversation and its members, named from the caller's side of it. */
+export function getConversation(conversationId: string): Promise<ConversationSummary> {
+  return apiFetch<ConversationSummary>(`/conversations/${conversationId}`);
+}
+
+/**
+ * Ask a vendor a question, before anything is booked.
+ *
+ * One thread per client and vendor, so this opens or reuses — asking about a
+ * second listing continues the first conversation rather than starting a
+ * near-identical one. `serviceId` is the listing it was asked from; it rides
+ * along on the message as a reference card and doesn't scope the thread.
+ *
+ * Refused with 429 when the client has too many questions nobody has answered.
+ * That message is written to be read, so show it as it comes.
+ */
+export function askVendor(
+  vendorId: string,
+  content: string,
+  serviceId?: string,
+): Promise<{ conversation_id: string; message: GroupMessage }> {
+  return apiFetch<{ conversation_id: string; message: GroupMessage }>(
+    "/conversations/enquiry",
+    {
+      method: "POST",
+      body: { vendor_id: vendorId, content, service_id: serviceId ?? null },
+    },
+  );
+}
+
+/**
+ * The private thread for one booking — the client and that vendor, nobody else.
+ *
+ * Idempotent: opening is how you get to it, so there's no "does it exist yet"
+ * to ask first. The plan's group chat has every vendor on it, which is the
+ * wrong room for a question about one booking.
+ */
+export function openBookingThread(bookingId: string): Promise<ConversationSummary> {
+  return apiFetch<ConversationSummary>(`/conversations/booking/${bookingId}`, {
+    method: "POST",
+  });
+}
+
 /** Newest window first (offset 0 = most recent), returned oldest→newest. */
 export function getConversationMessages(
   conversationId: string,

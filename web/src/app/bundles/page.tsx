@@ -20,7 +20,6 @@
 // "Needs you" badge, so the two can't tell you different things.
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";

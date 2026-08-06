@@ -681,6 +681,31 @@ export interface Negotiation {
 
 // ── Conversations (group chat) ───────────────────────────────────────
 
+/**
+ * What a conversation is about. Exactly one of the three ids on a summary is
+ * set, and this says which.
+ *
+ *   bundle    the group chat for a plan — every vendor on it, and the client
+ *   booking   the client and one vendor, privately, about one booking
+ *   enquiry   the client and one vendor, before anything is booked
+ */
+export type ConversationSubject = "bundle" | "booking" | "enquiry";
+
+/** A negotiation event, carried on an `offer` message. */
+export interface OfferMeta {
+  negotiation_id?: string;
+  offer_id?: string;
+  /** offer | counter | accept | reject */
+  action?: string;
+  amount_cents?: number | null;
+}
+
+/** The listing an enquiry was asked from, carried on its first message. */
+export interface ServiceRefMeta {
+  service_id?: string;
+  service_name?: string;
+}
+
 export interface GroupMessage {
   message_id: string;
   conversation_id: string;
@@ -689,22 +714,36 @@ export interface GroupMessage {
   sender_pfp?: string | null;
   content: string;
   created_at: string;
+  /**
+   * text | offer | system. `content` is a human sentence whatever the kind, so
+   * an unknown one still renders something true — the kind only decides
+   * whether a card is drawn around it.
+   */
+  kind?: string | null;
+  meta?: (OfferMeta & ServiceRefMeta) | null;
   read_by?: string[];
 }
 
 export interface ConversationSummary {
   conversation_id: string;
+  subject_type?: ConversationSubject | null;
   bundle_id?: string | null;
+  booking_id?: string | null;
+  vendor_id?: string | null;
+  /** Named per viewer for the two-person threads — see the server's _display_name. */
   name?: string | null;
-  /** all_parties | vendors_only */
+  /** all_parties | vendors_only | direct */
   type?: string | null;
   member_count?: number;
   members?: Array<{ user_id: string; name?: string | null; pfp_url?: string | null }>;
+  /** Unread in this thread, for this reader. */
+  unread_count?: number;
   last_message?: {
     message_id?: string;
     content?: string | null;
     sender_id?: string | null;
     sender_name?: string | null;
+    kind?: string | null;
     created_at?: string | null;
   } | null;
   created_at?: string | null;

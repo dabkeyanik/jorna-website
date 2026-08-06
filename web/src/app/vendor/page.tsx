@@ -15,6 +15,7 @@ import {
 import { loadIsVendor } from "@/lib/role";
 import { Card, LinkButton, Stars } from "@/components/ui";
 import { ModerationMenu } from "@/components/ModerationMenu";
+import { AskVendor } from "@/components/AskVendor";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -370,9 +371,10 @@ function VendorInner() {
           Want this vendor on your team? Build a bundle and we&apos;ll match them to your date and
           budget.
         </p>
-        <LinkButton href="/plan" className="mt-4">
-          Build my bundle
-        </LinkButton>
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <LinkButton href="/plan">Build my bundle</LinkButton>
+          <AskVendor vendorId={vendor.vendor_id} />
+        </div>
       </div>
 
       <div className="mt-6">

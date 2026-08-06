@@ -23,6 +23,7 @@ import {
   CARD_RETURN_KEY,
   getBundleConversation,
   getSavedCard,
+  openBookingThread,
   startCardSetup,
   type SavedCard,
 } from "@/lib/jorna";
@@ -382,11 +383,43 @@ function statusLine(b: BundleBooking, draft: boolean): { text: string; tone: str
   };
 }
 
+/**
+ * Open this booking's private thread and go to it.
+ *
+ * A button rather than a link because the thread may not exist yet — the server
+ * makes it on first ask and returns the same one after, so there is no "start a
+ * chat" and "open the chat" to tell apart, here or in the client's head.
+ */
+function MessageVendorButton({ bookingId }: { bookingId: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <Button
+      variant="quiet"
+      size="md"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const conv = await openBookingThread(bookingId);
+          router.push(`/conversation?id=${conv.conversation_id}`);
+        } catch {
+          // The plan page is not where a chat failure gets explained; the
+          // Messages tab lists every thread and is one tap away.
+          router.push("/messages");
+        }
+      }}
+    >
+      {busy ? "Opening…" : "Message"}
+    </Button>
+  );
+}
+
 function BookingRow({
   booking,
   event,
   draft,
-  chatId,
   busyId,
   note,
   panel,
@@ -404,8 +437,6 @@ function BookingRow({
   booking: BundleBooking;
   event: BundleEventInfo | null | undefined;
   draft: boolean;
-  /** The plan's group chat, when it has one (sent plans only). */
-  chatId: string | null;
   busyId: string | null;
   /** The result of the last action taken on this booking, if it was this one. */
   note: Note | null;
@@ -569,16 +600,13 @@ function BookingRow({
           <div className="mt-3 flex flex-wrap justify-end gap-2">
             {/* On the row, because "I have a question about the photographer"
                 starts at the photographer — not at a tab listing every chat
-                you're in. */}
-            {chatId ? (
-              <LinkButton
-                href={`/conversation?id=${chatId}`}
-                variant="quiet"
-                size="md"
-              >
-                Message
-              </LinkButton>
-            ) : null}
+                you're in.
+
+                It used to open the plan's group chat, which has every vendor on
+                it: the question was right, the room was wrong. This opens the
+                thread with that one vendor. The group chat is still a click
+                away at the top of the page, where it's about the whole plan. */}
+            <MessageVendorButton bookingId={booking.booking_id} />
             {booking.service_category && !awaiting ? (
               <Button variant="ghost" size="md" onClick={() => onSwap(booking)}>
                 Swap service
@@ -1429,7 +1457,6 @@ function BundleInner() {
       booking={b}
       event={bundle.event}
       draft={draft}
-      chatId={chatId}
       busyId={busyId}
       note={rowNote?.bookingId === b.booking_id ? rowNote : null}
       panel={panel}

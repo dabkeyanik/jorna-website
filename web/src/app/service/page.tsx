@@ -23,6 +23,7 @@ import {
   type Quantity,
 } from "@/lib/pricing";
 import { Avatar, Card, LinkButton, Stars } from "@/components/ui";
+import { AskVendor } from "@/components/AskVendor";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -257,6 +258,15 @@ function PricePanel({ service }: { service: ServiceItem }) {
         <LinkButton href={`/book?service=${service.service_id}`} size="lg">
           Request this service
         </LinkButton>
+        {/* Beside the request, not instead of it. A client who isn't ready to
+            book had one option on this page and it was a commitment — so the
+            question that would have got them there was asked somewhere else,
+            or not at all. */}
+        <AskVendor
+          vendorId={service.vendor_id}
+          serviceId={service.service_id}
+          serviceName={service.name}
+        />
         <LinkButton href={`/vendor?id=${service.vendor_id}`} variant="ghost" size="md">
           View vendor profile
         </LinkButton>
