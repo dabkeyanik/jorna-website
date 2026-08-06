@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { createEvent, listBundles, listEvents } from "@/lib/jorna";
 import {
+  celebrationProgress,
   compareByDate,
   isDraftBundle,
   missingCategories,
@@ -34,6 +35,7 @@ import {
   taskDetail,
   type MoneyBreakdown,
   type PlanTask,
+  type ProgressBreakdown,
 } from "@/lib/planning";
 import {
   CATEGORY_LABELS,
@@ -42,6 +44,7 @@ import {
   type EventItem,
 } from "@/lib/types";
 import { Button, Card, Chip, Field, LinkButton } from "@/components/ui";
+import { PlanProgress } from "@/components/PlanProgress";
 import { CityCombobox } from "@/components/CityCombobox";
 import { ClientOnlyRoute } from "@/components/ClientOnlyRoute";
 
@@ -88,12 +91,13 @@ interface Celebration {
   location: string | null;
   guestCount: number | null;
   tasks: PlanTask[];
-  paid: number;
   live: number;
   spend: number;
   /** What the host set out to spend, when they told us. */
   budget: number | null;
   money: MoneyBreakdown;
+  /** How far along it is, counted in vendors rather than dollars. */
+  progress: ProgressBreakdown;
   /** Categories they said they needed that nothing live covers. */
   missing: string[];
 }
@@ -127,11 +131,14 @@ function toCelebrations(events: EventItem[], bundles: BundleDetail[]): Celebrati
     location: event?.location ?? null,
     guestCount: event?.guest_count ?? null,
     tasks: [],
-    paid: 0,
     live: 0,
     spend: 0,
     budget: event?.budget ?? null,
     money: { ...ZERO_MONEY },
+    // Filled in below, once every bundle is in — progress counts what's still
+    // to book, which is a fact about the celebration and not about any one
+    // bundle in it.
+    progress: celebrationProgress([]),
     missing: [],
   });
 
@@ -155,7 +162,6 @@ function toCelebrations(events: EventItem[], bundles: BundleDetail[]): Celebrati
 
     const plan = planForBundle(bundle);
     entry.tasks.push(...plan.tasks);
-    entry.paid += plan.paidCount;
     entry.live += plan.liveCount;
     entry.spend += bundle.total_estimated_cost ?? 0;
 
@@ -173,6 +179,7 @@ function toCelebrations(events: EventItem[], bundles: BundleDetail[]): Celebrati
     // Compared across all of a celebration's bundles: a photographer booked in
     // one of them isn't missing just because the other doesn't have one.
     entry.missing = missingCategories(entry.event?.services_needed, entry.bundles);
+    entry.progress = celebrationProgress(entry.bundles, entry.missing.length);
   }
 
   // Upcoming first, soonest at the top; then finished, most recent first; then
@@ -208,7 +215,7 @@ function Fact({ label, value }: { label: string; value: string | null }) {
 }
 
 function CelebrationCard({ celebration }: { celebration: Celebration }) {
-  const { name, bundles, tasks, paid, live, spend, dateIso, budget } = celebration;
+  const { name, bundles, tasks, live, spend, dateIso, budget, progress } = celebration;
   const urgent = tasks.filter((t) => t.tone === "urgent").length;
   const when = countdown(dateIso);
   const total = money(spend);
@@ -228,12 +235,6 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
   const unpriced = celebration.money.unpricedCount;
   const overBudget =
     budget != null && unpriced === 0 && celebration.money.committed > budget;
-  // Scale against the budget when there is one, so the bar shows how much of it
-  // is spoken for; against the committed total otherwise, and never past 100%.
-  const barBase = Math.max(
-    budget && !overBudget ? budget : celebration.money.committed,
-    1,
-  );
 
   return (
     <Card
@@ -294,52 +295,43 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
         {live === 0 && total ? <Fact label="Estimated" value={total} /> : null}
       </div>
 
+      {/* Where the celebration has got to, in vendors. Not in money: the venue
+          is most of the bill, so paying it used to fill most of a bar while
+          five vendors sat unanswered — and nothing still to be booked was in
+          the total at all, which is how one paid vendor out of six needed drew
+          a full bar. See the Progress section of lib/planning.
+
+          Rendered on `progress.total`, not on `live`: a celebration with
+          categories listed and nothing booked yet is exactly the case the old
+          bar had nothing to say about. */}
+      <PlanProgress progress={progress} className="mt-4" />
+
       {live > 0 ? (
-        <div className="mt-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 text-xs">
-            <span className="text-ink-soft">
-              {/* A draft has committed to nothing — no vendor has been asked,
-                  and the figure is a sum of listed rates the client can still
-                  change. "Estimated" is what it is until the plan is sent. */}
-              {money(celebration.money.committed)}{" "}
-              {stage === "draft" ? "estimated" : "committed"}
-              {unpriced > 0 ? <span className="text-ink-faint"> so far</span> : null}
-              {celebration.budget ? (
-                <span className={overBudget ? "text-maroon dark:text-gold" : "text-ink-faint"}>
-                  {" "}
-                  of {money(celebration.budget)} budget
-                  {overBudget ? " — over" : ""}
-                </span>
-              ) : null}
-            </span>
-            <span className="text-ink-faint">
-              {paid} of {live} {live === 1 ? "vendor" : "vendors"} paid
-            </span>
-          </div>
-
-          {/* Released, then held, then what's still to pay. Against the budget
-              when there is one, so the bar reads as "of what I meant to spend". */}
-          <div className="mt-1.5 flex h-2 overflow-hidden rounded-full bg-line-soft">
-            {[
-              { value: celebration.money.released, className: "bg-green" },
-              { value: celebration.money.inEscrow, className: "bg-gold" },
-              { value: celebration.money.outstanding, className: "bg-gold/35" },
-            ].map((seg, i) =>
-              seg.value > 0 ? (
-                <div
-                  key={i}
-                  className={seg.className}
-                  style={{ width: `${Math.min(100, (seg.value / barBase) * 100)}%` }}
-                />
-              ) : null,
-            )}
-          </div>
-
-          {celebration.money.outstanding > 0 ? (
-            <p className="mt-1.5 text-xs text-ink-faint">
-              {money(celebration.money.outstanding)} still to pay
-            </p>
-          ) : null}
+        <div className="mt-3">
+          {/* The budget, in words. It used to be the bar's scale, which meant
+              the same bar measured spend on one card and progress-ish on the
+              next; as a sentence it says what it always meant. */}
+          <p className="text-xs text-ink-soft">
+            {/* A draft has committed to nothing — no vendor has been asked,
+                and the figure is a sum of listed rates the client can still
+                change. "Estimated" is what it is until the plan is sent. */}
+            {money(celebration.money.committed)}{" "}
+            {stage === "draft" ? "estimated" : "committed"}
+            {unpriced > 0 ? <span className="text-ink-faint"> so far</span> : null}
+            {celebration.budget ? (
+              <span className={overBudget ? "text-maroon dark:text-gold" : "text-ink-faint"}>
+                {" "}
+                of {money(celebration.budget)} budget
+                {overBudget ? " — over" : ""}
+              </span>
+            ) : null}
+            {celebration.money.outstanding > 0 ? (
+              <span className="text-ink-faint">
+                {" · "}
+                {money(celebration.money.outstanding)} still to pay
+              </span>
+            ) : null}
+          </p>
 
           {unpriced > 0 ? (
             <p className="mt-1.5 text-xs text-ink-faint">

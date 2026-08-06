@@ -54,9 +54,11 @@ import {
 } from "@/lib/types";
 import {
   bookingGaps,
+  celebrationProgress,
   describeGaps,
   isDeadBooking,
   isDraftBundle,
+  missingCategories,
   moneyForBundle,
   planIsCommitted,
   planForBundle,
@@ -74,6 +76,7 @@ import {
 } from "@/lib/address";
 import { AddressFields } from "@/components/AddressFields";
 import { DraftDetails } from "@/components/DraftDetails";
+import { PlanProgress } from "@/components/PlanProgress";
 import { ClientOnlyRoute } from "@/components/ClientOnlyRoute";
 import { addressPin } from "@/lib/geocode";
 import { Avatar, Button, Card, Field, LinkButton } from "@/components/ui";
@@ -1397,6 +1400,13 @@ function BundleInner() {
 
   const plan = planForBundle(bundle);
   const cash = moneyForBundle(bundle);
+  // The same reading as the dashboard card this page opens from — one bundle
+  // rather than a celebration's several, and the categories the client listed
+  // and hasn't covered counted the same way.
+  const progress = celebrationProgress(
+    [bundle],
+    missingCategories(event?.services_needed, [bundle]).length,
+  );
   const draft = isDraftBundle(bundle);
   const heldMoney = heldOnPlan(bundle.bookings ?? []);
   // The address forms seed themselves once, from the venue when there is one.
@@ -1583,9 +1593,12 @@ function BundleInner() {
           </div>
         ) : null}
 
-        <p className="mt-2 text-ink-soft">
-          {bundle.booking_count} {bundle.booking_count === 1 ? "vendor" : "vendors"}
-        </p>
+        {/* Where the plan has got to. It used to be a bare vendor count, which
+            is the one thing about a plan that never changes as you work
+            through it — the same "6 vendors" on the day it was drafted and the
+            day it was paid for. Same bar as the dashboard, from the same
+            counts, so opening a card can't tell you something new. */}
+        <PlanProgress progress={progress} className="mt-3 max-w-[40rem]" />
 
         {/* The plan at a glance: what it costs, what it is, and who's coming.
             One card, because they are one answer — as two, the figure sat in a
