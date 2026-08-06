@@ -235,9 +235,19 @@ function bookingTask(b: BundleBooking): PlanTask | null {
     };
   }
 
-  // Approved and waiting on payment. Mirrors the checkout guard: a total still
-  // pending a quantity can't be paid, so don't offer a Pay button.
-  if (b.status === "approved" && (pay === "unpaid" || pay === "processing")) {
+  // Approved and waiting on payment. Mirrors the checkout guard twice over: a
+  // total still pending a quantity can't be paid, so it gets a task about the
+  // quantity rather than a Pay button — and a charge already in flight isn't
+  // waiting on the client at all.
+  //
+  // `processing` used to be in this condition, which made it the only place in
+  // the app that read a payment in flight as unpaid. Everywhere else already
+  // agreed it isn't: the plan page's Pay button excludes it (a second charge
+  // for one booking is how a client pays twice), the status line says "Payment
+  // processing", and both the money figures and the progress bar count it as
+  // gone. So the task list — and the "Needs you" badge behind it — was telling
+  // a client to do the one thing every other screen is built to prevent.
+  if (b.status === "approved" && pay === "unpaid") {
     if (b.price_pending_quantity) {
       return {
         id: `quantity-${b.booking_id}`,
@@ -400,6 +410,130 @@ export function moneyForBundle(bundle: BundleDetail): MoneyBreakdown {
     else if (b.status === "approved") sum.outstanding += price;
   }
   return sum;
+}
+
+// ── Progress ─────────────────────────────────────────────────────────
+//
+// How far along the celebration is, counted in arrangements rather than in
+// dollars.
+//
+// The dashboard used to draw the money above as a bar, which read as progress
+// and wasn't:
+//
+//   - The venue is most of the bill. Paying it filled most of the bar while
+//     five vendors sat unanswered; sorting five smaller ones barely moved it.
+//   - Nothing still to be booked was in the denominator, so a wedding needing
+//     six categories with one venue paid drew a *full* bar.
+//   - The two states most in need of the client — a vendor who hasn't replied,
+//     and a booking that can't be priced — belonged to no segment at all, so
+//     the bar was silent about exactly what it should have been loudest about.
+//
+// So: one unit per thing that has to be sorted, each in exactly one stage,
+// including the ones nobody has started. Every rule reads a helper this file
+// already has rather than re-deriving it — a bar that disagreed with the task
+// list printed underneath it would be worse than no bar.
+
+/**
+ * The stages one arrangement passes through, in the order it passes through
+ * them. `problem` is the exception: it sits beside `paid` rather than after it,
+ * because disputed money has stopped moving forward.
+ */
+export const PROGRESS_STAGES = [
+  /** A category the client said they need that nothing live covers yet. */
+  "toBook",
+  /** In a draft — chosen, but no vendor has been asked. */
+  "chosen",
+  /** Sent, and the vendor hasn't answered. */
+  "awaiting",
+  /** Accepted by the vendor, not yet paid. */
+  "accepted",
+  /** Paid, held in escrow. */
+  "paid",
+  /** Paid and disputed: held, and going nowhere until someone rules on it. */
+  "problem",
+  /** The client has confirmed it happened, or the money has been released. */
+  "done",
+] as const;
+
+export type ProgressStage = (typeof PROGRESS_STAGES)[number];
+
+export interface ProgressBreakdown {
+  /** How many units sit in each stage. Sums to `total`. */
+  stages: Record<ProgressStage, number>;
+  /** Everything the celebration still has to get through, done included. */
+  total: number;
+}
+
+function noProgress(): Record<ProgressStage, number> {
+  return {
+    toBook: 0,
+    chosen: 0,
+    awaiting: 0,
+    accepted: 0,
+    paid: 0,
+    problem: 0,
+    done: 0,
+  };
+}
+
+/**
+ * Where a celebration has got to.
+ *
+ * `stillToBook` is the count from `missingCategories` — passed in rather than
+ * derived here because it is a property of the celebration, not of any one
+ * bundle: a photographer booked in one bundle isn't missing because the other
+ * doesn't have one. Without it the bar would fill up while half the plan was
+ * still an intention.
+ */
+export function celebrationProgress(
+  bundles: BundleDetail[],
+  stillToBook = 0,
+): ProgressBreakdown {
+  const stages = noProgress();
+  stages.toBook = stillToBook;
+
+  for (const bundle of bundles) {
+    // A draft's bookings are chosen, not requested — the backend doesn't tell
+    // the vendor until the plan is sent, so counting them as "waiting on a
+    // reply" would be waiting on someone who has never been asked.
+    const draft = isDraftBundle(bundle);
+
+    for (const b of bundle.bookings ?? []) {
+      // Declined or refunded isn't work outstanding, it's work that came back.
+      // It leaves the count here and reappears — if its category was one the
+      // client listed — as something still to book, so a vendor dropping out
+      // moves the bar backwards. That is what happened.
+      if (isDeadBooking(b)) continue;
+
+      const pay = b.payment_status ?? "unpaid";
+      if (pay === "disputed") {
+        // Checked before "done" so the bar can never read complete while money
+        // is frozen, whatever else has happened to the booking.
+        stages.problem += 1;
+      } else if (pay === "released" || b.customer_confirmed_at) {
+        stages.done += 1;
+      } else if (pay === "paid" || pay === "processing") {
+        // `processing` is a charge in flight: the client's part is over and
+        // there is nothing they could do to hurry it. Counted as paid here,
+        // raised as no task above, and refused a Pay button on the plan page —
+        // the three now say the same thing about it.
+        stages.paid += 1;
+      } else if (b.status === "pending" || b.status === "negotiation_ongoing") {
+        stages[draft ? "chosen" : "awaiting"] += 1;
+      } else {
+        // Accepted and unpaid. Including the ones priced per guest or per hour,
+        // which can't be paid until a quantity lands: they're a real step of
+        // this plan, and the money figures — where a rate is not a total and so
+        // can't be counted at all — are the reason they were invisible.
+        stages.accepted += 1;
+      }
+    }
+  }
+
+  return {
+    stages,
+    total: PROGRESS_STAGES.reduce((n, stage) => n + stages[stage], 0),
+  };
 }
 
 // ── Schedule ─────────────────────────────────────────────────────────
