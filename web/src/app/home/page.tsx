@@ -42,26 +42,15 @@ import type { VendorSearchItem } from "@/lib/types";
 import { LinkButton } from "@/components/ui";
 import { VendorCard, VendorCardSkeleton } from "@/components/VendorCard";
 import {
+  CELEBRATION_ICONS,
   IconArrow,
   IconCalendar,
+  IconCelebration,
   IconCheck,
   IconLock,
   IconShield,
   IconUsers,
 } from "@/components/marketing/icons";
-
-// Keyed by the celebration keys in lib/celebrations, so a tile added there
-// shows up here with a sensible glyph rather than silently going blank.
-const CELEBRATION_EMOJI: Record<string, string> = {
-  wedding: "💍",
-  sangeet: "🎶",
-  mehndi: "🌿",
-  pooja: "🪔",
-  bachelor: "🥂",
-  bachelorette: "✨",
-  birthday: "🎂",
-  graduation: "🎓",
-};
 
 const STEPS = [
   {
@@ -460,11 +449,9 @@ export default function HomePage() {
               <Link
                 key={c.key}
                 href={`/plan?event=${c.key}`}
-                className="flex flex-col items-center gap-2 rounded-xl border border-line-soft bg-card p-3 transition hover:border-gold/60 hover:bg-ground-2"
+                className="flex flex-col items-center gap-2 rounded-xl border border-line-soft bg-card p-3 text-gold transition hover:border-gold/60 hover:bg-ground-2"
               >
-                <span className="text-2xl" aria-hidden="true">
-                  {CELEBRATION_EMOJI[c.key] ?? "✦"}
-                </span>
+                {CELEBRATION_ICONS[c.key] ?? IconCelebration}
                 <span className="text-center text-xs font-medium text-ink-soft">
                   {c.label}
                 </span>
