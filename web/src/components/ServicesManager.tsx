@@ -394,10 +394,6 @@ export function ServicesManager({
                     </option>
                   ))}
                 </select>
-                <span className="mt-1 block text-xs text-ink-faint">
-                  Anything but a flat price needs the client&apos;s guest count or
-                  dates before they can pay.
-                </span>
               </label>
             </div>
 
@@ -464,7 +460,6 @@ export function ServicesManager({
               min={0}
               step={1}
               placeholder="9"
-              hint="Whole years — shown to clients as, e.g., “9 years”."
               required
               value={form.experience}
               onChange={(e) => setForm({ ...form, experience: e.target.value })}
@@ -576,9 +571,6 @@ export function ServicesManager({
                       onChange={(e) => setNewPhotos(Array.from(e.target.files ?? []))}
                     />
                   </label>
-                  <span className="mt-1 block text-xs text-ink-faint">
-                    Uploaded as soon as the service is created. You can add more later.
-                  </span>
                 </div>
                 <div>
                   <p className="mb-1.5 text-sm font-medium text-ink-soft">Videos</p>
