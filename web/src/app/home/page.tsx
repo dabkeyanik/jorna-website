@@ -252,7 +252,12 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="mt-12 grid h-[220px] grid-cols-3 gap-3 md:gap-4">
+          {/* auto-rows (not h-*) fixes the row's height: a plain h-[220px] on
+              the grid container leaves the implicit row auto-sized, so these
+              photos (percentage-height images with no other size hint) fall
+              back to their natural aspect ratio and spill past 220px into
+              the "How it works" section below. */}
+          <div className="mt-12 grid grid-cols-3 auto-rows-[220px] gap-3 md:gap-4">
             <div className="col-span-2 overflow-hidden rounded-2xl bg-panel">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
