@@ -4,7 +4,7 @@
 // the header on desktop (SiteHeader), and as the bottom tab bar on phones
 // (AppTabBar). Only one is visible at a time — the split is CSS, so both mount.
 //
-//   Client: Home · Builder · Marketplace · Dashboard · Needs you · Messages · Profile
+//   Client: Home · Builder · Market · Dashboard · Needs you · Messages · Profile
 //   Vendor: Home · Dashboard · Needs you · Messages · Profile
 //
 // Role is "has a vendor profile" (getMyVendor != null), the same signal iOS uses
@@ -70,7 +70,7 @@ export const CLIENT_TABS: NavItem[] = [
   { href: "/plan", label: "Builder", icon: icon(I.build), match: ["/plan"] },
   {
     href: "/marketplace",
-    label: "Marketplace",
+    label: "Market",
     icon: icon(I.marketplace),
     match: ["/marketplace", "/vendor"],
   },
