@@ -167,7 +167,12 @@ export interface VendorSearchItem {
   service_rating?: number | null;
   service_num_reviews?: number | null;
   location?: string | null;
+  /** The vendor's account avatar — a fallback when the listing has no photo
+   *  of its own. See `service_photo_url`. */
   pfp_url?: string | null;
+  /** This listing's own cover photo (or a video's poster frame). The card
+   *  leads with the service, so this takes priority over `pfp_url`. */
+  service_photo_url?: string | null;
   travel_radius_miles?: number | null;
   open_to_long_distance?: boolean;
   tags?: string[];

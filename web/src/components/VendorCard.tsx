@@ -18,6 +18,10 @@ export function VendorCard({ item }: { item: VendorSearchItem }) {
   const name = `${item.first_name ?? ""} ${item.last_name ?? ""}`.trim();
   const price = money(item.service_price);
   const monogram = (name || item.service_name || "·").charAt(0).toUpperCase();
+  // The listing's own photo first — the card leads with the service, so that's
+  // what a client is scrolling past photos of. Falls back to the vendor's
+  // avatar for a listing with no photo yet, and only then to the monogram.
+  const photo = item.service_photo_url || item.pfp_url;
   const distance =
     item.distance_miles != null ? `${Math.round(item.distance_miles)} mi away` : null;
 
@@ -35,10 +39,10 @@ export function VendorCard({ item }: { item: VendorSearchItem }) {
       className="group flex flex-col overflow-hidden rounded-2xl border border-card-edge bg-card shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:border-gold/50 hover:shadow-[0_20px_44px_-22px_rgba(74,11,26,0.4)]"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-panel">
-        {item.pfp_url ? (
+        {photo ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={item.pfp_url}
+            src={photo}
             alt={item.service_name || name}
             loading="lazy"
             className="size-full object-cover transition duration-300 group-hover:scale-[1.04]"
