@@ -38,6 +38,24 @@ function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
 }
 
+// experience is stored server-side as free text ("Text", not a number column)
+// so old listings can carry whatever a vendor once typed ("9+ years",
+// "over a decade"). The form only collects a whole number of years now, so
+// these two convert at the edges: parse a leading number back out for
+// editing (falls back to blank rather than guessing at prose), and format the
+// number into the sentence the backend — and everywhere else that displays
+// it — still expects.
+function parseExperienceYears(raw?: string | null): string {
+  if (!raw) return "";
+  const n = parseInt(raw, 10);
+  return Number.isNaN(n) ? "" : String(n);
+}
+
+function formatExperienceYears(raw: string): string {
+  const n = Math.max(0, Math.round(Number(raw) || 0));
+  return n === 1 ? "1 year" : `${n} years`;
+}
+
 // The rate's multiplier. "event" is a flat price — everything else needs a
 // quantity from the client at booking time before it can be paid.
 const PRICE_UNITS = [
@@ -130,7 +148,7 @@ export function ServicesManager({
     setForm({
       name: s.name,
       price: s.price,
-      experience: s.experience ?? "",
+      experience: parseExperienceYears(s.experience),
       price_unit: s.price_unit ?? "event",
       category: s.category ?? "",
       subcategory: s.subcategory ?? "",
@@ -213,6 +231,7 @@ export function ServicesManager({
       const payload: ServiceInput = {
         ...form,
         price: Number(form.price),
+        experience: formatExperienceYears(form.experience),
         subcategory: form.subcategory || null,
         location: form.location || null,
       };
@@ -439,8 +458,13 @@ export function ServicesManager({
             </div>
 
             <Field
-              label="Experience"
-              placeholder="9+ years"
+              label="Years of experience"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              placeholder="9"
+              hint="Whole years — shown to clients as, e.g., “9 years”."
               required
               value={form.experience}
               onChange={(e) => setForm({ ...form, experience: e.target.value })}
