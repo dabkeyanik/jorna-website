@@ -256,8 +256,11 @@ export default function HomePage() {
               the grid container leaves the implicit row auto-sized, so these
               photos (percentage-height images with no other size hint) fall
               back to their natural aspect ratio and spill past 220px into
-              the "How it works" section below. */}
-          <div className="mt-12 grid grid-cols-3 auto-rows-[220px] gap-3 md:gap-4">
+              the "How it works" section below. Taller at md+: 220px crops to
+              a near-square box at phone widths, but against the ~1248px
+              desktop container it flattens these portrait shots into thin
+              strips. */}
+          <div className="mt-12 grid grid-cols-3 auto-rows-[220px] gap-3 md:auto-rows-[360px] md:gap-4">
             <div className="col-span-2 overflow-hidden rounded-2xl bg-panel">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
