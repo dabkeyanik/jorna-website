@@ -2,19 +2,19 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
+import { MobileNavMenu } from "./MobileNavMenu";
 import { NavBadge, NEEDS_YOU, useAppNav } from "./nav";
 import { Button, LinkButton } from "./ui";
 
 // The top bar: wordmark, then the primary navigation, then the auth action.
 //
-// Navigation used to live only in the bottom tab bar, mirroring iOS. It's up
-// here on desktop now, because a row of links beside the wordmark is what a
-// website looks like — the bar stays on phones (AppTabBar, md:hidden), where a
-// thumb-reachable row is still the right answer. Both read components/nav, so
-// the two can't drift.
+// A row of links beside the wordmark is what a website looks like, so that's
+// what desktop gets. Phones get MobileNavMenu's hamburger button instead,
+// grouped with the auth action below — both read components/nav, so the two
+// can't drift.
 //
-// Text-only, no icons: the icons earn their place in a 68px-wide tab, and read
-// as clutter in a header.
+// Text-only, no icons, on the desktop row: next to text they'd just read as
+// clutter. MobileNavMenu's sheet has the room to show them.
 export function SiteHeader() {
   const { user, loading, logout } = useAuth();
   const { desktopItems: items, attention, home, isActive } = useAppNav();
@@ -84,6 +84,7 @@ export function SiteHeader() {
         ) : null}
 
         <nav className="flex shrink-0 items-center gap-2">
+          <MobileNavMenu />
           {loading ? null : user ? (
             <Button variant="ghost" onClick={logout}>
               Sign out

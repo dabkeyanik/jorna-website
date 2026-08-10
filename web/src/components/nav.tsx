@@ -1,11 +1,12 @@
 "use client";
 
 // The app's primary navigation, defined once and rendered twice: as links in
-// the header on desktop (SiteHeader), and as the bottom tab bar on phones
-// (AppTabBar). Only one is visible at a time — the split is CSS, so both mount.
+// the header on desktop (SiteHeader), and as a hamburger-triggered menu on
+// phones (MobileNavMenu). Only one is visible at a time — the split is CSS,
+// so both mount.
 //
 //   Client: Home · Builder · Market · Dashboard · Needs you · Messages · Profile
-//   Vendor: Home · Dashboard · Needs you · Messages · Profile
+//   Vendor: Dashboard · Needs you · Messages · Profile
 //
 // Role is "has a vendor profile" (getMyVendor != null), the same signal iOS uses
 // (vendorID != nil). Shown only to a signed-in user; the whole app lives under

@@ -31,10 +31,10 @@ always "none, verify manually" until a test runner is added.
 
 ## Shared UI shell
 
-- **Responsible for:** header/footer/tab-bar chrome and generic UI primitives
-  used across pages.
+- **Responsible for:** header/footer chrome (including the mobile hamburger
+  menu) and generic UI primitives used across pages.
 - **Code:** `web/src/components/SiteHeader.tsx`, `SiteFooter.tsx`,
-  `AppTabBar.tsx`, `VendorNav.tsx`, `nav.tsx`, `ui.tsx`,
+  `MobileNavMenu.tsx`, `VendorNav.tsx`, `nav.tsx`, `ui.tsx`,
   `ClientOnlyRoute.tsx`.
 - **Depends on:** `lib/auth.tsx` (role-aware nav), `lib/role.ts`.
 - **Consumers:** every page, via the root layout.
