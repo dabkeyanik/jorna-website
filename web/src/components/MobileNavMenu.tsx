@@ -12,6 +12,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { NavBadge, NEEDS_YOU, useAppNav } from "./nav";
 import { Card } from "./ui";
 
@@ -57,62 +58,71 @@ export function MobileNavMenu() {
         ) : null}
       </button>
 
-      {open ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end bg-black/40 md:hidden"
-          onClick={() => setOpen(false)}
-        >
-          {/* Stops the backdrop's close-on-click from also firing for clicks
-              inside the sheet. */}
-          <div className="w-full" onClick={(e) => e.stopPropagation()}>
-            <Card className="max-h-[85vh] w-full overflow-y-auto rounded-b-none">
-              <div className="flex items-center justify-between gap-3 border-b border-line-soft p-4">
-                <span className="serif text-lg text-ink">Menu</span>
-                <button
-                  onClick={() => setOpen(false)}
-                  className="text-sm text-ink-faint hover:text-ink"
-                  aria-label="Close"
-                >
-                  ✕
-                </button>
-              </div>
-              <nav
-                className="flex flex-col p-2"
-                style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}
-                aria-label="Primary"
-              >
-                {items.map((t) => {
-                  const active = isActive(t);
-                  const badge = t.href === NEEDS_YOU.href ? attention : 0;
-                  return (
-                    <Link
-                      key={t.href}
-                      href={t.href}
+      {open
+        ? createPortal(
+            // Portalled to <body>: SiteHeader's backdrop-blur gives it a
+            // backdrop-filter, which makes it a containing block for any
+            // `position: fixed` descendant — this sheet would size itself
+            // against the ~70px header box instead of the viewport otherwise,
+            // pinning it near the top of the screen with only its last row
+            // (Profile) inside the visible area.
+            <div
+              className="fixed inset-0 z-50 flex items-end bg-black/40 md:hidden"
+              onClick={() => setOpen(false)}
+            >
+              {/* Stops the backdrop's close-on-click from also firing for
+                  clicks inside the sheet. */}
+              <div className="w-full" onClick={(e) => e.stopPropagation()}>
+                <Card className="max-h-[85vh] w-full overflow-y-auto rounded-b-none">
+                  <div className="flex items-center justify-between gap-3 border-b border-line-soft p-4">
+                    <span className="serif text-lg text-ink">Menu</span>
+                    <button
                       onClick={() => setOpen(false)}
-                      aria-current={active ? "page" : undefined}
-                      className={`flex items-center gap-3 rounded-xl px-3 py-3 text-[0.95rem] font-semibold transition ${
-                        active
-                          ? "bg-maroon text-ground dark:bg-gold dark:text-[#2A0C19]"
-                          : "text-ink-soft hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
-                      }`}
+                      className="text-sm text-ink-faint hover:text-ink"
+                      aria-label="Close"
                     >
-                      {t.icon}
-                      {t.label}
-                      <NavBadge
-                        count={badge}
-                        // NavBadge is maroon-on-ground / gold-on-ground by default, which
-                        // vanishes against this row's own maroon/gold fill once active —
-                        // invert it so "Needs you" stays legible while you're on it.
-                        className={`ml-auto ${active ? "!bg-ground !text-maroon dark:!bg-[#2A0C19] dark:!text-gold" : ""}`}
-                      />
-                    </Link>
-                  );
-                })}
-              </nav>
-            </Card>
-          </div>
-        </div>
-      ) : null}
+                      ✕
+                    </button>
+                  </div>
+                  <nav
+                    className="flex flex-col p-2"
+                    style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}
+                    aria-label="Primary"
+                  >
+                    {items.map((t) => {
+                      const active = isActive(t);
+                      const badge = t.href === NEEDS_YOU.href ? attention : 0;
+                      return (
+                        <Link
+                          key={t.href}
+                          href={t.href}
+                          onClick={() => setOpen(false)}
+                          aria-current={active ? "page" : undefined}
+                          className={`flex items-center gap-3 rounded-xl px-3 py-3 text-[0.95rem] font-semibold transition ${
+                            active
+                              ? "bg-maroon text-ground dark:bg-gold dark:text-[#2A0C19]"
+                              : "text-ink-soft hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                          }`}
+                        >
+                          {t.icon}
+                          {t.label}
+                          <NavBadge
+                            count={badge}
+                            // NavBadge is maroon-on-ground / gold-on-ground by default, which
+                            // vanishes against this row's own maroon/gold fill once active —
+                            // invert it so "Needs you" stays legible while you're on it.
+                            className={`ml-auto ${active ? "!bg-ground !text-maroon dark:!bg-[#2A0C19] dark:!text-gold" : ""}`}
+                          />
+                        </Link>
+                      );
+                    })}
+                  </nav>
+                </Card>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }
