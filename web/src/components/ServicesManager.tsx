@@ -17,13 +17,16 @@ import {
   createService,
   deleteService,
   deleteServiceImage,
+  deleteServiceVideo,
   listServices,
   updateService,
   uploadServiceImages,
+  uploadServiceVideos,
   type ServiceInput,
 } from "@/lib/jorna";
 import {
   priceUnitLabel,
+  type MediaItem,
   type ServiceItem,
   type TaxonomyCategory,
   type VendorDetail,
@@ -79,12 +82,15 @@ export function ServicesManager({
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [uploadingFor, setUploadingFor] = useState<string | null>(null);
-  // Photos chosen while filling in a new service. They can only be sent once the
-  // service exists (the upload endpoint is per-service), so they wait here and
-  // go up right after create — iOS collects the image on its create screen the
-  // same way rather than making the vendor come back for it.
+  const [uploadingVideoFor, setUploadingVideoFor] = useState<string | null>(null);
+  // Photos/videos chosen while filling in a new service. They can only be sent
+  // once the service exists (the upload endpoint is per-service), so they wait
+  // here and go up right after create — iOS collects the image on its create
+  // screen the same way rather than making the vendor come back for it.
   const [newPhotos, setNewPhotos] = useState<File[]>([]);
+  const [newVideos, setNewVideos] = useState<File[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
+  const videoInput = useRef<HTMLInputElement>(null);
 
   async function refresh() {
     const res = await listServices({ vendor_id: vendor.vendor_id, limit: 100 });
@@ -100,6 +106,7 @@ export function ServicesManager({
     // Default to what this vendor does, so most services need no category fiddling.
     setForm({ ...blank, category: vendor.category ?? "", subcategory: vendor.subcategory ?? "" });
     setNewPhotos([]);
+    setNewVideos([]);
     setEditing("new");
     setError(null);
   }
@@ -119,6 +126,7 @@ export function ServicesManager({
       venue_longitude: s.venue_longitude ?? null,
     });
     setNewPhotos([]);
+    setNewVideos([]);
     setEditing(s.service_id);
     setError(null);
   }
@@ -204,11 +212,23 @@ export function ServicesManager({
             setError("Service saved, but the photos didn't upload. Add them from the list below.");
           }
         }
+        if (newVideos.length) {
+          try {
+            await uploadServiceVideos(created.service_id, newVideos);
+          } catch {
+            setError((prev) =>
+              prev
+                ? `${prev} The videos didn't upload either — add them from the list below.`
+                : "Service saved, but the videos didn't upload. Add them from the list below.",
+            );
+          }
+        }
       } else if (editing) {
         await updateService(editing, payload);
       }
       await refresh();
       setNewPhotos([]);
+      setNewVideos([]);
       setEditing(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't save that service.");
@@ -251,6 +271,30 @@ export function ServicesManager({
       await refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't remove that photo.");
+    }
+  }
+
+  async function addVideos(serviceId: string, files: FileList | null) {
+    if (!files?.length) return;
+    setUploadingVideoFor(serviceId);
+    setError(null);
+    try {
+      await uploadServiceVideos(serviceId, Array.from(files));
+      await refresh();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't upload that video.");
+    } finally {
+      setUploadingVideoFor(null);
+      if (videoInput.current) videoInput.current.value = "";
+    }
+  }
+
+  async function removeVideo(serviceId: string, url: string) {
+    try {
+      await deleteServiceVideo(serviceId, url);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't remove that video.");
     }
   }
 
@@ -473,23 +517,43 @@ export function ServicesManager({
             ) : null}
 
             {editing === "new" ? (
-              <div>
-                <p className="mb-1.5 text-sm font-medium text-ink-soft">Photos</p>
-                <label className="inline-block cursor-pointer rounded-lg border border-dashed border-card-edge px-3 py-2 text-xs text-ink-soft hover:border-gold">
-                  {newPhotos.length
-                    ? `${newPhotos.length} selected — choose again to replace`
-                    : "+ Choose photos"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => setNewPhotos(Array.from(e.target.files ?? []))}
-                  />
-                </label>
-                <span className="mt-1 block text-xs text-ink-faint">
-                  Uploaded as soon as the service is created. You can add more later.
-                </span>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <p className="mb-1.5 text-sm font-medium text-ink-soft">Photos</p>
+                  <label className="inline-block cursor-pointer rounded-lg border border-dashed border-card-edge px-3 py-2 text-xs text-ink-soft hover:border-gold">
+                    {newPhotos.length
+                      ? `${newPhotos.length} selected — choose again to replace`
+                      : "+ Choose photos"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => setNewPhotos(Array.from(e.target.files ?? []))}
+                    />
+                  </label>
+                  <span className="mt-1 block text-xs text-ink-faint">
+                    Uploaded as soon as the service is created. You can add more later.
+                  </span>
+                </div>
+                <div>
+                  <p className="mb-1.5 text-sm font-medium text-ink-soft">Videos</p>
+                  <label className="inline-block cursor-pointer rounded-lg border border-dashed border-card-edge px-3 py-2 text-xs text-ink-soft hover:border-gold">
+                    {newVideos.length
+                      ? `${newVideos.length} selected — choose again to replace`
+                      : "+ Choose videos"}
+                    <input
+                      type="file"
+                      accept="video/mp4,video/quicktime,video/webm"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => setNewVideos(Array.from(e.target.files ?? []))}
+                    />
+                  </label>
+                  <span className="mt-1 block text-xs text-ink-faint">
+                    Up to 50MB and 30 seconds each, up to 3 per service.
+                  </span>
+                </div>
               </div>
             ) : null}
 
@@ -555,27 +619,52 @@ export function ServicesManager({
                   </div>
                 </div>
 
-                {/* Photos */}
+                {/* Photos & videos */}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {(s.media ?? []).map((url) => (
-                    <div key={url} className="relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={url}
-                        alt=""
-                        className="size-16 rounded-lg object-cover"
-                        loading="lazy"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removePhoto(s.service_id, url)}
-                        className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-maroon text-xs text-ground"
-                        aria-label="Remove photo"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
+                  {(s.media ?? []).map((item: MediaItem) => {
+                    // A video's file can't go in an <img> — its server-generated
+                    // poster frame stands in for it here.
+                    const thumbSrc = item.type === "video" ? item.thumbnail_url : item.url;
+                    return (
+                      <div key={item.url} className="relative">
+                        {thumbSrc ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={thumbSrc}
+                            alt=""
+                            className="size-16 rounded-lg object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="size-16 rounded-lg bg-panel" />
+                        )}
+                        {item.type === "video" ? (
+                          <span
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-0 grid place-items-center"
+                          >
+                            <span className="grid size-5 place-items-center rounded-full bg-black/55 text-white">
+                              <svg viewBox="0 0 24 24" fill="currentColor" className="ml-0.5 size-2.5">
+                                <path d="M8 5v14l11-7z" />
+                              </svg>
+                            </span>
+                          </span>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            item.type === "video"
+                              ? removeVideo(s.service_id, item.url)
+                              : removePhoto(s.service_id, item.url)
+                          }
+                          className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-maroon text-xs text-ground"
+                          aria-label={`Remove ${item.type}`}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    );
+                  })}
                   <label className="cursor-pointer rounded-lg border border-dashed border-card-edge px-3 py-2 text-xs text-ink-soft hover:border-gold">
                     {uploadingFor === s.service_id ? "Uploading…" : "+ Add photos"}
                     <input
@@ -585,6 +674,17 @@ export function ServicesManager({
                       multiple
                       className="hidden"
                       onChange={(e) => addPhotos(s.service_id, e.target.files)}
+                    />
+                  </label>
+                  <label className="cursor-pointer rounded-lg border border-dashed border-card-edge px-3 py-2 text-xs text-ink-soft hover:border-gold">
+                    {uploadingVideoFor === s.service_id ? "Uploading…" : "+ Add video"}
+                    <input
+                      ref={videoInput}
+                      type="file"
+                      accept="video/mp4,video/quicktime,video/webm"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => addVideos(s.service_id, e.target.files)}
                     />
                   </label>
                 </div>

@@ -9,6 +9,7 @@ import {
   categoryLabel,
   priceUnitKind,
   priceUnitLabel,
+  type MediaItem,
   type Review,
   type ServiceItem,
   type VendorDetail,
@@ -57,14 +58,31 @@ function Monogram({
   );
 }
 
+/** A small play-triangle badge, overlaid on a video's thumbnail so it doesn't
+ *  read as just another (oddly static) photo in the rail. */
+function PlayBadge({ size = "size-8" }: { size?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`pointer-events-none absolute inset-0 grid place-items-center`}
+    >
+      <span className={`grid ${size} place-items-center rounded-full bg-black/55 text-white`}>
+        <svg viewBox="0 0 24 24" fill="currentColor" className="ml-0.5 size-1/2">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+      </span>
+    </span>
+  );
+}
+
 /**
- * The listing's photos. One large, the rest as thumbnails that swap into it —
- * rather than a "view all" control that opens nothing.
+ * The listing's photos and videos. One large, the rest as thumbnails that
+ * swap into it — rather than a "view all" control that opens nothing.
  */
-function Gallery({ media, name }: { media: string[]; name: string }) {
+function Gallery({ media, name }: { media: MediaItem[]; name: string }) {
   const [active, setActive] = useState(0);
 
-  // No photos: a band, not a hole. This kept the 4:3 frame the real gallery
+  // No media: a band, not a hole. This kept the 4:3 frame the real gallery
   // uses, which on the page's 1100px column is over 800px of empty gradient —
   // so a listing with nothing to show pushed its name, price and description
   // clean off the screen, and the one thing it had least of took up the most
@@ -79,35 +97,54 @@ function Gallery({ media, name }: { media: string[]; name: string }) {
     );
   }
 
+  const activeItem = media[active];
   const rest = media.slice(0, 5).filter((_, i) => i !== active);
 
   return (
     <div className="grid gap-2 sm:grid-cols-[2fr_1fr]">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={media[active]}
-        alt={name}
-        className="aspect-[4/3] w-full rounded-2xl object-cover"
-      />
+      {activeItem.type === "video" ? (
+        <video
+          key={activeItem.url}
+          src={activeItem.url}
+          poster={activeItem.thumbnail_url ?? undefined}
+          controls
+          className="aspect-[4/3] w-full rounded-2xl bg-black object-contain"
+        />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={activeItem.url}
+          alt={name}
+          className="aspect-[4/3] w-full rounded-2xl object-cover"
+        />
+      )}
       {rest.length > 0 ? (
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-2">
-          {rest.map((url) => {
-            const index = media.indexOf(url);
+          {rest.map((item) => {
+            const index = media.indexOf(item);
+            // A video's own file can't be dropped into an <img> — the thumbnail
+            // ffmpeg extracted server-side stands in for it here.
+            const thumbSrc = item.type === "video" ? item.thumbnail_url : item.url;
             return (
               <button
-                key={url}
+                key={item.url}
                 type="button"
                 onClick={() => setActive(index)}
-                aria-label={`Show photo ${index + 1} of ${media.length}`}
-                className="overflow-hidden rounded-xl ring-1 ring-card-edge transition hover:ring-gold focus-visible:ring-2 focus-visible:ring-gold"
+                aria-label={`Show ${item.type} ${index + 1} of ${media.length}`}
+                className="relative overflow-hidden rounded-xl ring-1 ring-card-edge transition hover:ring-gold focus-visible:ring-2 focus-visible:ring-gold"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={url}
-                  alt=""
-                  loading="lazy"
-                  className="aspect-[4/3] size-full object-cover"
-                />
+                {thumbSrc ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={thumbSrc}
+                    alt=""
+                    loading="lazy"
+                    className="aspect-[4/3] size-full object-cover"
+                  />
+                ) : (
+                  <div className="aspect-[4/3] size-full bg-panel" />
+                )}
+                {item.type === "video" ? <PlayBadge size="size-6" /> : null}
               </button>
             );
           })}

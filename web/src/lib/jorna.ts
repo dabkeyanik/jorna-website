@@ -25,6 +25,7 @@ import type {
   VendorBooking,
   VendorCreateInput,
   VendorUpdateInput,
+  MediaItem,
   MultiBundleResponse,
   Paginated,
   Review,
@@ -418,10 +419,10 @@ export function deleteService(serviceId: string): Promise<void> {
 export function uploadServiceImages(
   serviceId: string,
   files: File[],
-): Promise<ServiceItem> {
+): Promise<{ media: MediaItem[] }> {
   const form = new FormData();
   for (const file of files) form.append("files", file);
-  return apiUpload<ServiceItem>(`/services/${serviceId}/images`, form);
+  return apiUpload<{ media: MediaItem[] }>(`/services/${serviceId}/images`, form);
 }
 
 export function deleteServiceImage(
@@ -430,6 +431,28 @@ export function deleteServiceImage(
 ): Promise<unknown> {
   return apiFetch(
     `/services/${serviceId}/images?image_url=${encodeURIComponent(imageUrl)}`,
+    { method: "DELETE" },
+  );
+}
+
+/** Upload one or more videos for a service. Multipart; field name is `files`.
+ *  Capped server-side at 50MB / 30s each — the backend rejects anything over
+ *  that rather than trusting a client-side check. */
+export function uploadServiceVideos(
+  serviceId: string,
+  files: File[],
+): Promise<{ media: MediaItem[] }> {
+  const form = new FormData();
+  for (const file of files) form.append("files", file);
+  return apiUpload<{ media: MediaItem[] }>(`/services/${serviceId}/videos`, form);
+}
+
+export function deleteServiceVideo(
+  serviceId: string,
+  videoUrl: string,
+): Promise<unknown> {
+  return apiFetch(
+    `/services/${serviceId}/videos?video_url=${encodeURIComponent(videoUrl)}`,
     { method: "DELETE" },
   );
 }

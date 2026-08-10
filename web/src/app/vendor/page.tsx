@@ -67,7 +67,9 @@ function StatTile({ value, label }: { value: React.ReactNode; label: string }) {
 
 function ServiceRow({ service, canBook }: { service: ServiceItem; canBook: boolean }) {
   const unit = priceUnitLabel(service.price_unit);
-  const photo = service.media?.[0];
+  const first = service.media?.[0];
+  // A video's own file can't go in an <img> — show its poster frame instead.
+  const photo = first ? (first.type === "video" ? first.thumbnail_url : first.url) : null;
   return (
     <Card className="overflow-hidden transition hover:border-gold/40">
       <div className="flex flex-col sm:flex-row">

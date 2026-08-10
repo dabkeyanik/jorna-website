@@ -194,6 +194,14 @@ export interface VendorDetail {
   tags?: string[];
 }
 
+export interface MediaItem {
+  url: string;
+  type: "image" | "video";
+  /** Set for videos (a server-generated poster frame); absent for photos,
+   *  which have nothing else to show for themselves at thumbnail size. */
+  thumbnail_url?: string | null;
+}
+
 export interface ServiceItem {
   service_id: string;
   vendor_id: string;
@@ -204,7 +212,7 @@ export interface ServiceItem {
    *  along; it just had never been declared here. */
   duration_minutes?: number | null;
   experience?: string | null;
-  media?: string[];
+  media?: MediaItem[];
   category?: string | null;
   subcategory?: string | null;
   description?: string | null;
