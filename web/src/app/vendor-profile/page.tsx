@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import {
-  createVendor,
   getMyVendor,
   getVendorReviews,
   listServices,
@@ -18,9 +17,10 @@ import type {
   TaxonomyCategory,
   VendorDetail,
 } from "@/lib/types";
-import { Button, Card, Field, LinkButton, Stars } from "@/components/ui";
+import { Button, Card, LinkButton, Stars } from "@/components/ui";
 import { VendorNav } from "@/components/VendorNav";
 import { ServicesManager } from "@/components/ServicesManager";
+import { VendorIdentityFields, VendorReachFields } from "@/components/VendorProfileFields";
 
 function prettyDate(iso?: string | null): string | null {
   if (!iso || iso === "TBD") return null;
@@ -63,24 +63,30 @@ export default function VendorProfilePage() {
       .then(async ([tax, mine]) => {
         if (cancelled) return;
         setCategories(tax.categories);
-        setVendor(mine);
-        if (mine) {
-          setBio(mine.bio ?? "");
-          setCategory(mine.category ?? "");
-          setSubcategory(mine.subcategory ?? "");
-          setRadius(mine.travel_radius_miles?.toString() ?? "");
-          setLongDistance(Boolean(mine.open_to_long_distance));
-          setLocationNegotiable(Boolean(mine.open_to_price_negotiation));
-          setInstagram(mine.instagram_username ?? "");
-          // Both best-effort: the profile stays editable when either fails.
-          const [r, svc] = await Promise.all([
-            getVendorReviews(mine.vendor_id).catch(() => null),
-            listServices({ vendor_id: mine.vendor_id, limit: 100 }).catch(() => null),
-          ]);
-          if (cancelled) return;
-          if (r) setReviews(r.items);
-          if (svc) setServices(svc.items);
+        if (!mine) {
+          // Setup isn't done — that's /vendor-onboarding's job now, not a
+          // bare-bones form on this page. See that page for why "has a
+          // vendor record" alone isn't quite the test it uses for "done";
+          // this redirect only needs the coarser "not started at all" case.
+          router.replace("/vendor-onboarding");
+          return;
         }
+        setVendor(mine);
+        setBio(mine.bio ?? "");
+        setCategory(mine.category ?? "");
+        setSubcategory(mine.subcategory ?? "");
+        setRadius(mine.travel_radius_miles?.toString() ?? "");
+        setLongDistance(Boolean(mine.open_to_long_distance));
+        setLocationNegotiable(Boolean(mine.open_to_price_negotiation));
+        setInstagram(mine.instagram_username ?? "");
+        // Both best-effort: the profile stays editable when either fails.
+        const [r, svc] = await Promise.all([
+          getVendorReviews(mine.vendor_id).catch(() => null),
+          listServices({ vendor_id: mine.vendor_id, limit: 100 }).catch(() => null),
+        ]);
+        if (cancelled) return;
+        if (r) setReviews(r.items);
+        if (svc) setServices(svc.items);
       })
       .catch((err) =>
         !cancelled &&
@@ -90,11 +96,7 @@ export default function VendorProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
-
-  // Subcategories are per-category and validated server-side, so reset the
-  // choice whenever the category changes rather than sending a stale pair.
-  const subOptions = categories.find((c) => c.value === category)?.subcategories ?? [];
+  }, [user, router]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -102,23 +104,16 @@ export default function VendorProfilePage() {
     setError(null);
     setSaved(false);
     try {
-      if (vendor) {
-        const updated = await updateMyVendor({
-          bio,
-          category,
-          subcategory: subcategory || null,
-          travel_radius_miles: radius ? Number(radius) : null,
-          open_to_long_distance: longDistance,
-          open_to_price_negotiation: locationNegotiable,
-          instagram_username: instagram.trim().replace(/^@/, "") || null,
-        });
-        setVendor(updated);
-      } else {
-        // No category. Signing up is about who you are; what you sell is each
-        // service's own category, chosen when the service is added.
-        const created = await createVendor({ bio });
-        setVendor(created);
-      }
+      const updated = await updateMyVendor({
+        bio,
+        category,
+        subcategory: subcategory || null,
+        travel_radius_miles: radius ? Number(radius) : null,
+        open_to_long_distance: longDistance,
+        open_to_price_negotiation: locationNegotiable,
+        instagram_username: instagram.trim().replace(/^@/, "") || null,
+      });
+      setVendor(updated);
       setSaved(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't save your profile.");
@@ -127,7 +122,7 @@ export default function VendorProfilePage() {
     }
   }
 
-  if (authLoading || !user || loading) {
+  if (authLoading || !user || loading || !vendor) {
     return <p className="py-20 text-center text-ink-soft">Loading…</p>;
   }
 
@@ -139,162 +134,53 @@ export default function VendorProfilePage() {
           so setting up meant finding two — and neither was the whole listing. */}
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <span className="eyebrow">{vendor ? "Selling" : "Become a vendor"}</span>
-          <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold">
-            {vendor ? "Your listing" : "Create your vendor profile"}
-          </h1>
+          <span className="eyebrow">Selling</span>
+          <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold">Your listing</h1>
           <p className="mt-3 text-ink-soft">
-            {vendor
-              ? "What clients see when they find you in search or an AI bundle."
-              : "Who you are, so clients know who they're booking. What you sell comes next, one service at a time."}
+            What clients see when they find you in search or an AI bundle.
           </p>
         </div>
-        {vendor ? (
-          <LinkButton
-            href={`/vendor?id=${vendor.vendor_id}`}
-            variant="ghost"
-            size="md"
-            className="shrink-0"
-          >
-            See what clients see
-          </LinkButton>
-        ) : null}
+        <LinkButton
+          href={`/vendor?id=${vendor.vendor_id}`}
+          variant="ghost"
+          size="md"
+          className="shrink-0"
+        >
+          See what clients see
+        </LinkButton>
       </header>
 
       {/* Services first: a price change or a new photo is a weekly job, and the
           details below are set once. It also puts the listing-health "add a
           service" link on the page's main content rather than under a form. */}
-      {vendor ? (
-        <ServicesManager
-          vendor={vendor}
-          categories={categories}
-          initial={services}
-        />
-      ) : null}
+      <ServicesManager vendor={vendor} categories={categories} initial={services} />
 
-      {vendor ? (
-        <h2 className="serif mt-10 text-2xl text-ink">About your business</h2>
-      ) : null}
+      <h2 className="serif mt-10 text-2xl text-ink">About your business</h2>
       <Card className="mt-5 p-6">
         <form onSubmit={submit} className="grid gap-4">
-          {/* Only once they exist. Signing up asks who you are; what you sell
-              is decided per service, where it can differ per service — a DJ who
-              also does lighting had to pick one here and was findable under
-              only that one. Kept on the edit form because it still seeds a new
-              service's category and still reads as a headline on the profile. */}
-          {vendor ? (
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-ink-soft">
-                Your main category
-              </span>
-              <select
-                required
-                value={category}
-                onChange={(e) => {
-                  setCategory(e.target.value);
-                  setSubcategory("");
-                }}
-                className="w-full rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5 text-ink outline-none focus:border-gold"
-              >
-                <option value="" disabled>
-                  Choose a category
-                </option>
-                {categories.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-              <span className="mt-1 block text-xs text-ink-faint">
-                How you&apos;re listed. Each service you add gets its own
-                category, and starts from this one.
-              </span>
-            </label>
-          ) : null}
+          <VendorIdentityFields
+            categories={categories}
+            category={category}
+            subcategory={subcategory}
+            bio={bio}
+            onCategoryChange={(v) => {
+              setCategory(v);
+              setSubcategory("");
+            }}
+            onSubcategoryChange={setSubcategory}
+            onBioChange={setBio}
+          />
 
-          {vendor && subOptions.length > 0 ? (
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-ink-soft">
-                Speciality
-              </span>
-              <select
-                value={subcategory}
-                onChange={(e) => setSubcategory(e.target.value)}
-                className="w-full rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5 text-ink outline-none focus:border-gold"
-              >
-                <option value="">No speciality</option>
-                {subOptions.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-              <span className="mt-1 block text-xs text-ink-faint">
-                Clients filter by this — a DJ slot only shows DJs.
-              </span>
-            </label>
-          ) : null}
-
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-ink-soft">
-              About you
-            </span>
-            <textarea
-              required
-              rows={4}
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              placeholder="What you offer, your style, and what makes your work yours."
-              className="w-full rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5 text-ink outline-none focus:border-gold"
-            />
-          </label>
-
-          {vendor ? (
-            <>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field
-                  label="Travel radius (miles)"
-                  type="number"
-                  min={0}
-                  value={radius}
-                  onChange={(e) => setRadius(e.target.value)}
-                />
-                <Field
-                  label="Instagram (optional)"
-                  placeholder="yourhandle"
-                  value={instagram}
-                  onChange={(e) => setInstagram(e.target.value)}
-                />
-              </div>
-
-              <label className="flex items-start gap-2.5">
-                <input
-                  type="checkbox"
-                  checked={longDistance}
-                  onChange={(e) => setLongDistance(e.target.checked)}
-                  className="mt-1"
-                />
-                <span className="text-sm text-ink-soft">
-                  I&apos;ll travel beyond my radius for the right event
-                </span>
-              </label>
-
-              <label className="flex items-start gap-2.5">
-                <input
-                  type="checkbox"
-                  checked={locationNegotiable}
-                  onChange={(e) => setLocationNegotiable(e.target.checked)}
-                  className="mt-1"
-                />
-                <span className="text-sm text-ink-soft">
-                  I&apos;m open to discussing price
-                  <span className="block text-xs text-ink-faint">
-                    Whether a client can actually make an offer is set per service.
-                  </span>
-                </span>
-              </label>
-            </>
-          ) : null}
+          <VendorReachFields
+            radius={radius}
+            longDistance={longDistance}
+            locationNegotiable={locationNegotiable}
+            instagram={instagram}
+            onRadiusChange={setRadius}
+            onLongDistanceChange={setLongDistance}
+            onLocationNegotiableChange={setLocationNegotiable}
+            onInstagramChange={setInstagram}
+          />
 
           {error ? (
             <p className="rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
@@ -308,7 +194,7 @@ export default function VendorProfilePage() {
           ) : null}
 
           <Button type="submit" size="lg" disabled={busy}>
-            {busy ? "Saving…" : vendor ? "Save changes" : "Create vendor profile"}
+            {busy ? "Saving…" : "Save changes"}
           </Button>
         </form>
       </Card>
@@ -318,7 +204,7 @@ export default function VendorProfilePage() {
           what's coming, where's my money — and a star rating is none of those.
           Here it sits next to the things a vendor would change in response to
           it. */}
-      {vendor && (vendor.rating || reviews.length > 0) ? (
+      {vendor.rating || reviews.length > 0 ? (
         <div className="mt-6 rounded-2xl border border-card-edge bg-card p-5">
           <p className="eyebrow mb-3">How clients rate you</p>
           <div className="flex flex-wrap items-baseline gap-6">

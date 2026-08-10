@@ -140,10 +140,10 @@ function LoginInner() {
         // The Jorna JWT is the session now; drop the Supabase one.
         if (isGoogleSignup) await supabase.auth.signOut();
       }
-      // A new vendor goes straight to building their vendor profile — the web
-      // equivalent of iOS routing "I am a Vendor" into VendorInfoView, so the
-      // account and the storefront are one continuous flow.
-      router.push(mode === "register" && role === "vendor" ? "/vendor-profile" : next);
+      // A new vendor goes straight into guided setup — the web equivalent of
+      // iOS routing "I am a Vendor" into VendorInfoView, so the account and
+      // the storefront are one continuous flow.
+      router.push(mode === "register" && role === "vendor" ? "/vendor-onboarding" : next);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {

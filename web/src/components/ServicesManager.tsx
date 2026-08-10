@@ -65,11 +65,22 @@ export function ServicesManager({
   vendor,
   categories,
   initial,
+  autoStartNew = false,
+  onServiceAdded,
 }: {
   vendor: VendorDetail;
   categories: TaxonomyCategory[];
   /** Fetched by the page in its own pass, so this doesn't add a request. */
   initial: ServiceItem[];
+  /** Open the "new service" form immediately instead of waiting for "Add a
+   *  service" — used by the vendor-onboarding wizard, where this component
+   *  IS the step rather than an add-on to an existing list. Read once, as the
+   *  initial state, so opening the form costs no extra render. */
+  autoStartNew?: boolean;
+  /** Fires once a new service is successfully saved (a failed photo/video
+   *  upload doesn't hold it back — the service itself is already saved by
+   *  then). Used by the onboarding wizard to move to the next step. */
+  onServiceAdded?: () => void;
 }) {
   const [services, setServices] = useState<ServiceItem[]>(initial);
   const [error, setError] = useState<string | null>(null);
@@ -77,8 +88,12 @@ export function ServicesManager({
   /** The address as the Census matched it, shown back after a successful pin. */
   const [matched, setMatched] = useState<string | null>(null);
 
-  const [editing, setEditing] = useState<string | "new" | null>(null);
-  const [form, setForm] = useState<ServiceInput>(blank);
+  const [editing, setEditing] = useState<string | "new" | null>(autoStartNew ? "new" : null);
+  const [form, setForm] = useState<ServiceInput>(
+    autoStartNew
+      ? { ...blank, category: vendor.category ?? "", subcategory: vendor.subcategory ?? "" }
+      : blank,
+  );
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [uploadingFor, setUploadingFor] = useState<string | null>(null);
@@ -201,7 +216,8 @@ export function ServicesManager({
         subcategory: form.subcategory || null,
         location: form.location || null,
       };
-      if (editing === "new") {
+      const creating = editing === "new";
+      if (creating) {
         const created = await createService(payload);
         if (newPhotos.length) {
           try {
@@ -230,6 +246,10 @@ export function ServicesManager({
       setNewPhotos([]);
       setNewVideos([]);
       setEditing(null);
+      // After all of this component's own state has settled — the parent may
+      // respond by unmounting it (the onboarding wizard swaps to its next
+      // step), and that should happen after, not mid-update.
+      if (creating) onServiceAdded?.();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't save that service.");
     } finally {

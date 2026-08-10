@@ -85,11 +85,22 @@ always "none, verify manually" until a test runner is added.
   `vendor-profile/`, `my-availability/`, `my-bookings/`, `my-calendar/`,
   `my-earnings/`, `web/src/components/ServicesManager.tsx`,
   `VendorCard.tsx`, `VendorNav.tsx`.
+- **First-time setup:** `web/src/app/vendor-onboarding/` — a resumable
+  3-step wizard (category+bio, reach, first service) that both the
+  register-as-vendor flow and "Start selling" route to instead of
+  `vendor-profile/` directly. It shares field UI with `vendor-profile/` via
+  `web/src/components/VendorProfileFields.tsx`, and reuses `ServicesManager`
+  itself (via its `autoStartNew`/`onServiceAdded` props) for the service
+  step rather than a second form. `vendor-profile/` assumes setup is done and
+  redirects here if a user has no vendor record yet; the wizard's own test
+  for "done" is having at least one service, not just a vendor record — see
+  the comments in `vendor-onboarding/page.tsx` for why.
 - **Depends on:** `lib/jorna.ts`, `lib/types.ts`, `lib/availability.ts`,
   `lib/pricing.ts`.
 - **Consumers:** `lib/attention.ts` reads `vendorPlan.ts` for the nav badge.
 - **Related:** `web/src/app/vendor/stripe-onboard/` (+ `refresh/`, `return/`)
-  — Stripe Connect onboarding redirect targets.
+  — Stripe Connect onboarding redirect targets; the onboarding wizard's last
+  step links to `/my-earnings` to start that flow, but doesn't build it.
 
 ## Messaging & negotiation
 

@@ -174,7 +174,7 @@ export default function ProfilePage() {
               Offer your services on Jorna — get discovered by people who are
               actively planning, and get paid safely through escrow.
             </p>
-            <LinkButton href="/vendor-profile" className="mt-4">
+            <LinkButton href="/vendor-onboarding" className="mt-4">
               Start selling
             </LinkButton>
           </Card>
