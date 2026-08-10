@@ -19,18 +19,23 @@ import { ApiError } from "@/lib/api";
 import {
   createVendor,
   getMyVendor,
+  listBundles,
   listServices,
   listVendorCategories,
   updateMyVendor,
 } from "@/lib/jorna";
+import { hasActiveBookings } from "@/lib/planning";
+import { clearRoleCache } from "@/lib/role";
 import type { ServiceItem, TaxonomyCategory, VendorDetail } from "@/lib/types";
 import { Button, Card, LinkButton } from "@/components/ui";
 import { VendorIdentityFields, VendorReachFields } from "@/components/VendorProfileFields";
 import { ServicesManager } from "@/components/ServicesManager";
 
-type Step = "identity" | "reach" | "service" | "done";
+type Step = "blocked" | "identity" | "reach" | "service" | "done";
 
-const STEP_NUMBER: Record<Step, number> = { identity: 1, reach: 2, service: 3, done: 4 };
+// Only the steps that actually count toward "Step N of 3" — "blocked" and
+// "done" are both terminal states, not a position in the sequence.
+const STEP_NUMBER: Partial<Record<Step, number>> = { identity: 1, reach: 2, service: 3 };
 
 export default function VendorOnboardingPage() {
   const { user, loading: authLoading } = useAuth();
@@ -71,7 +76,13 @@ export default function VendorOnboardingPage() {
         if (cancelled) return;
         setCategories(tax.categories);
         if (!mine) {
-          setStep("identity");
+          // An account is one or the other (see ClientOnlyRoute) — converting
+          // out from under an open request or an escrowed booking would strand
+          // it with no client nav left to manage that from, so check before
+          // the point of no return rather than after.
+          const bundles = await listBundles().catch(() => []);
+          if (cancelled) return;
+          setStep(hasActiveBookings(bundles) ? "blocked" : "identity");
           return;
         }
         setVendor(mine);
@@ -114,6 +125,12 @@ export default function VendorOnboardingPage() {
     setError(null);
     try {
       const created = await createVendor({ bio, category, subcategory: subcategory || undefined });
+      // The account just became a vendor's — nav and ClientOnlyRoute read a
+      // 60s-cached answer to "is this a vendor," and this is the one moment
+      // that answer actually changes. Without this, the client tabs (and the
+      // client-only routes behind them) would still be reachable for up to a
+      // minute after this succeeds.
+      clearRoleCache();
       setVendor(created);
       setStep("reach");
     } catch (err) {
@@ -147,22 +164,44 @@ export default function VendorOnboardingPage() {
     return <p className="py-20 text-center text-ink-soft">Loading…</p>;
   }
 
+  const stepNumber = STEP_NUMBER[step];
+
   return (
     <div className="mx-auto w-[min(640px,100%-2rem)] py-14">
-      {step !== "done" ? (
+      {stepNumber ? (
         <>
-          <p className="eyebrow text-center">Step {STEP_NUMBER[step]} of 3</p>
+          <p className="eyebrow text-center">Step {stepNumber} of 3</p>
           <div className="mx-auto mt-3 flex max-w-xs gap-1.5" aria-hidden="true">
             {[1, 2, 3].map((n) => (
               <span
                 key={n}
                 className={`h-1.5 flex-1 rounded-full ${
-                  n <= STEP_NUMBER[step] ? "bg-gold" : "bg-line-soft"
+                  n <= stepNumber ? "bg-gold" : "bg-line-soft"
                 }`}
               />
             ))}
           </div>
         </>
+      ) : null}
+
+      {step === "blocked" ? (
+        <div className="py-10 text-center">
+          <p className="eyebrow">One thing first</p>
+          <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold">
+            Finish up as a client first
+          </h1>
+          <p className="mx-auto mt-3 max-w-md text-ink-soft">
+            You have an open request, an upcoming booking, or money still in
+            escrow. An account can only be a client or a seller, not both — wrap
+            that up (or wait for it to settle) before switching to a seller
+            account.
+          </p>
+          <div className="mt-8">
+            <LinkButton href="/bundles" size="lg">
+              Go to your celebrations
+            </LinkButton>
+          </div>
+        </div>
       ) : null}
 
       {step === "identity" ? (

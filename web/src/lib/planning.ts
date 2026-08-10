@@ -84,6 +84,26 @@ export function isDeadBooking(b: BundleBooking): boolean {
 }
 
 /**
+ * Does this account have a live financial relationship as a customer — an open
+ * request, an accepted booking, money still in escrow, a dispute? Used to
+ * decide whether it's safe to convert straight to a vendor account: an
+ * account can only be one or the other (see /vendor-onboarding), and
+ * converting out from under an open booking would strand it with no client
+ * nav left to manage it from.
+ *
+ * A dead booking (rejected/cancelled/refunded) or a released one (paid out,
+ * nothing left owing) doesn't block — that's history, not something in
+ * flight.
+ */
+export function hasActiveBookings(bundles: BundleDetail[]): boolean {
+  return bundles.some((bundle) =>
+    bundle.bookings.some(
+      (b) => !isDeadBooking(b) && (b.payment_status ?? "unpaid") !== "released",
+    ),
+  );
+}
+
+/**
  * Does the event still have a venue to check into? Mirrors the backend's source
  * of truth (the bundle's live venue booking) rather than any cached coords — a
  * rejected or refunded venue stops anchoring, and check-in 400s. (A disputed
