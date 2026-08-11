@@ -308,7 +308,7 @@ function MarketplaceInner() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search DJs, Mehndi, Venues…"
+            placeholder="Search DJs, Mehndi…"
             aria-label="Search vendors"
             autoFocus
             className="w-full rounded-xl border border-card-edge bg-ground-2 py-3 pl-11 pr-3.5 text-ink outline-none transition focus:border-gold focus:ring-2 focus:ring-gold/30"

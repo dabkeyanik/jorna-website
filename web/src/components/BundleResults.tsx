@@ -24,7 +24,7 @@ function money(n: number) {
 
 /** The middle "Balanced" tier is the one we nudge people toward. */
 function isRecommended(option: BundleOption) {
-  return option.label.trim().toLowerCase() === "balanced";
+  return option.label.trim().toLowerCase().includes("balanced");
 }
 
 /**
@@ -228,7 +228,7 @@ export function BundleResults({
 }) {
   return (
     // pt-4 leaves room for the "Recommended" ribbon to sit above its card.
-    <div className="grid items-start gap-4 pt-4 md:grid-cols-3">
+    <div className="grid grid-cols-1 items-start gap-4 pt-4 md:grid-cols-3">
       {options.map((o) => (
         <BundleCard
           key={o.label}
