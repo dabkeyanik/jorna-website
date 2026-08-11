@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
-import { deleteMe, getMyVendor, listBundles } from "@/lib/jorna";
+import { deleteMe, getEarnings, getMyVendor, listBundles } from "@/lib/jorna";
 import { moneyForBundle } from "@/lib/planning";
 import { disableWebPushForThisDevice } from "@/lib/push";
+import { vendorMoney } from "@/lib/vendorPlan";
 import type { VendorDetail } from "@/lib/types";
 import { Button, Card, LinkButton } from "@/components/ui";
 
@@ -50,6 +51,14 @@ export default function ProfilePage() {
    * this reason; the account is the same plans and the same money, so it is
    * refused here too.
    *
+   * Two directions, not one: money this account has paid as a buyer (checked
+   * via listBundles/moneyForBundle) and money a client has paid *into* this
+   * account's vendor services and is still owed *to* it (checked via
+   * getEarnings/vendorMoney, when this account has a vendor profile at all).
+   * The second used to go unchecked — a vendor with a paid, unconfirmed
+   * booking could delete their account and take a client's escrowed payment
+   * down with it, with nothing left to release it to.
+   *
    * Checked when they ask rather than on page load: it costs a request, and
    * nearly everyone opening this page is here for something else.
    *
@@ -61,14 +70,32 @@ export default function ProfilePage() {
     setBusy(true);
     setError(null);
     try {
-      const bundles = await listBundles();
-      const held = bundles.reduce((sum, b) => {
+      const [bundles, vendorEscrowCents] = await Promise.all([
+        listBundles(),
+        vendor
+          ? getEarnings(vendor.vendor_id).then((e) => vendorMoney(e)?.inEscrowCents ?? 0)
+          : Promise.resolve(0),
+      ]);
+      const boughtHeld = bundles.reduce((sum, b) => {
         const cash = moneyForBundle(b);
         return sum + cash.inEscrow + cash.strandedInEscrow;
       }, 0);
-      if (held > 0) {
+      const vendorHeld = vendorEscrowCents / 100;
+
+      if (boughtHeld > 0 || vendorHeld > 0) {
+        const clauses: string[] = [];
+        if (boughtHeld > 0) {
+          clauses.push(
+            `${money(boughtHeld)} you've paid is still held in escrow — release it to the vendor, request a refund, or report a problem on those bookings`,
+          );
+        }
+        if (vendorHeld > 0) {
+          clauses.push(
+            `${money(vendorHeld)} a client has paid you is still held in escrow — confirm those events so it can release to you`,
+          );
+        }
         setError(
-          `${money(held)} of yours is still held in escrow. Deleting your account wouldn't return it — it would only remove the record of where it went. Release it to the vendor, request a refund, or report a problem on those bookings first.`,
+          `${clauses.join(", and ")} before deleting. Deleting your account wouldn't return this money — it would only remove the record of where it went.`,
         );
         return;
       }
