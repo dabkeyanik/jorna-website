@@ -33,11 +33,29 @@ const ROLES: { value: Role; label: string; hint: string }[] = [
   { value: "vendor", label: "Vendor", hint: "List your services and get booked." },
 ];
 
+/**
+ * Where a successful login is allowed to send someone.
+ *
+ * `next` comes straight off the URL, so a crafted link — mailed, messaged, or
+ * just shared — can put anything there. Without this, a login that succeeds
+ * for real would hand the browser off to whatever the link named, right after
+ * the one moment a phishing page most wants to borrow credibility from.
+ * Anything but a single leading slash (a bare path, no scheme, no host) is
+ * rejected in favour of the same default an absent `next` already gets.
+ */
+function safeNext(raw: string | null): string {
+  if (!raw) return "/plan";
+  if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("://")) {
+    return "/plan";
+  }
+  return raw;
+}
+
 function LoginInner() {
   const { login, register } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") || "/plan";
+  const next = safeNext(params.get("next"));
   // Set when we've come back from Google as a brand-new identity that needs to
   // finish creating a Jorna account (the callback routes here with ?google=1).
   const isGoogleSignup = params.get("google") === "1";
@@ -404,7 +422,7 @@ function LoginInner() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<p className="py-20 text-center text-ink-soft">Loading…</p>}>
       <LoginInner />
     </Suspense>
   );

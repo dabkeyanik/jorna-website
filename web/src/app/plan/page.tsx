@@ -584,7 +584,7 @@ function PlanInner() {
 export default function PlanPage() {
   return (
     <ClientOnlyRoute>
-      <Suspense fallback={null}>
+      <Suspense fallback={<p className="py-20 text-center text-ink-soft">Loading…</p>}>
         <PlanInner />
       </Suspense>
     </ClientOnlyRoute>
