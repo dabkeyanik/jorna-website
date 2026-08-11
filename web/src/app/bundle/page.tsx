@@ -21,6 +21,7 @@ import {
   updateBooking,
   updateEvent,
   CARD_RETURN_KEY,
+  forgetSavedCard,
   getBundleConversation,
   getSavedCard,
   openBookingThread,
@@ -769,21 +770,27 @@ function BookingRow({
  * banner, which disappears the moment you send — so from then on the card that
  * would be charged, automatically, for every acceptance was unnamed and
  * unchangeable. A stale card meant failed charges the client couldn't fix, and
- * removing one wasn't possible from the web at all.
+ * removing one wasn't possible from the web at all until Remove was added
+ * alongside Change.
  *
  * Nothing here charges anything; the backend does that, on acceptance.
  */
 function CardOnFile({
   card,
   busy,
+  removing,
   onAdd,
+  onRemove,
   sent,
 }: {
   card: SavedCard | null;
   busy: boolean;
+  removing: boolean;
   onAdd: () => void;
+  onRemove: () => void;
   sent: boolean;
 }) {
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
   const named = card?.has_card
     ? `${card.brand ? card.brand[0].toUpperCase() + card.brand.slice(1) : "Card"}${
         card.last4 ? ` ending ${card.last4}` : ""
@@ -791,22 +798,62 @@ function CardOnFile({
     : null;
 
   return (
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-ground-2 px-4 py-3">
-      <p className="text-sm text-ink-soft">
-        {named ? (
-          <>
-            <span className="font-medium text-ink">{named}</span>
-            {sent
-              ? " — charged automatically as each vendor accepts. You won't be asked again."
-              : " — charged as each vendor accepts, never for one who declines."}
-          </>
-        ) : sent
-          ? "No card on file, so you'll be asked to pay each booking yourself as vendors accept."
-          : "Add a card and each vendor is paid as they accept. Without one you'll be asked to pay each booking yourself."}
-      </p>
-      <Button variant="ghost" size="md" disabled={busy} onClick={onAdd}>
-        {busy ? "Opening…" : named ? "Change card" : "Add a card"}
-      </Button>
+    <div className="mt-4 rounded-xl bg-ground-2 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-ink-soft">
+          {named ? (
+            <>
+              <span className="font-medium text-ink">{named}</span>
+              {sent
+                ? " — charged automatically as each vendor accepts. You won't be asked again."
+                : " — charged as each vendor accepts, never for one who declines."}
+            </>
+          ) : sent
+            ? "No card on file, so you'll be asked to pay each booking yourself as vendors accept."
+            : "Add a card and each vendor is paid as they accept. Without one you'll be asked to pay each booking yourself."}
+        </p>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="ghost" size="md" disabled={busy || removing} onClick={onAdd}>
+            {busy ? "Opening…" : named ? "Change card" : "Add a card"}
+          </Button>
+          {/* Removing was never possible from the web at all until now — this
+              is the way back to "no card on file" once one's been added. */}
+          {named ? (
+            <Button
+              variant="quiet"
+              size="md"
+              disabled={busy || removing}
+              onClick={() => setConfirmingRemove(true)}
+            >
+              Remove
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      {confirmingRemove ? (
+        <div className="mt-3 rounded-lg bg-panel p-3">
+          <p className="text-xs text-ink-soft">
+            Remove this card? You&apos;ll be asked to pay each booking yourself
+            as vendors accept, instead of being charged automatically.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <Button
+              size="md"
+              disabled={removing}
+              onClick={() => {
+                setConfirmingRemove(false);
+                onRemove();
+              }}
+            >
+              {removing ? "Removing…" : "Remove card"}
+            </Button>
+            <Button variant="ghost" size="md" onClick={() => setConfirmingRemove(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1205,6 +1252,7 @@ function BundleInner() {
   // sent, because that's the only screen where it changes what happens next.
   const [card, setCard] = useState<SavedCard | null>(null);
   const [addingCard, setAddingCard] = useState(false);
+  const [removingCard, setRemovingCard] = useState(false);
   // A message about one booking, shown on that booking's own card. Confirming,
   // paying, refunding and disputing all happen on a card that may be well down
   // a long page; putting their answers at the top meant pressing Confirm and
@@ -1376,6 +1424,23 @@ function BundleInner() {
         ok: false,
       });
       setAddingCard(false);
+    }
+  }
+
+  /** Detach the saved card. Nothing already charged is affected — this only
+   *  stops the next automatic one, the same as never having added a card. */
+  async function removeCard() {
+    setRemovingCard(true);
+    setNotice(null);
+    try {
+      setCard(await forgetSavedCard());
+    } catch (err) {
+      setNotice({
+        text: err instanceof ApiError ? err.message : "Couldn't remove that card.",
+        ok: false,
+      });
+    } finally {
+      setRemovingCard(false);
     }
   }
 
@@ -1751,7 +1816,14 @@ function BundleInner() {
               the card being charged automatically became unnamed and
               unchangeable. It belongs with the rest of the money. */}
           {!draft ? (
-            <CardOnFile card={card} busy={addingCard} onAdd={addCard} sent />
+            <CardOnFile
+              card={card}
+              busy={addingCard}
+              removing={removingCard}
+              onAdd={addCard}
+              onRemove={removeCard}
+              sent
+            />
           ) : null}
         </div>
       </header>
@@ -1792,7 +1864,14 @@ function BundleInner() {
               bookings, where they're always writable. */}
           <DraftDetails key={venueKey} bundle={bundle} onSaved={load} />
 
-          <CardOnFile card={card} busy={addingCard} onAdd={addCard} sent={false} />
+          <CardOnFile
+            card={card}
+            busy={addingCard}
+            removing={removingCard}
+            onAdd={addCard}
+            onRemove={removeCard}
+            sent={false}
+          />
 
           {/* Last, after the fields it depends on. It used to sit above them,
               inviting you to send a plan before filling in what sending needs. */}
