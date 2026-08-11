@@ -142,6 +142,16 @@ input[type="date"],
 input[type="time"],
 input[type="datetime-local"] {
   cursor: pointer;
+  /* iOS Safari sizes this widget off its own internal icon/spinner content
+     and can ignore an author `width` outright — `max-width` alone doesn't
+     stop it, since the default `min-width: auto` still wins. Also drop
+     Safari's native chrome (-webkit-appearance) so it lays out as a plain
+     textfield inside our own border instead of adding its own. */
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  -webkit-appearance: none;
+  appearance: none;
 }
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator,
