@@ -135,12 +135,12 @@ export default function AccountPage() {
       {/* Profile */}
       <Card className="mt-7 p-6">
         <form onSubmit={saveProfile} className="grid gap-4">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="First name" value={fName} onChange={(e) => setFName(e.target.value)} />
             <Field label="Last name" value={lName} onChange={(e) => setLName(e.target.value)} />
           </div>
           <Field label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
             <CityCombobox
               label="City & state"

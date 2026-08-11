@@ -329,7 +329,7 @@ export function DraftDetails({
             <p className="mb-2 text-sm font-medium text-ink-soft">
               When does it run?
             </p>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field
                 label="Starts"
                 type="time"
@@ -355,7 +355,7 @@ export function DraftDetails({
             <p className="mb-2 text-sm font-medium text-ink-soft">
               {b.service_name || "Hourly service"} — charged by the hour
             </p>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field
                 label="Starts"
                 type="time"

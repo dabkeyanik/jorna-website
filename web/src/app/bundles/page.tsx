@@ -524,7 +524,7 @@ function DashboardInner() {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field
                 label="Date"
                 type="date"
@@ -540,7 +540,7 @@ function DashboardInner() {
                 onChange={(v) => setLocation(v)}
               />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field
                 label="Guests (optional)"
                 type="number"

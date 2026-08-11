@@ -1090,7 +1090,7 @@ function CelebrationPanel({
     return (
       <div className="mt-4 border-t border-line-soft pt-4">
         <p className="mb-3 text-sm font-medium text-ink-soft">Event details</p>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {!committed ? (
             <>
               <Field

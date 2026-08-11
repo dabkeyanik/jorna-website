@@ -483,7 +483,7 @@ export default function HomePage() {
                 See all vendors {IconArrow}
               </Link>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {vendors
                 ? vendors.map((item) => (
                     <VendorCard
@@ -560,7 +560,7 @@ export default function HomePage() {
             <p className="mb-5 text-xs font-semibold uppercase tracking-[0.2em] text-ink-faint">
               Where your money is, at every stage
             </p>
-            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
               {ESCROW_STAGES.map((stage) => (
                 <div
                   key={stage.label}

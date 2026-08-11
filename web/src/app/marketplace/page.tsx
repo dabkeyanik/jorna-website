@@ -336,7 +336,7 @@ function MarketplaceInner() {
 
       {showFilters ? (
         <div className="mt-4 rounded-2xl border border-card-edge bg-panel p-4 sm:p-5">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <CityCombobox
                 label="Location"

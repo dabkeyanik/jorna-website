@@ -228,7 +228,7 @@ function GuestRow({
   if (editing) {
     return (
       <Card className="p-4">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Field label="Name" value={name} onChange={(e) => setName(e.target.value)} />
           <Field
             label="Email"
@@ -600,7 +600,7 @@ function Functions({
         {functions.map((fn) =>
           editingId === fn.function_id ? (
             <div key={fn.function_id} className="rounded-xl border border-card-edge bg-ground-2 p-3">
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <Field value={editName} onChange={(e) => setEditName(e.target.value)} />
                 <Field
                   type="date"
@@ -657,7 +657,7 @@ function Functions({
 
       {adding ? (
         <div className="mt-3 rounded-xl border border-card-edge bg-ground-2 p-3">
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <Field
               label="Name"
               placeholder="Sangeet"

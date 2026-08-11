@@ -358,7 +358,7 @@ function PlanInner() {
             <div>
               <p className="mb-2 text-sm font-medium text-ink-soft">When</p>
 
-              <div className="grid gap-2.5 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <Field
                   label={multiDay ? "First day" : "Event date"}
                   type="date"
@@ -405,7 +405,7 @@ function PlanInner() {
 
             <div>
               <p className="mb-2 text-sm font-medium text-ink-soft">Time</p>
-              <div className="grid gap-2.5 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <Field
                   label="Starts"
                   type="time"
