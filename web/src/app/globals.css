@@ -149,6 +149,28 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   display: none;
 }
 
+/* iOS/macOS Safari paints the unset mm/dd/yyyy and --:-- -- placeholder
+   segments in a fixed system gray, not the input's `color` — legible on a
+   plain white field, invisible against this app's dark theme. A value
+   picked from the picker renders fine (that part does follow `color`); only
+   the empty state disappears, so force it explicitly on every sub-part
+   rather than trusting inheritance to reach into the shadow tree. */
+input[type="date"]::-webkit-datetime-edit,
+input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+input[type="date"]::-webkit-datetime-edit-text,
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="date"]::-webkit-datetime-edit-year-field,
+input[type="time"]::-webkit-datetime-edit,
+input[type="time"]::-webkit-datetime-edit-fields-wrapper,
+input[type="time"]::-webkit-datetime-edit-text,
+input[type="time"]::-webkit-datetime-edit-hour-field,
+input[type="time"]::-webkit-datetime-edit-minute-field,
+input[type="time"]::-webkit-datetime-edit-ampm-field {
+  color: var(--color-ink);
+  -webkit-text-fill-color: var(--color-ink);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.001ms !important;
