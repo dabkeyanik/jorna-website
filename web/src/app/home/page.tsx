@@ -174,10 +174,6 @@ const FAQ_ITEMS = [
     q: "How long does money stay in escrow?",
     a: "From when you pay until after the event, once both sides confirm it went ahead. The booking shows its status the whole time, so you always know where your money is.",
   },
-  {
-    q: "What does the price on a listing mean?",
-    a: "Every listing carries a unit — per event, per person, per hour, or per day. Jorna never shows a rate as though it were a final total.",
-  },
 ];
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
