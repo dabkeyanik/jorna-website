@@ -26,7 +26,13 @@ import {
 } from "@/lib/jorna";
 import { hasActiveBookings } from "@/lib/planning";
 import { clearRoleCache } from "@/lib/role";
-import type { ServiceItem, TaxonomyCategory, VendorDetail } from "@/lib/types";
+import {
+  vendorSpecializations,
+  type ServiceItem,
+  type TaxonomyCategory,
+  type VendorDetail,
+  type VendorSpecialization,
+} from "@/lib/types";
 import { Button, Card, LinkButton } from "@/components/ui";
 import { VendorIdentityFields, VendorReachFields } from "@/components/VendorProfileFields";
 import { ServicesManager } from "@/components/ServicesManager";
@@ -52,11 +58,14 @@ export default function VendorOnboardingPage() {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set once the first service in this session is saved, so the "done for
+  // now" action only appears once there's something to finish with — before
+  // that, ServicesManager's own form is the only thing on screen.
+  const [addedService, setAddedService] = useState(false);
 
   // Step 1 — identity
   const [bio, setBio] = useState("");
-  const [category, setCategory] = useState("");
-  const [subcategory, setSubcategory] = useState("");
+  const [specializations, setSpecializations] = useState<VendorSpecialization[]>([]);
 
   // Step 2 — reach
   const [radius, setRadius] = useState("");
@@ -87,8 +96,7 @@ export default function VendorOnboardingPage() {
         }
         setVendor(mine);
         setBio(mine.bio ?? "");
-        setCategory(mine.category ?? "");
-        setSubcategory(mine.subcategory ?? "");
+        setSpecializations(vendorSpecializations(mine));
         setRadius(mine.travel_radius_miles?.toString() ?? "");
         setLongDistance(Boolean(mine.open_to_long_distance));
         setLocationNegotiable(Boolean(mine.open_to_price_negotiation));
@@ -121,10 +129,20 @@ export default function VendorOnboardingPage() {
 
   async function submitIdentity(e: React.FormEvent) {
     e.preventDefault();
+    if (specializations.length === 0) {
+      setError("Pick at least one category first.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      const created = await createVendor({ bio, category, subcategory: subcategory || undefined });
+      const [primary] = specializations;
+      const created = await createVendor({
+        bio,
+        category: primary.category,
+        subcategory: primary.subcategory ?? undefined,
+        specializations,
+      });
       // The account just became a vendor's — nav and ClientOnlyRoute read a
       // 60s-cached answer to "is this a vendor," and this is the one moment
       // that answer actually changes. Without this, the client tabs (and the
@@ -216,14 +234,9 @@ export default function VendorOnboardingPage() {
             <form onSubmit={submitIdentity} className="grid gap-4">
               <VendorIdentityFields
                 categories={categories}
-                category={category}
-                subcategory={subcategory}
+                specializations={specializations}
                 bio={bio}
-                onCategoryChange={(v) => {
-                  setCategory(v);
-                  setSubcategory("");
-                }}
-                onSubcategoryChange={setSubcategory}
+                onSpecializationsChange={setSpecializations}
                 onBioChange={setBio}
               />
               {error ? (
@@ -276,11 +289,11 @@ export default function VendorOnboardingPage() {
       {step === "service" && vendor ? (
         <>
           <h1 className="serif mt-5 text-center text-4xl text-maroon dark:text-gold">
-            List your first service
+            List your services
           </h1>
           <p className="mt-2 text-center text-ink-soft">
-            What clients can book — a price and a photo are what makes a
-            listing worth scrolling past.
+            What clients can book — add one for every specialty from step 1.
+            A price and a photo are what makes a listing worth scrolling past.
           </p>
           <div className="mt-8">
             <ServicesManager
@@ -288,9 +301,20 @@ export default function VendorOnboardingPage() {
               categories={categories}
               initial={services}
               autoStartNew
-              onServiceAdded={() => setStep("done")}
+              onServiceAdded={() => setAddedService(true)}
             />
           </div>
+          {addedService ? (
+            <div className="mt-8 text-center">
+              <Button type="button" size="lg" onClick={() => setStep("done")}>
+                Done for now
+              </Button>
+              <p className="mx-auto mt-2 max-w-sm text-sm text-ink-soft">
+                Add more anytime from your listing — one per specialty is what
+                gets you found in each.
+              </p>
+            </div>
+          ) : null}
         </>
       ) : null}
 

@@ -5,38 +5,71 @@
 // (where they're all just settings). One copy so wording and validation can't
 // drift between the two.
 
-import type { TaxonomyCategory } from "@/lib/types";
-import { Field } from "./ui";
+import { useState } from "react";
+import type { TaxonomyCategory, VendorSpecialization } from "@/lib/types";
+import { Chip, Field } from "./ui";
+
+function specKey(s: VendorSpecialization): string {
+  return `${s.category}:${s.subcategory ?? ""}`;
+}
+
+function specLabel(s: VendorSpecialization, categories: TaxonomyCategory[]): string {
+  const cat = categories.find((c) => c.value === s.category);
+  const sub = cat?.subcategories.find((o) => o.value === s.subcategory);
+  return sub ? `${cat?.label ?? s.category} · ${sub.label}` : cat?.label ?? s.category;
+}
 
 export function VendorIdentityFields({
   categories,
-  category,
-  subcategory,
+  specializations,
   bio,
-  onCategoryChange,
-  onSubcategoryChange,
+  onSpecializationsChange,
   onBioChange,
 }: {
   categories: TaxonomyCategory[];
-  category: string;
-  subcategory: string;
+  specializations: VendorSpecialization[];
   bio: string;
-  onCategoryChange: (value: string) => void;
-  onSubcategoryChange: (value: string) => void;
+  onSpecializationsChange: (next: VendorSpecialization[]) => void;
   onBioChange: (value: string) => void;
 }) {
-  const subOptions = categories.find((c) => c.value === category)?.subcategories ?? [];
+  // Which category's options are on screen — a picker, not part of the
+  // selection itself. Starts on the first thing already picked so reopening
+  // this form (settings) doesn't land on an empty picker.
+  const [pickerCategory, setPickerCategory] = useState(specializations[0]?.category ?? "");
+  const pickerCat = categories.find((c) => c.value === pickerCategory);
+  const subOptions = pickerCat?.subcategories ?? [];
+
+  function has(category: string, subcategory: string | null) {
+    return specializations.some(
+      (s) => s.category === category && (s.subcategory ?? null) === subcategory,
+    );
+  }
+
+  function toggle(category: string, subcategory: string | null) {
+    if (has(category, subcategory)) {
+      onSpecializationsChange(
+        specializations.filter(
+          (s) => !(s.category === category && (s.subcategory ?? null) === subcategory),
+        ),
+      );
+    } else {
+      onSpecializationsChange([...specializations, { category, subcategory }]);
+    }
+  }
+
+  function remove(target: VendorSpecialization) {
+    onSpecializationsChange(specializations.filter((s) => specKey(s) !== specKey(target)));
+  }
 
   return (
     <>
       <label className="block">
         <span className="mb-1.5 block text-sm font-medium text-ink-soft">
-          Your main category
+          Add a category
         </span>
         <select
-          required
-          value={category}
-          onChange={(e) => onCategoryChange(e.target.value)}
+          value={pickerCategory}
+          onChange={(e) => setPickerCategory(e.target.value)}
           className="w-full rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5 text-ink outline-none focus:border-gold"
         >
           <option value="" disabled>
@@ -49,33 +82,65 @@ export function VendorIdentityFields({
           ))}
         </select>
         <span className="mt-1 block text-xs text-ink-faint">
-          How you&apos;re listed. Each service you add gets its own category,
-          and starts from this one.
+          Pick every category you sell in, then any specialities within it —
+          each service you add still gets its own, starting from these.
         </span>
       </label>
 
-      {subOptions.length > 0 ? (
-        <label className="block">
+      {pickerCat ? (
+        <div>
           <span className="mb-1.5 block text-sm font-medium text-ink-soft">
-            Speciality
+            What you offer in {pickerCat.label}
           </span>
-          <select
-            value={subcategory}
-            onChange={(e) => onSubcategoryChange(e.target.value)}
-            className="w-full rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5 text-ink outline-none focus:border-gold"
-          >
-            <option value="">No speciality</option>
+          <div className="flex flex-wrap gap-2">
+            <Chip
+              active={has(pickerCat.value, null)}
+              onClick={() => toggle(pickerCat.value, null)}
+            >
+              {pickerCat.label}
+            </Chip>
             {subOptions.map((s) => (
-              <option key={s.value} value={s.value}>
+              <Chip
+                key={s.value}
+                active={has(pickerCat.value, s.value)}
+                onClick={() => toggle(pickerCat.value, s.value)}
+              >
                 {s.label}
-              </option>
+              </Chip>
             ))}
-          </select>
-          <span className="mt-1 block text-xs text-ink-faint">
-            Clients filter by this — a DJ slot only shows DJs.
-          </span>
-        </label>
+          </div>
+        </div>
       ) : null}
+
+      <div>
+        <span className="mb-1.5 block text-sm font-medium text-ink-soft">
+          Your specializations
+        </span>
+        {specializations.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {specializations.map((s) => (
+              <span
+                key={specKey(s)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-gold/12 py-1 pl-3 pr-1.5 text-xs font-semibold text-maroon dark:text-gold"
+              >
+                {specLabel(s, categories)}
+                <button
+                  type="button"
+                  onClick={() => remove(s)}
+                  aria-label={`Remove ${specLabel(s, categories)}`}
+                  className="grid size-4 place-items-center rounded-full hover:bg-maroon/15 dark:hover:bg-gold/20"
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-ink-faint">
+            Pick at least one category above — clients filter by this.
+          </p>
+        )}
+      </div>
 
       <label className="block">
         <span className="mb-1.5 block text-sm font-medium text-ink-soft">About you</span>

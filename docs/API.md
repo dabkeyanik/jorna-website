@@ -82,3 +82,13 @@ apply to WS handshakes). See `web/src/lib/chat.ts` for the consumer.
 - Response shapes: `web/src/lib/types.ts`.
 - Not-yet-built API needs (proposed, decisions made but unimplemented):
   `MESSAGING_PROPOSAL.md`, `RESCHEDULE_PROPOSAL.md`.
+- `VendorDetail.specializations` / the `specializations` field on
+  `VendorCreateInput`/`VendorUpdateInput` (`web/src/lib/types.ts`) are sent
+  and read optimistically — the frontend now lets a vendor multi-select
+  during onboarding (see `VendorIdentityFields` in
+  `web/src/components/VendorProfileFields.tsx`), but the backend hasn't
+  confirmed it persists or returns this array yet. `category`/`subcategory`
+  are still sent alongside it (mirroring the first entry) so nothing breaks
+  if the backend only ever supports the single pair. Until the backend adds
+  it, a reload only shows the first specialization back
+  (`vendorSpecializations()` in `types.ts` is where that fallback lives).

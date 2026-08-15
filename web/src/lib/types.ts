@@ -140,6 +140,20 @@ export function categoryLabel(key: string): string {
   );
 }
 
+/** A vendor's specializations, as the onboarding wizard and profile settings
+ *  form need them: a list, never empty for a vendor who's finished setup.
+ *  Falls back to a single-item list built from `category`/`subcategory` for
+ *  a record the backend hasn't returned `specializations` for yet — see the
+ *  comment on that field. */
+export function vendorSpecializations(vendor: {
+  category?: string | null;
+  subcategory?: string | null;
+  specializations?: VendorSpecialization[];
+}): VendorSpecialization[] {
+  if (vendor.specializations?.length) return vendor.specializations;
+  return vendor.category ? [{ category: vendor.category, subcategory: vendor.subcategory ?? null }] : [];
+}
+
 // ── Browse / vendors ─────────────────────────────────────────────────
 
 export interface Paginated<T> {
@@ -178,12 +192,30 @@ export interface VendorSearchItem {
   tags?: string[];
 }
 
+/** One category, optionally narrowed to a speciality within it — what a
+ *  vendor now picks any number of during onboarding. See `specializations`
+ *  below for why this is a list rather than a single pair. */
+export interface VendorSpecialization {
+  category: string;
+  subcategory?: string | null;
+}
+
 export interface VendorDetail {
   vendor_id: string;
   user_id: string;
   bio?: string | null;
+  /** The vendor's first specialization, mirrored here for older display code
+   *  (vendor cards, the public profile badge) and as the default category
+   *  for a new service — see `specializations` for the full list a vendor
+   *  can pick from during onboarding. */
   category?: string | null;
   subcategory?: string | null;
+  /** Every category(+speciality) a vendor sells under, not just the first —
+   *  onboarding now offers a multi-select instead of one pair. This assumes
+   *  backend support that didn't exist when `category`/`subcategory` were
+   *  added; until the backend returns it, `vendorSpecializations()` below
+   *  reconstructs a one-item list from those two fields instead. */
+  specializations?: VendorSpecialization[];
   rating?: number | null;
   num_events?: number | null;
   travel_radius_miles?: number | null;
@@ -579,12 +611,18 @@ export interface VendorCreateInput {
    *  otherwise. Search reads the services (see the backend's search_vendors). */
   category?: string;
   subcategory?: string | null;
+  /** The full multi-select list; `category`/`subcategory` above mirror its
+   *  first entry, since that's the pair the backend is confirmed to persist
+   *  today. Sent alongside rather than instead of them until the backend
+   *  adds a matching column — see the comment on `VendorDetail.specializations`. */
+  specializations?: VendorSpecialization[];
 }
 
 export interface VendorUpdateInput {
   bio?: string;
   category?: string;
   subcategory?: string | null;
+  specializations?: VendorSpecialization[];
   travel_radius_miles?: number | null;
   open_to_long_distance?: boolean;
   open_to_price_negotiation?: boolean;

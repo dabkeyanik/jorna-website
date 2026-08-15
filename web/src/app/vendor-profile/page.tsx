@@ -11,11 +11,13 @@ import {
   listVendorCategories,
   updateMyVendor,
 } from "@/lib/jorna";
-import type {
-  Review,
-  ServiceItem,
-  TaxonomyCategory,
-  VendorDetail,
+import {
+  vendorSpecializations,
+  type Review,
+  type ServiceItem,
+  type TaxonomyCategory,
+  type VendorDetail,
+  type VendorSpecialization,
 } from "@/lib/types";
 import { Button, Card, LinkButton, Stars } from "@/components/ui";
 import { VendorNav } from "@/components/VendorNav";
@@ -45,8 +47,7 @@ export default function VendorProfilePage() {
 
   // Form
   const [bio, setBio] = useState("");
-  const [category, setCategory] = useState("");
-  const [subcategory, setSubcategory] = useState("");
+  const [specializations, setSpecializations] = useState<VendorSpecialization[]>([]);
   const [radius, setRadius] = useState("");
   const [longDistance, setLongDistance] = useState(false);
   const [locationNegotiable, setLocationNegotiable] = useState(false);
@@ -73,8 +74,7 @@ export default function VendorProfilePage() {
         }
         setVendor(mine);
         setBio(mine.bio ?? "");
-        setCategory(mine.category ?? "");
-        setSubcategory(mine.subcategory ?? "");
+        setSpecializations(vendorSpecializations(mine));
         setRadius(mine.travel_radius_miles?.toString() ?? "");
         setLongDistance(Boolean(mine.open_to_long_distance));
         setLocationNegotiable(Boolean(mine.open_to_price_negotiation));
@@ -100,14 +100,20 @@ export default function VendorProfilePage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (specializations.length === 0) {
+      setError("Pick at least one category first.");
+      return;
+    }
     setBusy(true);
     setError(null);
     setSaved(false);
     try {
+      const [primary] = specializations;
       const updated = await updateMyVendor({
         bio,
-        category,
-        subcategory: subcategory || null,
+        category: primary.category,
+        subcategory: primary.subcategory ?? null,
+        specializations,
         travel_radius_miles: radius ? Number(radius) : null,
         open_to_long_distance: longDistance,
         open_to_price_negotiation: locationNegotiable,
@@ -160,14 +166,9 @@ export default function VendorProfilePage() {
         <form onSubmit={submit} className="grid gap-4">
           <VendorIdentityFields
             categories={categories}
-            category={category}
-            subcategory={subcategory}
+            specializations={specializations}
             bio={bio}
-            onCategoryChange={(v) => {
-              setCategory(v);
-              setSubcategory("");
-            }}
-            onSubcategoryChange={setSubcategory}
+            onSpecializationsChange={setSpecializations}
             onBioChange={setBio}
           />
 
