@@ -1,0 +1,12 @@
+{
+  // Cloudflare Pages project serving ./public (the marketing page at / and the
+  // exported web app under /app). Migrated off Workers Static Assets, whose
+  // many-file asset serving intermittently dropped the /app routes.
+  //
+  // Deploy with `npm run deploy` (build + `wrangler pages deploy` + verify).
+  // The apex jornaevents.com is attached to this project in the Cloudflare
+  // dashboard (Pages → jorna-events → Custom domains). The previous Worker
+  // "misty-water-0dbb" is retired once the domain is moved.
+  "name": "jorna-events",
+  "pages_build_output_dir": "./public"
+}
