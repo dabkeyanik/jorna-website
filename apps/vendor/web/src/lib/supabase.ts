@@ -59,9 +59,9 @@ export function takeOAuthNext(): string {
   try {
     const v = localStorage.getItem(OAUTH_NEXT_KEY);
     localStorage.removeItem(OAUTH_NEXT_KEY);
-    return v || "/plan";
+    return v || "/my-dashboard";
   } catch {
-    return "/plan";
+    return "/my-dashboard";
   }
 }
 

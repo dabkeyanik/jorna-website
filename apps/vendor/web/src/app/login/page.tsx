@@ -44,9 +44,9 @@ const ROLES: { value: Role; label: string; hint: string }[] = [
  * rejected in favour of the same default an absent `next` already gets.
  */
 function safeNext(raw: string | null): string {
-  if (!raw) return "/plan";
+  if (!raw) return "/my-dashboard";
   if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("://")) {
-    return "/plan";
+    return "/my-dashboard";
   }
   return raw;
 }

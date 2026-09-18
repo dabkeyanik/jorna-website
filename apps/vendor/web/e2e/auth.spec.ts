@@ -2,7 +2,7 @@ import { test, expect } from "./support/fixtures";
 import { mockTokenPair, mockUser } from "./support/mock-data";
 
 test.describe("authentication", () => {
-  test("signs in with a valid identifier/password and lands on /plan", async ({ page, api }) => {
+  test("signs in with a valid identifier/password and lands on /my-dashboard", async ({ page, api }) => {
     const user = mockUser();
     api.post("/auth/login", mockTokenPair());
     api.get("/me", user);
@@ -12,7 +12,7 @@ test.describe("authentication", () => {
     await page.getByLabel("Password").fill("correct-horse-battery-staple");
     await page.getByRole("button", { name: "Sign in" }).click();
 
-    await expect(page).toHaveURL(/\/app\/plan\/?$/);
+    await expect(page).toHaveURL(/\/app\/my-dashboard\/?$/);
 
     const loginCalls = api.requestsTo("POST", "/auth/login");
     expect(loginCalls).toHaveLength(1);
