@@ -247,6 +247,24 @@ export interface VendorDetail {
   stripe_ready?: boolean | null;
   venmo_handle?: string | null;
   zelle_contact?: string | null;
+  /** Contract defaults — seed values for a new booking/contract, not
+   *  consumed by the backend beyond being returned here. See
+   *  ContractTerms and the Contracts builder. */
+  default_deposit_percent?: number | null;
+  default_cancellation_window_hours?: number | null;
+  default_overtime_rate_cents?: number | null;
+  default_addon_rate_cents?: number | null;
+  default_contract_terms?: ContractTerms | null;
+  default_guest_count_mode?: "required" | "optional" | "not_applicable" | null;
+}
+
+/** Free-form contract terms (equipment/power, travel, custom clauses) —
+ *  narrative, never computed against, so one flexible shape rather than a
+ *  column per clause. See Booking.contract_terms in the backend. */
+export interface ContractTerms {
+  equipment_power?: string;
+  travel?: string;
+  custom?: { label: string; value: string }[];
 }
 
 export interface MediaItem {
@@ -718,6 +736,12 @@ export interface VendorUpdateInput {
   payment_method?: "stripe" | "manual";
   venmo_handle?: string | null;
   zelle_contact?: string | null;
+  default_deposit_percent?: number | null;
+  default_cancellation_window_hours?: number | null;
+  default_overtime_rate_cents?: number | null;
+  default_addon_rate_cents?: number | null;
+  default_contract_terms?: ContractTerms | null;
+  default_guest_count_mode?: "required" | "optional" | "not_applicable" | null;
 }
 
 // ── Moderation ───────────────────────────────────────────────────────
@@ -944,7 +968,9 @@ export interface CalendarStatus {
 /** A booking as the vendor sees it (the fuller `_booking_dict` payload). */
 export interface VendorBooking {
   booking_id: string;
-  user_id: string;
+  /** Null for a guest/contract booking — no client account at all. See
+   *  guest_name/guest_email/guest_phone and is_guest_booking below. */
+  user_id: string | null;
   client_name?: string | null;
   service_id?: string | null;
   service_name?: string | null;
@@ -995,6 +1021,163 @@ export interface VendorBooking {
   funds_released_at?: string | null;
   vendor_checked_in_at?: string | null;
   client_checked_in_at?: string | null;
+  /** Guest/contract booking fields — see docs (backend) DECISIONS.md #13.
+   *  All null on an ordinary authenticated booking. */
+  is_guest_booking?: boolean;
+  guest_name?: string | null;
+  guest_email?: string | null;
+  guest_phone?: string | null;
+  contract_token?: string | null;
+  deposit_percent?: number | null;
+  deposit_amount_cents?: number | null;
+  cancellation_window_hours?: number | null;
+  overtime_rate_cents?: number | null;
+  addon_rate_cents?: number | null;
+  contract_terms?: ContractTerms | null;
+  signer_name?: string | null;
+  signed_at?: string | null;
+  deposit_marked_paid_at?: string | null;
+  deposit_confirmed_received_at?: string | null;
+}
+
+// ── Contracts (vendor-authored, no-login guest bookings) ──────────────
+
+/** The vendor's own view of a contract — GET/PATCH /contracts/{id},
+ *  POST /contracts. Shares most fields with GuestBooking below; kept as a
+ *  separate type since the vendor's view includes contract_token (the
+ *  guest never sees their own token echoed back) and no vendor-identity
+ *  fields the guest view has instead. */
+export interface Contract {
+  booking_id: string;
+  vendor_id: string;
+  service_id: string;
+  service_name: string | null;
+  date_iso: string;
+  date_end: string | null;
+  time_start: string;
+  time_end: string;
+  location: string;
+  guest_count: number | null;
+  amount_cents: number;
+  deposit_percent: number | null;
+  deposit_amount_cents: number | null;
+  cancellation_window_hours: number | null;
+  overtime_rate_cents: number | null;
+  addon_rate_cents: number | null;
+  contract_terms: ContractTerms | null;
+  guest_name: string | null;
+  guest_email: string | null;
+  guest_phone: string | null;
+  signer_name: string | null;
+  signed_at: string | null;
+  contract_token: string;
+  vendor_display_name: string | null;
+}
+
+export interface ContractCreateInput {
+  service_id: string;
+  date_iso: string;
+  date_end?: string | null;
+  time_start: string;
+  time_end: string;
+  amount_cents: number;
+  deposit_percent?: number | null;
+  cancellation_window_hours?: number | null;
+  overtime_rate_cents?: number | null;
+  addon_rate_cents?: number | null;
+  contract_terms?: ContractTerms | null;
+}
+
+export type ContractUpdateInput = Partial<ContractCreateInput>;
+
+/** The public, no-login view of a guest booking — GET/PATCH
+ *  /guest-bookings/{token}, POST .../sign. Includes the vendor's payment
+ *  handle (how the client actually pays) instead of contract_token (the
+ *  token is already the credential the client used to get here). */
+export interface GuestBooking {
+  booking_id: string;
+  vendor_display_name: string | null;
+  vendor_venmo_handle: string | null;
+  vendor_zelle_contact: string | null;
+  service_name: string | null;
+  date_iso: string;
+  date_end: string | null;
+  time_start: string;
+  time_end: string;
+  location: string;
+  guest_count: number | null;
+  amount_cents: number;
+  deposit_percent: number | null;
+  deposit_amount_cents: number | null;
+  cancellation_window_hours: number | null;
+  overtime_rate_cents: number | null;
+  addon_rate_cents: number | null;
+  contract_terms: ContractTerms | null;
+  guest_name: string | null;
+  guest_email: string | null;
+  guest_phone: string | null;
+  signer_name: string | null;
+  signed_at: string | null;
+  payment_status: string;
+  deposit_marked_paid_at: string | null;
+  deposit_confirmed_received_at: string | null;
+}
+
+export interface GuestBookingDetailsInput {
+  guest_name?: string | null;
+  guest_email?: string | null;
+  guest_phone?: string | null;
+  location?: string | null;
+  guest_count?: number | null;
+}
+
+// ── Clients CRM ─────────────────────────────────────────────────────
+
+export interface VendorClient {
+  key: string;
+  user_id: string | null;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  event_count: number;
+  lifetime_value_cents: number;
+  is_guest: boolean;
+  repeat_client: boolean;
+}
+
+// ── Leads ────────────────────────────────────────────────────────────
+
+export type LeadStatus = "new" | "contacted" | "quoted" | "won" | "lost";
+
+export interface Lead {
+  lead_id: string;
+  vendor_id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  event_date_iso: string | null;
+  note: string | null;
+  status: LeadStatus;
+  converted_booking_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LeadCreateInput {
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  event_date_iso?: string | null;
+  note?: string | null;
+}
+
+export interface LeadUpdateInput {
+  name?: string;
+  phone?: string | null;
+  email?: string | null;
+  event_date_iso?: string | null;
+  note?: string | null;
+  status?: LeadStatus;
 }
 
 // ── Vendor payments ──────────────────────────────────────────────────

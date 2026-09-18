@@ -8,6 +8,9 @@ import type {
   AvailabilitySlot,
   BlockedUser,
   CalendarStatus,
+  Contract,
+  ContractCreateInput,
+  ContractUpdateInput,
   ConversationSummary,
   Earnings,
   EventCreateInput,
@@ -15,15 +18,21 @@ import type {
   EventItem,
   GroupMessage,
   Guest,
+  GuestBooking,
+  GuestBookingDetailsInput,
   GuestList,
   Invitation,
   RsvpReply,
+  Lead,
+  LeadCreateInput,
+  LeadUpdateInput,
   Negotiation,
   ReportTargetType,
   StripeStatus,
   User,
   TaxonomyCategory,
   VendorBooking,
+  VendorClient,
   VendorCreateInput,
   VendorUpdateInput,
   MediaItem,
@@ -802,6 +811,84 @@ export function setBookingStatus(
   });
 }
 
+// ── Contracts (vendor-authored, no-login guest bookings) ──────────────
+
+export function createContract(input: ContractCreateInput): Promise<Contract> {
+  return apiFetch<Contract>("/contracts", { method: "POST", body: input });
+}
+
+export function getContract(bookingId: string): Promise<Contract> {
+  return apiFetch<Contract>(`/contracts/${bookingId}`);
+}
+
+export function updateContract(bookingId: string, updates: ContractUpdateInput): Promise<Contract> {
+  return apiFetch<Contract>(`/contracts/${bookingId}`, { method: "PATCH", body: updates });
+}
+
+// ── Clients CRM ─────────────────────────────────────────────────────
+
+export function getVendorClients(): Promise<{ items: VendorClient[]; total: number }> {
+  return apiFetch("/vendors/me/clients");
+}
+
+// ── Leads ────────────────────────────────────────────────────────────
+
+export function createLead(input: LeadCreateInput): Promise<Lead> {
+  return apiFetch<Lead>("/leads", { method: "POST", body: input });
+}
+
+export function listLeads(): Promise<{ items: Lead[]; total: number }> {
+  return apiFetch("/leads");
+}
+
+export function updateLead(leadId: string, updates: LeadUpdateInput): Promise<Lead> {
+  return apiFetch<Lead>(`/leads/${leadId}`, { method: "PATCH", body: updates });
+}
+
+export function deleteLead(leadId: string): Promise<{ message: string }> {
+  return apiFetch(`/leads/${leadId}`, { method: "DELETE" });
+}
+
+export function convertLead(leadId: string, input: ContractCreateInput): Promise<Contract> {
+  return apiFetch<Contract>(`/leads/${leadId}/convert`, { method: "POST", body: input });
+}
+
+// ── Guest booking link (public, no login — see /booking-link) ─────────
+//
+// None of these go through the normal Authorization-bearer path — there's no
+// session to attach. The contract_token in the URL is the entire credential,
+// same trust model as the RSVP system's invitation token.
+
+export function getGuestBooking(token: string): Promise<GuestBooking> {
+  return apiFetch<GuestBooking>(`/guest-bookings/${token}`);
+}
+
+export function fillGuestBookingDetails(
+  token: string,
+  details: GuestBookingDetailsInput,
+): Promise<GuestBooking> {
+  return apiFetch<GuestBooking>(`/guest-bookings/${token}`, { method: "PATCH", body: details });
+}
+
+export function signGuestBooking(token: string, signerName: string): Promise<GuestBooking> {
+  return apiFetch<GuestBooking>(`/guest-bookings/${token}/sign`, {
+    method: "POST",
+    body: { signer_name: signerName },
+  });
+}
+
+export function guestMarkFullPaid(
+  token: string,
+): Promise<{ message: string; payment_status: string }> {
+  return apiFetch(`/guest-bookings/${token}/mark-paid`, { method: "POST" });
+}
+
+export function guestMarkDepositPaid(
+  token: string,
+): Promise<{ message: string; deposit_marked_paid_at: string }> {
+  return apiFetch(`/guest-bookings/${token}/mark-deposit-paid`, { method: "POST" });
+}
+
 // ── Events ───────────────────────────────────────────────────────────
 //
 // There's no GET /events/{id}; the list is the source of detail. A booking has
@@ -915,6 +1002,27 @@ export function confirmPaymentReceived(
   bookingId: string,
 ): Promise<{ message: string; payment_status: string }> {
   return apiFetch(`/payments/bookings/${bookingId}/confirm-received`, { method: "POST" });
+}
+
+/**
+ * Client: mark a contract booking's deposit as paid — the authenticated
+ * sibling of guestMarkDepositPaid, for a real-account booking that has a
+ * deposit configured. Self-reported, same as markBookingPaid above.
+ */
+export function markDepositPaid(
+  bookingId: string,
+): Promise<{ message: string; deposit_marked_paid_at: string }> {
+  return apiFetch(`/payments/bookings/${bookingId}/mark-deposit-paid`, { method: "POST" });
+}
+
+/**
+ * Vendor: confirm receiving a contract booking's deposit. Works for a guest
+ * booking too — only checks the vendor's identity, never who the client is.
+ */
+export function confirmDepositReceived(
+  bookingId: string,
+): Promise<{ message: string; deposit_confirmed_received_at: string }> {
+  return apiFetch(`/payments/bookings/${bookingId}/confirm-deposit-received`, { method: "POST" });
 }
 
 /**

@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import {
   confirmBookingEvent,
+  confirmDepositReceived,
   confirmPaymentReceived,
   getMyVendor,
   getStripeStatus,
@@ -44,6 +45,12 @@ function prettyDate(iso?: string | null): string | null {
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
+}
+
+/** A guest booking has no client_name (no account to join to) — guest_name
+ *  is what the client typed in themselves instead. */
+function clientDisplayName(b: VendorBooking): string | null {
+  return b.client_name || b.guest_name || null;
 }
 
 type Filter = "pending" | "upcoming" | "all";
@@ -226,6 +233,15 @@ export default function MyBookingsPage() {
     );
   }
 
+  function confirmDeposit(b: VendorBooking) {
+    void release(
+      b,
+      () => confirmDepositReceived(b.booking_id),
+      "Couldn't confirm — please try again.",
+      "Deposit confirmed.",
+    );
+  }
+
   if (authLoading || !user || loading) {
     return <p className="py-20 text-center text-ink-soft">Loading…</p>;
   }
@@ -358,7 +374,7 @@ export default function MyBookingsPage() {
                       {b.service_name || "Package"}
                     </h3>
                     <p className="mt-0.5 text-sm text-ink-soft">
-                      {b.client_name || "A client"}
+                      {clientDisplayName(b) || "A client"}
                       {b.event_name ? ` · ${b.event_name}` : ""}
                       {b.service_category
                         ? ` · ${categoryLabel(b.service_subcategory || b.service_category)}`
@@ -398,10 +414,13 @@ export default function MyBookingsPage() {
 
                 {/* On the row, same as the client's side of this button — a
                     question about this booking starts here, not in a tab
-                    listing every thread. */}
-                <div className="mt-3 flex justify-end">
-                  <MessageVendorButton bookingId={b.booking_id} />
-                </div>
+                    listing every thread. Not available on a guest booking —
+                    there's no account on the other end to message. */}
+                {!b.is_guest_booking ? (
+                  <div className="mt-3 flex justify-end">
+                    <MessageVendorButton bookingId={b.booking_id} />
+                  </div>
+                ) : null}
 
                 {decidable ? (
                   confirmDecline === b.booking_id ? (
@@ -463,7 +482,7 @@ export default function MyBookingsPage() {
                   confirmCancel === b.booking_id ? (
                     <div className="mt-3 rounded-lg bg-panel p-3">
                       <p className="text-xs text-ink-soft">
-                        Cancel this booking? {b.client_name || "Your client"} is
+                        Cancel this booking? {clientDisplayName(b) || "Your client"} is
                         told straight away, and it comes off their plan.{" "}
                         {cancellingPaidBooking
                           ? "They'll be refunded in full — you won't be paid for this one."
@@ -562,7 +581,7 @@ export default function MyBookingsPage() {
                     escrow confirmation, so it never moves the payout along. */}
                 {b.client_checked_in_at ? (
                   <p className="mt-3 text-xs text-green">
-                    {b.client_name || "Your client"} checked in at the venue on{" "}
+                    {clientDisplayName(b) || "Your client"} checked in at the venue on{" "}
                     {formatCheckInTime(b.client_checked_in_at)}.
                   </p>
                 ) : null}
@@ -611,6 +630,36 @@ export default function MyBookingsPage() {
                   </div>
                 ) : null}
 
+                {/* Deposit self-attestation — a second, earlier pair alongside
+                    the full-payment one below, only present when this
+                    booking (almost always a Contract) has a deposit
+                    configured at all. */}
+                {b.deposit_percent != null && b.status === "approved" ? (
+                  <div className="mt-3 border-t border-line-soft pt-3">
+                    {b.deposit_marked_paid_at && !b.deposit_confirmed_received_at ? (
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-ink-faint">
+                          {clientDisplayName(b) || "Your client"} says they&apos;ve sent the deposit.
+                        </p>
+                        <Button
+                          size="md"
+                          disabled={busyId === b.booking_id}
+                          onClick={() => confirmDeposit(b)}
+                        >
+                          {busyId === b.booking_id ? "Confirming…" : "I received the deposit"}
+                        </Button>
+                      </div>
+                    ) : b.deposit_confirmed_received_at ? (
+                      <p className="text-xs text-green">You confirmed receiving the deposit.</p>
+                    ) : (
+                      <p className="text-xs text-ink-faint">
+                        Waiting on {clientDisplayName(b) || "the client"} to pay the deposit
+                        {b.deposit_amount_cents != null ? ` (${money(b.deposit_amount_cents / 100)})` : ""}.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+
                 {/* Manual track: paid directly, not through Jorna. Nothing to
                     check in or release here — just the client's own report
                     that they've sent it, waiting on this vendor to say the
@@ -620,7 +669,7 @@ export default function MyBookingsPage() {
                     {b.payment_status === "marked_paid" ? (
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-xs text-ink-faint">
-                          {b.client_name || "Your client"} says they&apos;ve sent payment directly.
+                          {clientDisplayName(b) || "Your client"} says they&apos;ve sent payment directly.
                         </p>
                         <Button
                           size="md"
@@ -634,7 +683,7 @@ export default function MyBookingsPage() {
                       <p className="text-xs text-green">You confirmed receiving payment.</p>
                     ) : (
                       <p className="text-xs text-ink-faint">
-                        Waiting on {b.client_name || "the client"} to pay you directly.
+                        Waiting on {clientDisplayName(b) || "the client"} to pay you directly.
                       </p>
                     )}
                   </div>
