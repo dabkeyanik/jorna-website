@@ -16,92 +16,140 @@ future session — ask the user for it if missing).
 
 ## Current Status
 
-**Step 0 done** (of Section 6's 9 steps, 0–8): this repo now exists as a
-fork of `jorna-website` with the customer-facing marketplace/booking-request
-pages removed. Steps 1–8 (all backend + the new Contracts/Clients/pipeline
-frontend work) are **not started**.
+Steps 0–5 of Section 6's 9 steps (0–8) are done. Backend (Sections 1/3/4 of
+the plan, all in `Desiconnect`) is **fully complete**. This repo has the
+Contracts builder and the public signing page, both manually verified
+end-to-end in a browser against a live backend. **Not started**: step 6
+(deposit UI is actually already done — see below, this was pulled forward),
+step 7 (pipeline kanban + stat tiles + Clients CRM + Leads CRUD), step 8
+(contract-defaults Settings section).
 
-## What Was Done (Step 0)
+## What Was Done
 
-- Created via `git archive HEAD | tar -x` from `jorna-website`'s `main` tip
-  into `~/Documents/GitHub/jorna/jorna-vendor` — fresh git history, no
-  shared branch with `jorna-website`. `jorna-website` itself was **not
-  touched** and stays live/dormant as a fallback.
-- **No remote yet** — this is a local-only repo (`git init`, no
-  `git remote add origin`). The user will create the GitHub repo and push
-  this history + link Cloudflare Pages themselves when ready.
-- Deleted `web/src/app/{marketplace,plan,bundle,bundles,book,event,events,guests,rsvp,check-in}/`
-  and their e2e specs (`booking.spec.ts`, `marketplace.spec.ts`) — this app
-  no longer has a self-service client booking-request flow.
-- Fixed the post-login default redirect (`login/page.tsx`'s `safeNext()`,
-  `lib/supabase.ts`'s `takeOAuthNext()`): was `/plan` (now deleted), now
-  `/my-dashboard`. Updated `auth.spec.ts`'s matching assertion.
-- Added an `allowScripts` block to `web/package.json` (was missing there,
-  only on the root one) — needed for `npm install` to succeed in this
-  environment's npm-scripts sandboxing. Unrelated to the product work, just
-  a local tooling fix.
-- **Deliberately not done** (flagged in the plan as later cleanup, not part
-  of Step 0): the "host" vs "vendor" role distinction (`lib/role.ts`'s
-  `loadIsVendor()`, `nav.tsx`'s `CLIENT_TABS`) is now dead/broken for any
-  client-role account (every link in `CLIENT_TABS` past Home/Needs-you/
-  Messages/Profile 404s, since marketplace/plan/bundle/bundles are gone) —
-  unexercised by any current test, but do this cleanup properly once a
-  later step touches nav/auth rather than patching it piecemeal.
-- **Also flagged, not yet done**: `web/src/app/vendor/[id]`'s public listing
-  page still has a "book this vendor" CTA pointing at the now-deleted
-  booking flow — needs to change (contact info / Instagram link only) as
-  part of whichever step first touches that page.
+**Step 0** — forked from `jorna-website`, stripped the customer-facing
+marketplace/booking pages, fixed the post-login redirect. No remote yet
+(local-only, `git init`, no `origin` — user pushes when ready to link
+Cloudflare Pages). Full detail on this step was in this file's previous
+version; see `git log` if needed, not repeated here.
 
-## Verification (Step 0)
+**Backend** (`Desiconnect`, branch `feature/vendor-contracts-data-model`,
+committed, **not pushed, no PR**): all of plan Sections 1/3/4 —
+- 5 additive migrations: `bookings.user_id` nullable + guest contact +
+  `contract_token`; contract terms (deposit %, cancellation window,
+  overtime/addon rates, `contract_terms` JSON) + signature fields; a second
+  deposit-specific self-attestation pair; `Vendor.default_*` contract
+  defaults; new `leads` table.
+- Guard audit: fixed 2 real bugs (vendor could open a message thread or
+  start a negotiation on their own guest booking, crashing on a null
+  user_id) — see `docs/DECISIONS.md` #13 in that repo.
+- New routers: `contracts.py`/`contract_service.py` (vendor-authed: create/
+  edit contract, `GET /vendors/me/clients`, Lead CRUD) and
+  `guest_bookings.py`/`guest_booking_service.py` (fully public: read by
+  token, fill details, sign — emails a receipt — self-report paying).
+- Authenticated deposit mark/confirm pair added to `stripe_service.py`/
+  `payments.py` (works for both guest and real-account bookings on the
+  vendor's confirm side).
+- **Also fixed**: `_booking_dict` (the general `GET /bookings/vendor/{id}`
+  list vendored by dashboard/my-bookings/pipeline) didn't expose any of the
+  new fields at first — only `/contracts/{id}` and `/guest-bookings/{token}`
+  did. Fixed and covered by a regression test.
+- 926 backend tests passing throughout; full migration chain verified
+  against a real local Postgres 16 (Homebrew, not Docker — not installed
+  here), upgrade **and** downgrade.
 
-All green in `~/Documents/GitHub/jorna/jorna-vendor`:
-- `cd web && npm run typecheck` — clean.
-- `cd web && npm run lint` — 0 errors, 16 pre-existing warnings (same
-  `react-hooks/set-state-in-effect` class as `jorna-website`, none new).
-- `cd web && npm run test` — 55/55 passed.
-- `cd web && npm run test:e2e` — 21/21 passed (after the redirect-assertion
-  fix above).
-- `npm run build` (repo root) — production build + static export succeeded,
-  27 routes (down from `jorna-website`'s ~38, matching the deletions).
-- Committed as two commits: `Fork jorna-website as the starting point for
-  the vendor-only rebuild` then `Strip customer-facing marketplace/
-  booking-request pages`.
-
-**Note for a fresh session**: `npm --prefix web install` fails in this
-environment with an `EALLOWSCRIPTS` error even with the `allowScripts` field
-present — `cd web && npm install` directly works. Plain `npm run <script>`
-commands (lint/typecheck/test/build, and the husky pre-commit hook) work
-fine via `--prefix web` or from root; it's specifically the dependency
-*install* step that needs the `cd web` workaround.
+**Frontend** (this repo, committed to `main` directly — no remote, no PR
+concept yet):
+- `lib/types.ts` / `lib/jorna.ts`: all new types + API functions for
+  Contracts, Clients, Leads, and the public guest-booking-link calls.
+- `app/contracts/new/page.tsx` — vendor picks a package, sets date/time/
+  price/terms, gets back a copyable `/booking-link?t=...` link.
+- `app/booking-link/page.tsx` — the public, zero-login page a client opens.
+  Cloned `/rsvp/page.tsx`'s shape (that file was deleted in Step 0; if you
+  need to re-reference it, `git show ff1f030:web/src/app/rsvp/page.tsx`).
+  Handles unsigned (fill details + terms + sign) and signed (confirmation +
+  self-report deposit/full payment paid) states.
+- `app/my-bookings/page.tsx` — fixed to handle a guest booking correctly:
+  was showing "A client" (no `client_name`, since there's no account) and a
+  "Message" button that would 400 (messaging is guest-incompatible
+  server-side). Added a `clientDisplayName()` helper (falls back to
+  `guest_name`), hid the Message button for `is_guest_booking`, and added a
+  deposit self-attestation block (mirrors the existing full-payment one)
+  with a vendor-side "I received the deposit" button.
+- Verified: typecheck/lint (0 errors, same 16 pre-existing warnings)/unit
+  (55)/e2e (21) all green, production build succeeds (`/booking-link` and
+  `/contracts/new` both export). **Also did a full manual browser
+  walkthrough**: registered a vendor, added a package, created a contract,
+  opened the link in an isolated (logged-out) browser context, filled
+  details, signed, marked the deposit paid as the guest, then confirmed
+  receiving it from the vendor's own `/my-bookings` — the whole loop works.
 
 ## Remaining Work
 
-Sections 1–8 of the plan (`/Users/yd/.claude/plans/delightful-leaping-starlight.md`),
-in order:
-1. Backend data model — 5 Alembic migrations in `Desiconnect/server`
-   (guest fields on `Booking`, contract/signature fields, deposit
-   attestation timestamps, `Vendor` contract defaults, new `Lead` table).
-2. Guard audit (must land with migration `0058`, before step 3 is exposed)
-   — every code path assuming a joinable client `User` needs a clean
-   400/404 for a `user_id IS NULL` booking instead of crashing.
-3. Guest-booking backend endpoints (vendor-authed contract creation +
-   public token-authed read/fill-details/sign/payment-attestation).
-4. Contracts builder UI (this repo).
-5. Public signing page (this repo, clone `/rsvp/page.tsx`'s no-login shape
-   — note `/rsvp` itself was deleted in Step 0, so read it from
-   `jorna-website` instead, or from this repo's git history at the Step-0
-   fork commit, before it was removed).
-6. Deposit/final-payment self-attestation UI.
-7. Pipeline kanban + stat tiles + Clients CRM + Leads CRUD (this repo).
-8. Contract-defaults Settings section (this repo) — build alongside step 4.
+Per the plan's Section 6 (steps renumbered slightly since deposit UI landed
+early, folded into the Contracts builder/booking-link/my-bookings work
+above rather than being its own pass):
+
+7. **Pipeline kanban + stat tiles + Clients CRM + Leads CRUD** (this repo,
+   frontend only — all backend endpoints already exist and are tested).
+   - New route `app/my-pipeline/page.tsx`: derive the 5 stages (Inquiry/
+     Awaiting client/Confirmed/Deposit received/Done) client-side per the
+     plan's Section 2 exact derivation logic — add a `pipelineStage()`
+     function to `lib/vendorPlan.ts`, plus Vitest coverage for every branch
+     (this is the single most important test to get right per the plan —
+     more so than e2e, since it's the source of truth for both the kanban
+     and the stat tiles).
+   - New route `app/my-clients/page.tsx` backed by the already-built
+     `getVendorClients()`.
+   - Leads CRUD UI (list/create/edit/convert) — `createLead`/`listLeads`/
+     `updateLead`/`deleteLead`/`convertLead` are already in `lib/jorna.ts`;
+     needs a page, probably folded into the pipeline page's "Inquiry"
+     column or its own `app/my-leads/page.tsx` — not yet decided, use
+     judgment or ask the user.
+   - Add "Clients"/"Pipeline" (or "Contracts") entries to `VendorNav.tsx`
+     and `nav.tsx`'s `VENDOR_DESKTOP_TABS` once these routes exist — not
+     done yet, so none of the new pages are reachable from nav yet (only by
+     typing the URL, as this session did for testing).
+8. **Contract-defaults Settings section** — new
+   `components/VendorContractDefaultsFields.tsx` (same shared-component
+   pattern as `VendorPaymentFields`), surfaced on `/vendor-profile`, backed
+   by the `default_*` fields already on `VendorDetail`/`VendorUpdateInput`
+   and already returned by `GET /vendors/me`. The Contracts builder already
+   reads these for pre-fill (`getMyVendor()` in `contracts/new/page.tsx`) —
+   just no UI yet to *set* them, so a vendor can't actually change their
+   defaults without hitting the API by hand.
+
+## Known follow-ups, not blocking, flagged so they aren't forgotten
+
+- `lib/role.ts`/`nav.tsx`'s `CLIENT_TABS` — the host/vendor role split is
+  still dead code for any client-role account (flagged since Step 0, still
+  not cleaned up). Do this once a step touches nav anyway (adding the new
+  tabs above is a natural point).
+- `app/vendor/[id]`'s public listing page still has a stale "book this
+  vendor" CTA pointing at the deleted booking flow (flagged since Step 0).
+- Pre-existing, unrelated bug noticed while testing: `GET /bookings/vendor`
+  (no vendor_id) in `Desiconnect`'s `app/routers/bookings.py` is shadowed by
+  the earlier-registered `GET /bookings/{booking_id}` route (Starlette
+  matches route-registration order) — "vendor" gets treated as a
+  `booking_id` and 404s. Dead code in practice: `listVendorBookings()` in
+  this repo always calls the vendor_id-qualified form
+  (`/bookings/vendor/{id}`), never the bare one. Not fixed — out of scope,
+  pre-existing, harmless since nothing calls the broken path.
+- Backend branch (`feature/vendor-contracts-data-model` in `Desiconnect`)
+  has **not been pushed or opened as a PR** — check with the user first,
+  same pattern as the `ESCROW_ENABLED` work earlier. This repo has no
+  remote at all yet.
 
 ## Notes for the Next Agent
 
-- The backend work (steps 1–3) happens in `Desiconnect`
-  (`~/Documents/GitHub/jorna/Desiconnect`), **not** in this repo — same
-  backend, shared with (dormant) `jorna-website`. No staging DB there;
-  every migration needs a local `alembic upgrade head` + `downgrade -1`
-  round-trip before it's pushed.
-- The plan's Section 3 abuse-surface discussion (public signing endpoints)
-  is the single highest-uncertainty part of this whole feature — reread it
-  before building those endpoints, not just before shipping them.
+- `cd server && venv/bin/python -m X` (not `venv/bin/X` directly) in
+  `Desiconnect` — the venv's script shebangs are stale from before that
+  repo moved into `~/Documents/GitHub/jorna/`.
+- `cd web && npm install` (not `npm --prefix web install`) in this repo —
+  an environment-specific `EALLOWSCRIPTS` quirk, unrelated to the product.
+- For a manual end-to-end browser check, run the backend with
+  `ESCROW_ENABLED=false` and a throwaway `DATABASE_URL=sqlite:///...`, and
+  the frontend with matching `NEXT_PUBLIC_API_BASE_URL` (and
+  `NEXT_PUBLIC_ESCROW_ENABLED=false` if you also want the Stripe UI hidden
+  — this session forgot that flag once and saw the Stripe payment-method
+  picker during registration; harmless, unrelated to Contracts, but easy to
+  avoid).
