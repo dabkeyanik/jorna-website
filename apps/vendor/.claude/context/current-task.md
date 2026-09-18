@@ -7,151 +7,101 @@
 
 ## Goal
 
-Fix the issues found by the 2026-08-29 vendor onboarding QA pass (published
-report artifact, 15 findings + a production test-data note). This session
-implemented fixes for everything in-scope for this repo.
+Rebuild this repo as a vendor-only dashboard product (kanban pipeline,
+"Contracts" with vendor-set deposit %/cancellation window/overtime rate and
+a no-login client e-signature, a "Clients" CRM), inspired by a Figma mockup.
+Full plan: `/Users/yd/.claude/plans/delightful-leaping-starlight.md` (also
+readable from this repo's working tree if that path doesn't resolve from a
+future session — ask the user for it if missing).
 
 ## Current Status
 
-Done. 13 of 15 findings fixed and verified with `tsc --noEmit`, `npm run
-lint`, and a full `npm run build`, all clean (lint is the same 12
-pre-existing `react-hooks/set-state-in-effect` errors as before this
-session — none newly introduced, none in onboarding files). No browser
-automation tool was available in this session, so the fixes were **not**
-exercised in a live browser — see Verification below.
+**Step 0 done** (of Section 6's 9 steps, 0–8): this repo now exists as a
+fork of `jorna-website` with the customer-facing marketplace/booking-request
+pages removed. Steps 1–8 (all backend + the new Contracts/Clients/pipeline
+frontend work) are **not started**.
 
-## What Was Fixed
+## What Was Done (Step 0)
 
-1. **Specializations silently dropped (finding 01)** — originally worked
-   around here by making `VendorIdentityFields` single-pick, since the
-   backend only persisted one category/subcategory pair. That workaround was
-   **reverted** later in the same session once the backend was actually
-   fixed: `Desiconnect/server` (sibling repo, `c:\Users\yanik\Documents\GitHub\Desiconnect`)
-   got a `specializations` JSON column on `vendors`
-   (`server/alembic/versions/0045_add_vendor_specializations.py`) wired
-   through `POST /vendors` / `PATCH /vendors/me` / `GET /vendors/me`, plus a
-   new test file (`server/tests/test_vendor_specializations.py`, 6 tests,
-   full suite 776 passed/0 failed). `VendorIdentityFields` is back to its
-   original multi-select, and the `docs/API.md` / `types.ts` comments now
-   describe the backend fix rather than "confirmed does not persist".
-   **This only actually round-trips once that migration is deployed** —
-   `alembic upgrade head` against the real `DATABASE_URL` plus a backend
-   deploy, neither of which happened in this session. Until then, multi-pick
-   silently reproduces the original bug (only the first entry survives).
-   Deploy the backend before shipping this frontend change, or ideally
-   together.
-2. **Google vendor signup bypassed the wizard (finding 02)** —
-   `auth/callback/page.tsx`: landing is now `role === "vendor" ?
-   "/vendor-onboarding" : next`, dropping the `is_new_user` check so an
-   *existing* client picking "Vendor" also reaches onboarding, not `/plan`.
-3. **"Become a vendor" lost intent across the login hop (finding 03)** —
-   home page CTA now links `/login?mode=register&role=vendor`; `login/page.tsx`
-   seeds `role` state from the URL on mount (was always `null`). Also fixed
-   the sign-in-mode subheading, which was hardcoded to the host pitch even
-   when `role=vendor` was known (part of finding 14) — applied the same
-   `role=vendor` param to the `/vendor-onboarding` and `/vendor-profile`
-   unauthenticated redirects so that carries through too.
-4. **Client→vendor guard failed open (finding 04)** —
-   `vendor-onboarding/page.tsx`: `listBundles()` is no longer
-   `.catch(() => [])`'d away. A failure now shows an error + "Try again"
-   button (new `!step` render branch) instead of silently treating "couldn't
-   check" as "nothing to check". Same page's loading gate previously showed
-   an infinite spinner on any load error; now shows the same retry UI.
-5. **Stale "Pinned to…" banner (finding 05)** — `ServicesManager.tsx`:
-   `setMatched(null)` added to `startNew()`, `startEdit()`, and the Cancel
-   button.
-6. **Price field ate a typed zero (finding 06)** — `form.price || ""` →
-   `form.price ?? ""`.
-7. **"You're live" / dashboard mismatch (finding 07)** — took the
-   report's "cheapest honest version": softened the done-screen headline,
-   added a "Set weekly hours" link next to "Set up payments", moved "Go to
-   your listing" to a smaller tertiary link. Did **not** add a 4th wizard
-   step (report's "fuller version") — out of scope for this pass.
-8. **No profile-photo nudge (finding 08)** — added a `no-profile-photo`
-   warning rule to `listingHealth()` in `web/src/lib/vendorPlan.ts`,
-   pointing at `/account` (where the upload actually lives).
-9. **Vendor could report/block themselves (finding 09)** — `vendor/page.tsx`
-   now computes `isOwnVendor` via `useAuth()` vs `vendor.user_id` and hides
-   the CTA block + `ModerationMenu` when true.
-10. **No way back / no way out of the wizard (finding 10)** — added a
-    state-only Back button on steps 2 and 3, and an "I'll add packages
-    later" link (→ `/vendor-profile`) on step 3 before a package is added.
-    Because Back can now return to step 1 after the vendor record already
-    exists, `submitIdentity` was changed to call `updateMyVendor` instead of
-    `createVendor` when `vendor` is already set — otherwise a second Back
-    round-trip would have tried to create a duplicate vendor record.
-11. **Validation error not cleared (finding 11)** — both onboarding step 1
-    and `/vendor-profile` now clear `error` as soon as a category is picked
-    (`updateSpecializations` wrapper around `setSpecializations`).
-12. **No `aria-live` on errors (finding 12)** — added `role="alert"` to
-    every error paragraph in the onboarding path: both wizard steps,
-    `ServicesManager.tsx`, and `/vendor-profile`. Did **not** implement the
-    report's secondary ask (moving focus to the offending control) — no
-    existing focus-management convention in this codebase to extend, and
-    `role="alert"` alone satisfies the "screen reader gets nothing" failure
-    mode.
-13. **CityCombobox missing `aria-controls` (finding 13)** — added `useId()`
-    to link the input to the listbox.
-14. **Copy mismatches (finding 14)** — reach-step "skip them" text (no skip
-    button existed) reworded to "leave them blank"; login subheading fix
-    covered under item 3 above.
+- Created via `git archive HEAD | tar -x` from `jorna-website`'s `main` tip
+  into `~/Documents/GitHub/jorna/jorna-vendor` — fresh git history, no
+  shared branch with `jorna-website`. `jorna-website` itself was **not
+  touched** and stays live/dormant as a fallback.
+- **No remote yet** — this is a local-only repo (`git init`, no
+  `git remote add origin`). The user will create the GitHub repo and push
+  this history + link Cloudflare Pages themselves when ready.
+- Deleted `web/src/app/{marketplace,plan,bundle,bundles,book,event,events,guests,rsvp,check-in}/`
+  and their e2e specs (`booking.spec.ts`, `marketplace.spec.ts`) — this app
+  no longer has a self-service client booking-request flow.
+- Fixed the post-login default redirect (`login/page.tsx`'s `safeNext()`,
+  `lib/supabase.ts`'s `takeOAuthNext()`): was `/plan` (now deleted), now
+  `/my-dashboard`. Updated `auth.spec.ts`'s matching assertion.
+- Added an `allowScripts` block to `web/package.json` (was missing there,
+  only on the root one) — needed for `npm install` to succeed in this
+  environment's npm-scripts sandboxing. Unrelated to the product work, just
+  a local tooling fix.
+- **Deliberately not done** (flagged in the plan as later cleanup, not part
+  of Step 0): the "host" vs "vendor" role distinction (`lib/role.ts`'s
+  `loadIsVendor()`, `nav.tsx`'s `CLIENT_TABS`) is now dead/broken for any
+  client-role account (every link in `CLIENT_TABS` past Home/Needs-you/
+  Messages/Profile 404s, since marketplace/plan/bundle/bundles are gone) —
+  unexercised by any current test, but do this cleanup properly once a
+  later step touches nav/auth rather than patching it piecemeal.
+- **Also flagged, not yet done**: `web/src/app/vendor/[id]`'s public listing
+  page still has a "book this vendor" CTA pointing at the now-deleted
+  booking flow — needs to change (contact info / Instagram link only) as
+  part of whichever step first touches that page.
 
-## Not Fixed (deliberately out of scope)
+## Verification (Step 0)
 
-- **Finding 15 (red lint)** — still the same 12 pre-existing
-  `react-hooks/set-state-in-effect` errors from before this session, spread
-  across mostly-unrelated files (account, activity, book, bundle, bundles,
-  conversation, payment-complete, vendor, NegotiationPanel, nav ×2, auth.tsx).
-  `vendor/page.tsx` has one (line ~190, not touched by this session's edit)
-  but fixing it means touching every other file in that list too — a
-  separate repo-wide lint-hygiene pass, not an onboarding fix.
-- **Stripe Connect round trip** — still unverified; starting it creates a
-  real third-party account, not something to do unattended.
-- **The `blocked` step** (client with an active/escrowed booking converting
-  to vendor) — still only reviewed in code, not exercised; needs a second
-  account with money in flight.
-- **Production test data** — the QA report's `qa_vendor_0829` account and
-  the pre-existing `Test DJ Package (QA)` vendor are still sitting on the
-  live backend. This repo has no admin/deletion tooling; cleanup needs to
-  happen against the backend directly (`Desiconnect/server`) or via whatever
-  admin access exists there.
-- **Deploying the `specializations` backend fix** — the migration and API
-  change exist in `Desiconnect/server` (see item 1 above) but nothing was
-  deployed this session. The frontend is already back to multi-select on the
-  assumption this lands; if the backend deploy slips, multi-pick reproduces
-  the original silent-data-loss bug until it does.
+All green in `~/Documents/GitHub/jorna/jorna-vendor`:
+- `cd web && npm run typecheck` — clean.
+- `cd web && npm run lint` — 0 errors, 16 pre-existing warnings (same
+  `react-hooks/set-state-in-effect` class as `jorna-website`, none new).
+- `cd web && npm run test` — 55/55 passed.
+- `cd web && npm run test:e2e` — 21/21 passed (after the redirect-assertion
+  fix above).
+- `npm run build` (repo root) — production build + static export succeeded,
+  27 routes (down from `jorna-website`'s ~38, matching the deletions).
+- Committed as two commits: `Fork jorna-website as the starting point for
+  the vendor-only rebuild` then `Strip customer-facing marketplace/
+  booking-request pages`.
 
-## Verification
+**Note for a fresh session**: `npm --prefix web install` fails in this
+environment with an `EALLOWSCRIPTS` error even with the `allowScripts` field
+present — `cd web && npm install` directly works. Plain `npm run <script>`
+commands (lint/typecheck/test/build, and the husky pre-commit hook) work
+fine via `--prefix web` or from root; it's specifically the dependency
+*install* step that needs the `cd web` workaround.
 
-- `npx tsc --noEmit` (in `web/`) — clean.
-- `npm run lint` (in `web/`) — 12 errors, 5 warnings, identical set to the
-  pre-session baseline (confirmed by re-running before and after every
-  change, including after the multi-select revert).
-- `npm run build` (repo root) — full production build + static export
-  succeeded, all 40 routes prerendered without error (also re-run after the
-  revert).
-- `Desiconnect/server`: full backend test suite (`pytest`, from
-  `server/venv`) — 776 passed, 12 skipped, 0 failed, including the 6 new
-  `test_vendor_specializations.py` tests.
-- **Not done**: no browser was available in this session to click through
-  the flow. Before shipping, someone should walk: home → "Become a vendor"
-  (logged out) → register as vendor → land correctly on step 1 with role
-  pre-selected; Back/forward through all 3 steps; the retry button on a
-  simulated network failure; the vendor-viewing-own-listing case (no
-  Report/Block, no client CTAs); and — once the backend is deployed — that
-  picking two specializations in step 1 survives a reload.
+## Remaining Work
 
-## Files Changed
+Sections 1–8 of the plan (`/Users/yd/.claude/plans/delightful-leaping-starlight.md`),
+in order:
+1. Backend data model — 5 Alembic migrations in `Desiconnect/server`
+   (guest fields on `Booking`, contract/signature fields, deposit
+   attestation timestamps, `Vendor` contract defaults, new `Lead` table).
+2. Guard audit (must land with migration `0058`, before step 3 is exposed)
+   — every code path assuming a joinable client `User` needs a clean
+   400/404 for a `user_id IS NULL` booking instead of crashing.
+3. Guest-booking backend endpoints (vendor-authed contract creation +
+   public token-authed read/fill-details/sign/payment-attestation).
+4. Contracts builder UI (this repo).
+5. Public signing page (this repo, clone `/rsvp/page.tsx`'s no-login shape
+   — note `/rsvp` itself was deleted in Step 0, so read it from
+   `jorna-website` instead, or from this repo's git history at the Step-0
+   fork commit, before it was removed).
+6. Deposit/final-payment self-attestation UI.
+7. Pipeline kanban + stat tiles + Clients CRM + Leads CRUD (this repo).
+8. Contract-defaults Settings section (this repo) — build alongside step 4.
 
-**This repo (jorna-website)**:
-`web/src/app/{auth/callback,home,login,vendor-onboarding,vendor-profile,vendor}/page.tsx`,
-`web/src/components/{VendorProfileFields,ServicesManager,CityCombobox}.tsx`,
-`web/src/lib/{types,vendorPlan}.ts`, `docs/API.md`.
+## Notes for the Next Agent
 
-**`Desiconnect/server`** (sibling repo, `c:\Users\yanik\Documents\GitHub\Desiconnect`
-— not this repo, but touched this session per an explicit ask):
-`server/app/db/models.py`, `server/app/routers/vendors.py`,
-`server/app/services/vendor_service.py`,
-`server/alembic/versions/0045_add_vendor_specializations.py` (new),
-`server/tests/test_vendor_specializations.py` (new). Uncommitted, undeployed
-— see "Not Fixed" above.
+- The backend work (steps 1–3) happens in `Desiconnect`
+  (`~/Documents/GitHub/jorna/Desiconnect`), **not** in this repo — same
+  backend, shared with (dormant) `jorna-website`. No staging DB there;
+  every migration needs a local `alembic upgrade head` + `downgrade -1`
+  round-trip before it's pushed.
+- The plan's Section 3 abuse-surface discussion (public signing endpoints)
+  is the single highest-uncertainty part of this whole feature — reread it
+  before building those endpoints, not just before shipping them.
