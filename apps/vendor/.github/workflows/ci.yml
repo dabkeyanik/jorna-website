@@ -6,15 +6,6 @@ on:
   pull_request:
     branches: [main]
 
-# Applies to every job below, so every `next build` in this workflow (build
-# verification, PR previews, production) bakes in the same value — this repo
-# has no escrow/Stripe checkout flow at all (contract deposits are
-# self-attested, paid off-platform), and lib/flags.ts's ESCROW_ENABLED
-# defaults to true absent this override. Static export means the flag is
-# baked in at build time, not read at runtime — see lib/flags.ts.
-env:
-  NEXT_PUBLIC_ESCROW_ENABLED: "false"
-
 jobs:
   build:
     name: Lint, typecheck, test, build
@@ -43,8 +34,16 @@ jobs:
       - name: Test
         run: npm --prefix web run test
 
+      # This repo has no escrow/Stripe checkout flow at all (contract
+      # deposits are self-attested, paid off-platform) — matches what the
+      # preview/deploy jobs below actually ship. NOT set for the e2e job:
+      # its Stripe-gating specs intentionally exercise the escrow-on code
+      # path, same as jorna-website keeps those tests passing under the
+      # flag's true default while production itself ships it off.
       - name: Build
         run: npm run build
+        env:
+          NEXT_PUBLIC_ESCROW_ENABLED: "false"
 
   e2e:
     name: E2E (Playwright)
@@ -119,6 +118,8 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          NEXT_PUBLIC_ESCROW_ENABLED: "false"
 
       # A non-production --branch value makes this a Cloudflare Pages
       # *preview* deployment — left alone by the `deploy` job below, which
@@ -201,5 +202,6 @@ jobs:
       - name: Deploy
         run: npm run deploy
         env:
+          NEXT_PUBLIC_ESCROW_ENABLED: "false"
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
