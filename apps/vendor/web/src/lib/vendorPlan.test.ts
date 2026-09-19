@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { vendorTasks } from "./vendorPlan";
+import { pipelineStage, pipelineStats, vendorTasks } from "./vendorPlan";
 import type { VendorBooking } from "./types";
 
 function booking(overrides: Partial<VendorBooking> = {}): VendorBooking {
@@ -50,5 +50,169 @@ describe("vendorTasks — negotiation", () => {
       null,
     );
     expect(tasks.map((t) => t.kind)).not.toContain("negotiation");
+  });
+});
+
+describe("pipelineStage", () => {
+  // Ordinary, marketplace-sourced bookings (no contract_token) — no
+  // signature step, BookingStatus is what "confirmed" means for these.
+  it("buckets a pending ordinary booking as inquiry", () => {
+    expect(pipelineStage(booking({ status: "pending" }))).toBe("inquiry");
+  });
+
+  it("buckets a negotiating ordinary booking as inquiry", () => {
+    expect(pipelineStage(booking({ status: "negotiation_ongoing" }))).toBe("inquiry");
+  });
+
+  it("buckets an approved ordinary booking as confirmed", () => {
+    expect(pipelineStage(booking({ status: "approved" }))).toBe("confirmed");
+  });
+
+  // Guest/contract bookings (have a contract_token) — created already
+  // "approved" with no accept/decline step, so the signature is what
+  // "confirmed" means instead of status.
+  it("buckets an unsigned contract booking as awaiting_client, even though status is already approved", () => {
+    expect(
+      pipelineStage(
+        booking({ status: "approved", contract_token: "tok", signed_at: null }),
+      ),
+    ).toBe("awaiting_client");
+  });
+
+  it("buckets a signed contract booking as confirmed", () => {
+    expect(
+      pipelineStage(
+        booking({
+          status: "approved",
+          contract_token: "tok",
+          signed_at: "2027-01-01T00:00:00Z",
+        }),
+      ),
+    ).toBe("confirmed");
+  });
+
+  // Deposit received — only reachable when a deposit is actually configured.
+  it("buckets a signed contract with a confirmed deposit as deposit_received", () => {
+    expect(
+      pipelineStage(
+        booking({
+          status: "approved",
+          contract_token: "tok",
+          signed_at: "2027-01-01T00:00:00Z",
+          deposit_percent: 50,
+          deposit_confirmed_received_at: "2027-01-02T00:00:00Z",
+        }),
+      ),
+    ).toBe("deposit_received");
+  });
+
+  it("does not treat a marked-but-unconfirmed deposit as deposit_received", () => {
+    expect(
+      pipelineStage(
+        booking({
+          status: "approved",
+          contract_token: "tok",
+          signed_at: "2027-01-01T00:00:00Z",
+          deposit_percent: 50,
+          deposit_marked_paid_at: "2027-01-02T00:00:00Z",
+          deposit_confirmed_received_at: null,
+        }),
+      ),
+    ).toBe("confirmed");
+  });
+
+  // Done — only once everything owed is confirmed received.
+  it("buckets a fully-confirmed-paid booking with no deposit as done", () => {
+    expect(
+      pipelineStage(
+        booking({
+          status: "approved",
+          contract_token: "tok",
+          signed_at: "2027-01-01T00:00:00Z",
+          payment_status: "confirmed_paid",
+        }),
+      ),
+    ).toBe("done");
+  });
+
+  it("does not reach done on full payment alone when a deposit was never confirmed", () => {
+    expect(
+      pipelineStage(
+        booking({
+          status: "approved",
+          contract_token: "tok",
+          signed_at: "2027-01-01T00:00:00Z",
+          deposit_percent: 50,
+          payment_status: "confirmed_paid",
+        }),
+      ),
+    ).toBe("confirmed");
+  });
+
+  it("reaches done once both the deposit and the full payment are confirmed", () => {
+    expect(
+      pipelineStage(
+        booking({
+          status: "approved",
+          contract_token: "tok",
+          signed_at: "2027-01-01T00:00:00Z",
+          deposit_percent: 50,
+          deposit_confirmed_received_at: "2027-01-02T00:00:00Z",
+          payment_status: "confirmed_paid",
+        }),
+      ),
+    ).toBe("done");
+  });
+
+  it("does not auto-advance to done just because the event date has passed", () => {
+    // Explicit product decision: accuracy over tidiness — see the function's
+    // own doc comment.
+    expect(
+      pipelineStage(
+        booking({
+          status: "approved",
+          contract_token: "tok",
+          signed_at: "2027-01-01T00:00:00Z",
+          date_iso: "2020-01-01",
+          payment_status: "unpaid",
+        }),
+      ),
+    ).toBe("confirmed");
+  });
+
+  it("treats the Stripe track's released status as fully paid too", () => {
+    expect(
+      pipelineStage(
+        booking({
+          status: "approved",
+          contract_token: "tok",
+          signed_at: "2027-01-01T00:00:00Z",
+          payment_status: "released",
+        }),
+      ),
+    ).toBe("done");
+  });
+});
+
+describe("pipelineStats", () => {
+  it("counts stages and sums unconfirmed deposits owed, excluding dead bookings", () => {
+    const stats = pipelineStats([
+      booking({ status: "pending" }), // inquiry
+      booking({ status: "approved", contract_token: "t1" }), // awaiting_client
+      booking({ status: "approved" }), // confirmed
+      booking({
+        status: "approved",
+        contract_token: "t2",
+        deposit_percent: 50,
+        deposit_amount_cents: 50_000,
+      }), // awaiting_client, deposit owed
+      booking({ status: "rejected", contract_token: "t3", deposit_percent: 50, deposit_amount_cents: 99_999 }), // dead, excluded
+    ]);
+    expect(stats).toEqual({
+      openInquiries: 1,
+      awaitingClient: 2,
+      depositsOwedCents: 50_000,
+      confirmedEvents: 1,
+    });
   });
 });

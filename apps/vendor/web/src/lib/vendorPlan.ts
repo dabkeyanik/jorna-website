@@ -234,6 +234,99 @@ export function isDeadVendorBooking(b: VendorBooking): boolean {
   );
 }
 
+// ── Pipeline (kanban) ──────────────────────────────────────────────────
+//
+// A pure derived function over already-fetched bookings, same philosophy as
+// vendorTasks/vendorEvents above — not a stored field, so nothing has to
+// keep a "stage" column in sync with status/payment_status/timestamps by
+// hand. Backend mirror: Desiconnect's docs/DECISIONS.md #13.
+
+export type PipelineStage =
+  | "inquiry"
+  | "awaiting_client"
+  | "confirmed"
+  | "deposit_received"
+  | "done";
+
+/**
+ * Where one booking sits on the pipeline. Assumes a *live* booking —
+ * filter with `!isDeadVendorBooking(b)` first; a rejected/cancelled/
+ * refunded booking doesn't belong on the kanban at all, not even in
+ * "Inquiry". Evaluated top-to-bottom, first match wins:
+ *
+ * 1. Done — everything owed has been confirmed received. Deliberately does
+ *    NOT auto-advance just because the event date passed: a vendor who
+ *    forgot to confirm should see a stale-looking card, not a booking that
+ *    silently vanished with money unconfirmed (a deliberate accuracy-over-
+ *    tidiness tradeoff, not an oversight).
+ * 2. Deposit received — a deposit is configured and confirmed, but the
+ *    booking isn't fully Done yet. Only exists for a booking that has
+ *    deposit_percent set at all; one with none skips straight from
+ *    Confirmed to Done.
+ * 3/4. A guest/contract booking (has a contract_token) is created already
+ *    BookingStatus "approved" — there's no vendor accept/decline step in
+ *    that flow, the vendor is both author and approver of their own offer
+ *    — so status alone can't distinguish "sent, waiting on the client" from
+ *    "the deal is real" the way it does for an ordinary booking. The
+ *    client's e-signature is what actually means "confirmed" here:
+ *    Confirmed once signed_at is set, Awaiting client until then.
+ * 3'. An ordinary, marketplace-sourced booking (no contract_token) has no
+ *    signature step at all — BookingStatus "approved" (the vendor's own
+ *    accept decision) is what "Confirmed" means for it instead.
+ * 5. Inquiry — everything else: a pending/negotiating ordinary booking, or
+ *    any booking predating this pipeline that doesn't fit the above
+ *    (bucketed here so nothing already in the system goes unclassified).
+ */
+export function pipelineStage(b: VendorBooking): PipelineStage {
+  const hasDeposit = b.deposit_percent != null;
+  const depositConfirmed = Boolean(b.deposit_confirmed_received_at);
+  // "confirmed_paid" is the manual track's terminal state (the only live
+  // track with escrow disabled); "released" is its Stripe-track equivalent,
+  // kept for a booking predating the MVP's manual-only switch.
+  const fullyPaid = b.payment_status === "confirmed_paid" || b.payment_status === "released";
+
+  if ((!hasDeposit || depositConfirmed) && fullyPaid) return "done";
+  if (hasDeposit && depositConfirmed) return "deposit_received";
+
+  if (b.contract_token) {
+    return b.signed_at ? "confirmed" : "awaiting_client";
+  }
+  return b.status === "approved" ? "confirmed" : "inquiry";
+}
+
+export interface PipelineStats {
+  openInquiries: number;
+  awaitingClient: number;
+  depositsOwedCents: number;
+  confirmedEvents: number;
+}
+
+/** The dashboard's stat tiles — reducers over the same derived stages, not
+ *  a separate backend aggregation call. */
+export function pipelineStats(bookings: VendorBooking[]): PipelineStats {
+  const live = bookings.filter((b) => !isDeadVendorBooking(b));
+  let openInquiries = 0;
+  let awaitingClient = 0;
+  let depositsOwedCents = 0;
+  let confirmedEvents = 0;
+
+  for (const b of live) {
+    const stage = pipelineStage(b);
+    if (stage === "inquiry") openInquiries += 1;
+    if (stage === "awaiting_client") awaitingClient += 1;
+    if (stage === "confirmed" || stage === "deposit_received") confirmedEvents += 1;
+    if (
+      b.deposit_percent != null &&
+      !b.deposit_confirmed_received_at &&
+      b.deposit_amount_cents
+    ) {
+      depositsOwedCents += b.deposit_amount_cents;
+    }
+  }
+
+  return { openInquiries, awaitingClient, depositsOwedCents, confirmedEvents };
+}
+
 /**
  * What the vendor still has to do.
  *

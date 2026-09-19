@@ -46,6 +46,11 @@ const I = {
   needsYou: (
     <path d="M12 3a6 6 0 0 0-6 6c0 4-2 5-2 5h16s-2-1-2-5a6 6 0 0 0-6-6ZM10 19a2 2 0 0 0 4 0" />
   ),
+  pipeline: <path d="M4 4h4v16H4V4Zm6 0h4v10h-4V4Zm6 0h4v13h-4V4Z" />,
+  clients: (
+    <path d="M9 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM2.5 20a6.5 6.5 0 0 1 13 0M16 8.2a3 3 0 1 1 0 5.9M16.3 14.6c2.7.4 4.7 2.4 4.7 5.4" />
+  ),
+  leads: <path d="M4 4.5h16l-6.2 8v6.4l-3.6 1.6v-8L4 4.5Z" />,
 };
 
 export const icon = (d: React.ReactNode, className = "size-6") => (
@@ -77,20 +82,19 @@ export const MESSAGES: NavItem = {
   match: ["/messages"],
 };
 
-export const CLIENT_TABS: NavItem[] = [
+// Every real login in this app is a vendor now — the marketplace/booking-
+// request flow this used to serve (Builder, Market, a bundles dashboard) was
+// deleted when this repo forked from jorna-website (see docs/DECISIONS.md).
+// What's left is the narrow signed-in-but-not-yet-selling gap: someone who's
+// created an account but hasn't finished vendor-onboarding, or is still
+// signed in during that flow. Route them at that, not at three dead links.
+export const NO_VENDOR_TABS: NavItem[] = [
   { href: "/home", label: "Home", icon: icon(I.home), match: ["/home", "/browse"] },
-  { href: "/plan", label: "Builder", icon: icon(I.build), match: ["/plan"] },
   {
-    href: "/marketplace",
-    label: "Market",
-    icon: icon(I.marketplace),
-    match: ["/marketplace", "/vendor"],
-  },
-  {
-    href: "/bundles",
-    label: "Dashboard",
-    icon: icon(I.dashboard),
-    match: ["/bundles", "/bundle", "/book", "/events", "/event"],
+    href: "/vendor-onboarding",
+    label: "Get started",
+    icon: icon(I.build),
+    match: ["/vendor-onboarding"],
   },
   NEEDS_YOU,
   MESSAGES,
@@ -125,6 +129,10 @@ export const VENDOR_TABS: NavItem[] = [
       "/vendor",
       "/home",
       "/browse",
+      "/my-pipeline",
+      "/my-clients",
+      "/my-leads",
+      "/contracts",
     ],
   },
   NEEDS_YOU,
@@ -184,6 +192,24 @@ export const VENDOR_DESKTOP_TABS: NavItem[] = [
     // "/vendor" is the public listing view — the same thing a client sees, so
     // it belongs here rather than leaving the bar unlit.
     match: ["/vendor-profile", "/vendor", "/marketplace"],
+  },
+  {
+    href: "/my-pipeline",
+    label: "Pipeline",
+    icon: icon(I.pipeline),
+    match: ["/my-pipeline"],
+  },
+  {
+    href: "/my-clients",
+    label: "Clients",
+    icon: icon(I.clients),
+    match: ["/my-clients"],
+  },
+  {
+    href: "/my-leads",
+    label: "Leads",
+    icon: icon(I.leads),
+    match: ["/my-leads"],
   },
   NEEDS_YOU,
   MESSAGES,
@@ -267,8 +293,8 @@ export function useAppNav(): {
 
   const signedOut = loading || !user;
   return {
-    items: signedOut ? null : isVendor ? VENDOR_TABS : CLIENT_TABS,
-    desktopItems: signedOut ? null : isVendor ? VENDOR_DESKTOP_TABS : CLIENT_TABS,
+    items: signedOut ? null : isVendor ? VENDOR_TABS : NO_VENDOR_TABS,
+    desktopItems: signedOut ? null : isVendor ? VENDOR_DESKTOP_TABS : NO_VENDOR_TABS,
     attention,
     messagesUnread,
     // Where the wordmark goes. A logo goes home, and home for a seller is their

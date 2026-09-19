@@ -20,7 +20,10 @@ import { usePathname } from "next/navigation";
 // this page is the whole list.
 const TABS = [
   { href: "/my-dashboard", label: "Dashboard" },
+  { href: "/my-pipeline", label: "Pipeline" },
   { href: "/my-bookings", label: "All bookings" },
+  { href: "/my-clients", label: "Clients" },
+  { href: "/my-leads", label: "Leads" },
   { href: "/my-calendar", label: "Calendar" },
   { href: "/my-earnings", label: "Earnings" },
   { href: "/vendor-profile", label: "Listing" },

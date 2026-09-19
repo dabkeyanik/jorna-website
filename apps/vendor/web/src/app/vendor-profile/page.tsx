@@ -27,6 +27,8 @@ import {
   VendorIdentityFields,
   VendorPaymentFields,
   VendorReachFields,
+  VendorContractDefaultsFields,
+  contractDefaultsToStrings,
 } from "@/components/VendorProfileFields";
 
 function prettyDate(iso?: string | null): string | null {
@@ -60,6 +62,11 @@ export default function VendorProfilePage() {
   const [paymentMethod, setPaymentMethod] = useState<"stripe" | "manual">("stripe");
   const [venmoHandle, setVenmoHandle] = useState("");
   const [zelleContact, setZelleContact] = useState("");
+  const [depositPercent, setDepositPercent] = useState("");
+  const [cancellationWindowHours, setCancellationWindowHours] = useState("");
+  const [overtimeRate, setOvertimeRate] = useState("");
+  const [equipmentPower, setEquipmentPower] = useState("");
+  const [travel, setTravel] = useState("");
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login?next=/vendor-profile&role=vendor");
@@ -92,6 +99,12 @@ export default function VendorProfilePage() {
         setPaymentMethod(ESCROW_ENABLED ? (mine.payment_method ?? "stripe") : "manual");
         setVenmoHandle(mine.venmo_handle ?? "");
         setZelleContact(mine.zelle_contact ?? "");
+        const defaults = contractDefaultsToStrings(mine);
+        setDepositPercent(defaults.depositPercent);
+        setCancellationWindowHours(defaults.cancellationWindowHours);
+        setOvertimeRate(defaults.overtimeRate);
+        setEquipmentPower(defaults.equipmentPower);
+        setTravel(defaults.travel);
         // Both best-effort: the profile stays editable when either fails.
         const [r, svc] = await Promise.all([
           getVendorReviews(mine.vendor_id).catch(() => null),
@@ -145,6 +158,15 @@ export default function VendorProfilePage() {
         payment_method: paymentMethod,
         venmo_handle: trimmedVenmo || null,
         zelle_contact: trimmedZelle || null,
+        default_deposit_percent: depositPercent ? Number(depositPercent) : null,
+        default_cancellation_window_hours: cancellationWindowHours
+          ? Number(cancellationWindowHours)
+          : null,
+        default_overtime_rate_cents: overtimeRate ? Math.round(Number(overtimeRate) * 100) : null,
+        default_contract_terms:
+          equipmentPower.trim() || travel.trim()
+            ? { equipment_power: equipmentPower.trim() || undefined, travel: travel.trim() || undefined }
+            : null,
       });
       setVendor(updated);
       setSaved(true);
@@ -227,6 +249,24 @@ export default function VendorProfilePage() {
               onPaymentMethodChange={setPaymentMethod}
               onVenmoHandleChange={setVenmoHandle}
               onZelleContactChange={setZelleContact}
+            />
+          </div>
+        </Card>
+
+        <h2 className="serif mt-10 text-2xl text-ink">Contract defaults</h2>
+        <Card className="mt-5 p-6">
+          <div className="grid gap-4">
+            <VendorContractDefaultsFields
+              depositPercent={depositPercent}
+              cancellationWindowHours={cancellationWindowHours}
+              overtimeRate={overtimeRate}
+              equipmentPower={equipmentPower}
+              travel={travel}
+              onDepositPercentChange={setDepositPercent}
+              onCancellationWindowHoursChange={setCancellationWindowHours}
+              onOvertimeRateChange={setOvertimeRate}
+              onEquipmentPowerChange={setEquipmentPower}
+              onTravelChange={setTravel}
             />
           </div>
         </Card>

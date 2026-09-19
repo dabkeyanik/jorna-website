@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { ESCROW_ENABLED } from "@/lib/flags";
-import type { TaxonomyCategory, VendorSpecialization } from "@/lib/types";
+import type { ContractTerms, TaxonomyCategory, VendorSpecialization } from "@/lib/types";
 import { Chip, Field } from "./ui";
 
 function specKey(s: VendorSpecialization): string {
@@ -324,4 +324,100 @@ export function VendorPaymentFields({
       ) : null}
     </>
   );
+}
+
+/** Defaults that seed a new Contracts-builder booking — a vendor sets these
+ *  once instead of re-typing the same deposit %/cancellation window/
+ *  overtime rate into every booking. Purely a starting point: the builder
+ *  lets each one be overridden per booking, and nothing here is read by
+ *  the backend beyond being returned on GET /vendors/me. */
+export function VendorContractDefaultsFields({
+  depositPercent,
+  cancellationWindowHours,
+  overtimeRate,
+  equipmentPower,
+  travel,
+  onDepositPercentChange,
+  onCancellationWindowHoursChange,
+  onOvertimeRateChange,
+  onEquipmentPowerChange,
+  onTravelChange,
+}: {
+  depositPercent: string;
+  cancellationWindowHours: string;
+  overtimeRate: string;
+  equipmentPower: string;
+  travel: string;
+  onDepositPercentChange: (value: string) => void;
+  onCancellationWindowHoursChange: (value: string) => void;
+  onOvertimeRateChange: (value: string) => void;
+  onEquipmentPowerChange: (value: string) => void;
+  onTravelChange: (value: string) => void;
+}) {
+  return (
+    <>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Field
+          label="Default deposit (%)"
+          type="number"
+          min={0}
+          max={100}
+          placeholder="e.g. 50"
+          value={depositPercent}
+          onChange={(e) => onDepositPercentChange(e.target.value)}
+        />
+        <Field
+          label="Cancellation window (hours)"
+          type="number"
+          min={0}
+          placeholder="e.g. 720"
+          value={cancellationWindowHours}
+          onChange={(e) => onCancellationWindowHoursChange(e.target.value)}
+        />
+        <Field
+          label="Overtime rate ($/hr)"
+          type="number"
+          min={0}
+          step="0.01"
+          value={overtimeRate}
+          onChange={(e) => onOvertimeRateChange(e.target.value)}
+        />
+      </div>
+      <Field
+        label="Equipment & power (optional)"
+        placeholder="Vendor brings all gear; venue provides standard power"
+        value={equipmentPower}
+        onChange={(e) => onEquipmentPowerChange(e.target.value)}
+      />
+      <Field
+        label="Travel (optional)"
+        placeholder="30 miles included, $0.75/mi beyond"
+        value={travel}
+        onChange={(e) => onTravelChange(e.target.value)}
+      />
+      <p className="text-xs text-ink-faint">
+        Just a starting point — every new booking in Contracts can still change these.
+      </p>
+    </>
+  );
+}
+
+/** Round-trip helpers for VendorContractDefaultsFields, shared by every
+ *  caller so the dollars-vs-cents conversion can't drift between them. */
+export function contractDefaultsToStrings(vendor: {
+  default_deposit_percent?: number | null;
+  default_cancellation_window_hours?: number | null;
+  default_overtime_rate_cents?: number | null;
+  default_contract_terms?: ContractTerms | null;
+}) {
+  return {
+    depositPercent: vendor.default_deposit_percent?.toString() ?? "",
+    cancellationWindowHours: vendor.default_cancellation_window_hours?.toString() ?? "",
+    overtimeRate:
+      vendor.default_overtime_rate_cents != null
+        ? (vendor.default_overtime_rate_cents / 100).toString()
+        : "",
+    equipmentPower: vendor.default_contract_terms?.equipment_power ?? "",
+    travel: vendor.default_contract_terms?.travel ?? "",
+  };
 }

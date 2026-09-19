@@ -14,10 +14,7 @@ import { createContract, getMyVendor, listServices } from "@/lib/jorna";
 import type { Contract, ServiceItem, VendorDetail } from "@/lib/types";
 import { Button, Card, Field } from "@/components/ui";
 import { VendorNav } from "@/components/VendorNav";
-
-function centsToDollarsStr(cents?: number | null): string {
-  return cents != null ? (cents / 100).toString() : "";
-}
+import { contractDefaultsToStrings } from "@/components/VendorProfileFields";
 
 function guestBookingLink(token: string): string {
   // basePath is "/app" (next.config.ts) and doesn't rewrite a plain string
@@ -66,11 +63,12 @@ export default function NewContractPage() {
           return;
         }
         setVendor(mine);
-        setDepositPercent(mine.default_deposit_percent?.toString() ?? "");
-        setCancellationWindowHours(mine.default_cancellation_window_hours?.toString() ?? "");
-        setOvertimeRate(centsToDollarsStr(mine.default_overtime_rate_cents));
-        setEquipmentPower(mine.default_contract_terms?.equipment_power ?? "");
-        setTravel(mine.default_contract_terms?.travel ?? "");
+        const defaults = contractDefaultsToStrings(mine);
+        setDepositPercent(defaults.depositPercent);
+        setCancellationWindowHours(defaults.cancellationWindowHours);
+        setOvertimeRate(defaults.overtimeRate);
+        setEquipmentPower(defaults.equipmentPower);
+        setTravel(defaults.travel);
 
         const svc = await listServices({ vendor_id: mine.vendor_id, limit: 100 }).catch(() => null);
         if (cancelled) return;

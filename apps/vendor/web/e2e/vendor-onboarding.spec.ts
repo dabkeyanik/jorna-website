@@ -74,8 +74,8 @@ test.describe("vendor onboarding", () => {
 
     await page.goto("vendor-onboarding/");
     await expect(page.getByRole("heading", { name: "What do you sell?" })).toBeVisible();
-    // Still a client at this point — the top nav shows the client tabs.
-    await expect(page.getByRole("link", { name: "Builder" })).toBeVisible();
+    // Still not a vendor at this point — the top nav shows the no-vendor tabs.
+    await expect(page.getByRole("link", { name: "Get started" })).toBeVisible();
 
     await page.getByLabel("Add a category").selectOption({ label: "Photography" });
     await page.getByRole("button", { name: "Photography", exact: true }).click();
@@ -90,7 +90,7 @@ test.describe("vendor onboarding", () => {
 
     // A route change with no reload — the moment the fixed effect re-checks.
     await expect(page.getByRole("link", { name: "Earnings" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Builder" })).not.toBeVisible();
+    await expect(page.getByRole("link", { name: "Get started" })).not.toBeVisible();
   });
 
   test("requires at least one category before continuing", async ({ page, api }) => {
