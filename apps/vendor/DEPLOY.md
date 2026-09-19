@@ -7,9 +7,19 @@ The site (the web app, serving both `/` and `/app`, plus a small static
 jornaevents.com) — the two must never share a Cloudflare project name, or
 one repo's CI would overwrite the other's production site.
 
-No custom domain is attached yet; the site is reachable at
-`https://jorna-vendor.pages.dev` until one is added (Cloudflare dashboard →
-Workers & Pages → jorna-vendor → Custom domains).
+`jornaevents.com` and `www.jornaevents.com` are attached as custom domains
+(Cloudflare dashboard → Workers & Pages → jorna-vendor → Custom domains) —
+moved here from jorna-website's `jorna-events` project, which now serves the
+consumer app at `book.jornaevents.com` instead. The site is also still
+reachable at `https://jorna-vendor.pages.dev`.
+
+## Gotcha: don't byte-compare the apex against `*.pages.dev`
+
+The zone injects a Cloudflare bot-detection script (`__CF$cv$params`, ~938
+bytes, appended before `</body>`) into HTML served through the custom
+domain. `jorna-vendor.pages.dev` does **not** get that injection — see
+jorna-website's `DEPLOY.md` for the full story and a byte-diff recipe that
+strips it before comparing.
 
 ## Deploy
 
@@ -32,11 +42,11 @@ route and re-deploys until they all serve 200 for three consecutive sweeps
 (see `scripts/deploy.mjs`). `npm run deploy:once` is the raw single-shot and
 skips the `npm ci` step.
 
-`scripts/deploy.mjs` verifies against `https://jorna-vendor.pages.dev` by
-default (`DEPLOY_DOMAIN` env var overrides this) — once a custom domain is
-attached, see jorna-website's own `DEPLOY.md` for why a custom domain's
-bot/WAF protection can force verification back onto the `*.pages.dev` URL
-specifically for CI runner IPs.
+`scripts/deploy.mjs` verifies against `https://jornaevents.com` by default
+(`DEPLOY_DOMAIN` env var overrides this). CI sets `DEPLOY_DOMAIN` to
+`https://jorna-vendor.pages.dev` because the zone's bot/WAF protection
+blocks GitHub Actions runner IPs — see jorna-website's own `DEPLOY.md` for
+the full story.
 
 ## One-time setup for a fresh Cloudflare Pages project
 
@@ -85,6 +95,9 @@ curl -i -X OPTIONS -H "Origin: https://pr-999.jorna-vendor.pages.dev" \
 ```
 
 If that doesn't come back, the backend's `ALLOWED_ORIGIN_REGEX` (Railway env
-var on `Desiconnect`) needs a pattern covering
-`pr-<n>.jorna-vendor.pages.dev`, alongside the one already covering
-jorna-website's previews.
+var on `Desiconnect`) needs a pattern covering `pr-<n>.jorna-vendor.pages.dev`.
+As of the jornaevents.com domain cutover, it's
+`^https://([a-z0-9-]+\.)?(jorna-events|jorna-vendor)\.pages\.dev$`, which
+covers both this repo's and jorna-website's previews; `ALLOWED_ORIGINS` also
+now includes `https://jornaevents.com`, `https://www.jornaevents.com`, and
+`https://jorna-vendor.pages.dev` for this repo's production traffic.

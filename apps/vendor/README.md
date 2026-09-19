@@ -2,7 +2,7 @@
 
 The Jorna site: the **Jorna web app**, served at both `/` and `/app`, plus a
 small hand-written **help page** at `/help`. Everything is a static export
-from one Cloudflare Pages project (`jorna-events`) out of one repo.
+from one Cloudflare Pages project (`jorna-vendor`) out of one repo.
 (Previously a Cloudflare Worker; migrated off Workers Static Assets — see
 `docs/DECISIONS.md` for why.)
 

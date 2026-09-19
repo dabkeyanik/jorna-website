@@ -7,6 +7,10 @@
   // Pages project — this repo was forked from jorna-website, and its CI
   // deploy job (.github/workflows/ci.yml) would silently overwrite the real
   // production site if the two ever pointed at the same Cloudflare project.
+  //
+  // The jornaevents.com apex (+ www) is attached to this project in the
+  // Cloudflare dashboard (Pages → jorna-vendor → Custom domains), moved here
+  // from jorna-website's jorna-events project — see DEPLOY.md.
   "name": "jorna-vendor",
   "pages_build_output_dir": "./public"
 }

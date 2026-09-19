@@ -9,7 +9,7 @@ here.
 ## Components
 
 ```
-                         Cloudflare Pages ("jorna-events")
+                         Cloudflare Pages ("jorna-vendor")
                          serves everything in public/
 ┌───────────────────────────────────────────────────────────────┐
 │  public/                                                       │

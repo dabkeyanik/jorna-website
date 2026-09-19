@@ -192,16 +192,17 @@ jobs:
       # DEPLOY.md. It exits non-zero on a bad deploy, which fails this job
       # visibly instead of leaving prod half-broken with a green Action.
       #
-      # No custom domain yet, so scripts/deploy.mjs's default
-      # (https://jorna-vendor.pages.dev) already matches — no DEPLOY_DOMAIN
-      # override needed here. Once a custom domain is attached in the
-      # Cloudflare dashboard, add DEPLOY_DOMAIN back if that zone's own
-      # bot/WAF protection ends up blocking GitHub Actions runner IPs the
-      # way jorna-website's jornaevents.com zone does (see that repo's
-      # DEPLOY.md for the full story) — verify against pages.dev instead.
+      # jornaevents.com + www.jornaevents.com are now attached (moved here
+      # from jorna-website's jorna-events project). That zone's bot/WAF
+      # protection 403s every request from GitHub Actions' runner IPs — same
+      # issue jorna-website's DEPLOY.md documents — so CI verifies against
+      # the WAF-free pages.dev URL instead; a human running `npm run deploy`
+      # locally still verifies the real production domain (DEPLOY_DOMAIN
+      # unset, falls back to the apex).
       - name: Deploy
         run: npm run deploy
         env:
           NEXT_PUBLIC_ESCROW_ENABLED: "false"
+          DEPLOY_DOMAIN: https://jorna-vendor.pages.dev
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

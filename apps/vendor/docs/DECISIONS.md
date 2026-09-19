@@ -12,7 +12,7 @@ than guessed.
 The site was originally deployed as a Cloudflare Worker using Static Assets.
 
 ### Decision
-Migrated to a Cloudflare Pages project (`jorna-events`) serving `public/`.
+Migrated to a Cloudflare Pages project (`jorna-vendor`) serving `public/`.
 The old Worker (`misty-water-0dbb`) has been deleted.
 
 ### Consequences

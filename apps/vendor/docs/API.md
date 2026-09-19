@@ -63,11 +63,11 @@ fetch() → NEXT_PUBLIC_API_BASE_URL (default: a Railway-hosted FastAPI backend)
 
 ## CORS / environment note
 
-The backend's `ALLOWED_ORIGINS` only includes `https://jornaevents.com` (and
-presumably `http://localhost:3000` for dev — confirmed working per
-`README.md`). `*.pages.dev` preview URLs are **rejected** by CORS; see
-`DEPLOY.md` for the verified preflight output. Don't expect a Cloudflare
-Pages preview deployment to be able to call the API.
+The backend's `ALLOWED_ORIGINS` includes `https://jornaevents.com` and
+`https://www.jornaevents.com` (this repo's production domain since the
+jornaevents.com cutover), plus `http://localhost:3000` for dev. Bare
+`*.pages.dev` preview URLs are matched by `ALLOWED_ORIGIN_REGEX` instead —
+see `DEPLOY.md` for the pattern and a verified preflight check.
 
 ## Realtime
 

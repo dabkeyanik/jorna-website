@@ -17,11 +17,12 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const appDir = join(root, "public", "app");
 const PAGES_PROJECT = "jorna-vendor";
-// No custom domain yet — verify against the project's own pages.dev URL.
-// Once a custom domain is attached in the Cloudflare dashboard, override via
-// DEPLOY_DOMAIN (see jorna-website's DEPLOY.md for why a custom domain zone's
-// bot/WAF protection can make a *.pages.dev comparison necessary again).
-const DOMAIN = process.env.DEPLOY_DOMAIN ?? `https://${PAGES_PROJECT}.pages.dev`;
+// jornaevents.com is the apex now attached to this project (moved here from
+// jorna-website's jorna-events project), so it's what we verify by default.
+// CI overrides via DEPLOY_DOMAIN to the WAF-free pages.dev URL instead — see
+// jorna-website's DEPLOY.md for why the zone's bot/WAF protection blocks
+// GitHub Actions runner IPs specifically.
+const DOMAIN = process.env.DEPLOY_DOMAIN ?? "https://jornaevents.com";
 const MAX_ATTEMPTS = 4;
 // A deploy can pass one check, then 404 for a while as it propagates across edge
 // PoPs. Don't trust a single green check — require several consecutive clean
