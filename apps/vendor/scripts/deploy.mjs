@@ -16,15 +16,12 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const appDir = join(root, "public", "app");
-const PAGES_PROJECT = "jorna-events";
-// The apex is on Pages and is what people hit, so it is what we verify. The old
-// Worker (misty-water-0dbb) is deleted; there is no second deploy target.
-//
-// Don't try to judge freshness by comparing this HTML against a *.pages.dev URL.
-// The zone injects a bot-detection script (__CF$cv$params, ~938 bytes) into HTML
-// served through the custom domain and not into pages.dev, so the bytes always
-// differ and a byte comparison reports a perfectly current deploy as stale.
-const DOMAIN = process.env.DEPLOY_DOMAIN ?? "https://jornaevents.com";
+const PAGES_PROJECT = "jorna-vendor";
+// No custom domain yet — verify against the project's own pages.dev URL.
+// Once a custom domain is attached in the Cloudflare dashboard, override via
+// DEPLOY_DOMAIN (see jorna-website's DEPLOY.md for why a custom domain zone's
+// bot/WAF protection can make a *.pages.dev comparison necessary again).
+const DOMAIN = process.env.DEPLOY_DOMAIN ?? `https://${PAGES_PROJECT}.pages.dev`;
 const MAX_ATTEMPTS = 4;
 // A deploy can pass one check, then 404 for a while as it propagates across edge
 // PoPs. Don't trust a single green check — require several consecutive clean

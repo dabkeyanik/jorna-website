@@ -6,6 +6,15 @@ on:
   pull_request:
     branches: [main]
 
+# Applies to every job below, so every `next build` in this workflow (build
+# verification, PR previews, production) bakes in the same value — this repo
+# has no escrow/Stripe checkout flow at all (contract deposits are
+# self-attested, paid off-platform), and lib/flags.ts's ESCROW_ENABLED
+# defaults to true absent this override. Static export means the flag is
+# baked in at build time, not read at runtime — see lib/flags.ts.
+env:
+  NEXT_PUBLIC_ESCROW_ENABLED: "false"
+
 jobs:
   build:
     name: Lint, typecheck, test, build
@@ -118,7 +127,7 @@ jobs:
       # multi-attempt stability-polling verification is tuned for
       # production, not a one-shot preview build.
       - name: Deploy preview
-        run: npx --no-install wrangler pages deploy public --project-name jorna-events --branch "pr-${{ github.event.pull_request.number }}" --commit-dirty=true
+        run: npx --no-install wrangler pages deploy public --project-name jorna-vendor --branch "pr-${{ github.event.pull_request.number }}" --commit-dirty=true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -128,7 +137,7 @@ jobs:
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
-            const url = `https://pr-${prNumber}.jorna-events.pages.dev`;
+            const url = `https://pr-${prNumber}.jorna-vendor.pages.dev`;
             const marker = "<!-- pr-preview-comment -->";
             const body = `${marker}\n🔗 Preview: ${url}\n\nUses the production backend/DB — see [DEPLOY.md](../blob/main/DEPLOY.md) before exercising booking/payment flows.`;
             const { data: comments } = await github.rest.issues.listComments({
@@ -182,17 +191,15 @@ jobs:
       # DEPLOY.md. It exits non-zero on a bad deploy, which fails this job
       # visibly instead of leaving prod half-broken with a green Action.
       #
-      # DEPLOY_DOMAIN overrides the default jornaevents.com target: that
-      # zone's bot/WAF protection 403s every request from GitHub Actions'
-      # runner IPs (confirmed — the wrangler upload itself succeeds, only
-      # the runner's own verification fetches get blocked; the same route
-      # is a clean 200 from any other network). jorna-events.pages.dev is
-      # the same Cloudflare Pages deployment without that zone's WAF rules,
-      # so it verifies the deploy actually went live without depending on
-      # runner IPs being allowed through jornaevents.com's bot protection.
+      # No custom domain yet, so scripts/deploy.mjs's default
+      # (https://jorna-vendor.pages.dev) already matches — no DEPLOY_DOMAIN
+      # override needed here. Once a custom domain is attached in the
+      # Cloudflare dashboard, add DEPLOY_DOMAIN back if that zone's own
+      # bot/WAF protection ends up blocking GitHub Actions runner IPs the
+      # way jorna-website's jornaevents.com zone does (see that repo's
+      # DEPLOY.md for the full story) — verify against pages.dev instead.
       - name: Deploy
         run: npm run deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          DEPLOY_DOMAIN: https://jorna-events.pages.dev

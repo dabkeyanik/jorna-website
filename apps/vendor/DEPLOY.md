@@ -1,16 +1,15 @@
-# Deploying jornaevents.com
+# Deploying jorna-vendor
 
 The site (the web app, serving both `/` and `/app`, plus a small static
 `/help` page) is a static export in `public/`, hosted on **Cloudflare Pages**
-(project `jorna-events`). The apex `jornaevents.com` is a custom domain on
-that project. The old Workers Static Assets deployment (`misty-water-0dbb`)
-is deleted. There is no separate marketing page anymore — see "Root routing"
-in `docs/ARCHITECTURE.md`.
+(project `jorna-vendor` — see `wrangler.jsonc`). This repo was forked from
+`jorna-website` (project `jorna-events`, which stays untouched and serves
+jornaevents.com) — the two must never share a Cloudflare project name, or
+one repo's CI would overwrite the other's production site.
 
-> **Why Pages, not Workers.** It was on Workers Static Assets, whose many-file
-> asset serving intermittently dropped every `/app` route (marketing page stayed
-> up, app 404'd) even after a deploy verified green. Pages is built for
-> many-file static exports and serves them reliably.
+No custom domain is attached yet; the site is reachable at
+`https://jorna-vendor.pages.dev` until one is added (Cloudflare dashboard →
+Workers & Pages → jorna-vendor → Custom domains).
 
 ## Deploy
 
@@ -33,38 +32,34 @@ route and re-deploys until they all serve 200 for three consecutive sweeps
 (see `scripts/deploy.mjs`). `npm run deploy:once` is the raw single-shot and
 skips the `npm ci` step.
 
-**Verification target differs between CI and a human running it locally.**
-`scripts/deploy.mjs` defaults to verifying against `https://jornaevents.com`,
-overridable via `DEPLOY_DOMAIN`. The `deploy` job in CI sets
-`DEPLOY_DOMAIN=https://jorna-events.pages.dev` because the `jornaevents.com`
-zone's bot/WAF protection 403s every request from GitHub Actions' runner
-IPs — confirmed by hand: the `wrangler` upload itself always succeeds, only
-the runner's own follow-up verification fetches got blocked, and the exact
-same routes were a clean 200 from every other network tested. `pages.dev` is
-the same Cloudflare Pages deployment without that zone's WAF rules, so it
-still proves the deploy went live; running `npm run deploy` locally verifies
-the real production domain as before (unaffected, since your own network
-isn't blocked).
+`scripts/deploy.mjs` verifies against `https://jorna-vendor.pages.dev` by
+default (`DEPLOY_DOMAIN` env var overrides this) — once a custom domain is
+attached, see jorna-website's own `DEPLOY.md` for why a custom domain's
+bot/WAF protection can force verification back onto the `*.pages.dev` URL
+specifically for CI runner IPs.
 
-## Gotcha: don't byte-compare the apex against `*.pages.dev`
+## One-time setup for a fresh Cloudflare Pages project
 
-The zone injects a Cloudflare bot-detection script (`__CF$cv$params`, ~938
-bytes, appended before `</body>`) into HTML served through the custom domain.
-`jorna-events.pages.dev` does **not** get that injection.
-
-So the same deployment serves different bytes on the two hostnames, always. A
-hash or size comparison between them will report a perfectly current apex as
-"stale" — that misreading cost an afternoon once already. To compare properly,
-strip the injected script first:
-
-```bash
-diff <(curl -s https://jorna-events.pages.dev/app/login/ | sed 's|<script>(function(){function c().*</script>||') \
-     <(curl -s https://jornaevents.com/app/login/      | sed 's|<script>(function(){function c().*</script>||')
-```
-
-Note also that `/app/*` pages are client-rendered behind `<Suspense>`, so their
-served HTML contains none of the UI text — grepping the HTML for a string you
-just added will find nothing on either host. It lives in the JS bundle.
+1. In the Cloudflare dashboard: Workers & Pages → Create → Pages → **Connect
+   to Git** is *not* what this repo uses (that's Cloudflare's own build
+   pipeline, bypassing this repo's CI gates) — instead, create the project
+   with **no** Git connection so this repo's own GitHub Actions `deploy` job
+   is the only thing that pushes to it. Easiest way: run
+   `npx wrangler pages project create jorna-vendor` once, locally, with
+   `wrangler login` authenticated to the right Cloudflare account.
+2. Create a Cloudflare API token (My Profile → API Tokens → Create Token →
+   "Edit Cloudflare Workers" template, or a custom token scoped to
+   `Account.Cloudflare Pages: Edit`) and note the Account ID (right sidebar
+   of any zone/dashboard page).
+3. Add both as GitHub repo secrets:
+   ```bash
+   gh secret set CLOUDFLARE_API_TOKEN --repo jornaevents/jorna-vendor
+   gh secret set CLOUDFLARE_ACCOUNT_ID --repo jornaevents/jorna-vendor
+   ```
+   (`gh secret set` prompts for the value interactively — nothing is echoed
+   or logged.)
+4. Push to `main` (or merge a PR into it) — the `deploy` job now has what it
+   needs.
 
 ## Per-PR staging previews
 
@@ -72,25 +67,24 @@ Every PR gets its own live preview, deployed by the `preview` job in
 `.github/workflows/ci.yml`: `wrangler pages deploy public --branch
 pr-<PR number>` — a non-production `--branch` value makes Cloudflare Pages
 create a **preview** deployment instead of promoting to production, at
-`https://pr-<n>.jorna-events.pages.dev`. It does not touch `jornaevents.com`
-or the bare `jorna-events.pages.dev` domain, both still owned solely by the
-`deploy` job on merge to `main`. The job posts (and updates, on new pushes)
-a sticky PR comment with the link.
-
-This used to be a dead end — backend CORS rejected any `*.pages.dev` origin,
-so a preview rendered but every API call failed. The backend now sets
-`ALLOWED_ORIGIN_REGEX=^https://([a-z0-9-]+\.)?jorna-events\.pages\.dev$` on
-Railway (ORed with `ALLOWED_ORIGINS` by `CORSMiddleware`), which covers any
-`pr-<n>.jorna-events.pages.dev` preview without editing Railway per PR.
+`https://pr-<n>.jorna-vendor.pages.dev`. It does not touch the production
+`jorna-vendor.pages.dev` URL, which only the `deploy` job (on merge to
+`main`) owns. The job posts (and updates, on new pushes) a sticky PR comment
+with the link.
 
 **Not a fully isolated staging environment**: previews call the same
-production backend and production database as `jornaevents.com` — there's
-no separate staging API or DB. Good for checking that a change renders and
-behaves correctly against real data; a preview that walks through a booking
-or payment flow is still writing to production. Verify with:
+backend and database as production — there's no separate staging API or DB
+(see this repo's own `CLAUDE.md`/`docs/DECISIONS.md`). A preview that walks
+through a booking or contract-signing flow is still writing real data.
+Verify CORS is wired for a preview URL with:
 
 ```bash
-curl -i -X OPTIONS -H "Origin: https://pr-999.jorna-events.pages.dev" \
+curl -i -X OPTIONS -H "Origin: https://pr-999.jorna-vendor.pages.dev" \
     -H "Access-Control-Request-Method: POST" $API/auth/login
-# expect: access-control-allow-origin: https://pr-999.jorna-events.pages.dev
+# expect: access-control-allow-origin: https://pr-999.jorna-vendor.pages.dev
 ```
+
+If that doesn't come back, the backend's `ALLOWED_ORIGIN_REGEX` (Railway env
+var on `Desiconnect`) needs a pattern covering
+`pr-<n>.jorna-vendor.pages.dev`, alongside the one already covering
+jorna-website's previews.
