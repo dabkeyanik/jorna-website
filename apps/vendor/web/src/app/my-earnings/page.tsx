@@ -21,7 +21,6 @@ import {
 import { paymentsSetup, vendorMoney } from "@/lib/vendorPlan";
 import { Button, Card, Field, LinkButton } from "@/components/ui";
 import { VendorNav } from "@/components/VendorNav";
-import { VendorPaymentFields } from "@/components/VendorProfileFields";
 
 function money(cents: number) {
   return `$${Math.round(cents / 100).toLocaleString()}`;
@@ -74,14 +73,6 @@ function EarningsInner() {
   const [savingDirect, setSavingDirect] = useState(false);
   const [directError, setDirectError] = useState<string | null>(null);
 
-  // Escrow disabled: the standing "Payment details" form, sharing
-  // VendorPaymentFields with /vendor-profile instead of its own inline pair
-  // of fields (this page previously reimplemented that itself).
-  const [paymentMethod, setPaymentMethod] = useState<"stripe" | "manual">("manual");
-  const [savingPayment, setSavingPayment] = useState(false);
-  const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [paymentSaved, setPaymentSaved] = useState(false);
-
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login?next=/my-earnings");
   }, [authLoading, user, router]);
@@ -107,7 +98,6 @@ function EarningsInner() {
         setVendor(mine);
         setVenmoHandle(mine?.venmo_handle ?? "");
         setZelleContact(mine?.zelle_contact ?? "");
-        setPaymentMethod(ESCROW_ENABLED ? (mine?.payment_method ?? "stripe") : "manual");
         if (mine) await load(mine.vendor_id);
       })
       .catch((err) =>
@@ -157,32 +147,6 @@ function EarningsInner() {
       setDirectError(err instanceof ApiError ? err.message : "Couldn't save that.");
     } finally {
       setSavingDirect(false);
-    }
-  }
-
-  async function savePaymentDetails(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmedVenmo = venmoHandle.trim();
-    const trimmedZelle = zelleContact.trim();
-    if (paymentMethod === "manual" && !trimmedVenmo && !trimmedZelle) {
-      setPaymentError("Add a Venmo handle or Zelle contact so clients know how to pay you.");
-      return;
-    }
-    setSavingPayment(true);
-    setPaymentError(null);
-    setPaymentSaved(false);
-    try {
-      const updated = await updateMyVendor({
-        payment_method: paymentMethod,
-        venmo_handle: trimmedVenmo || null,
-        zelle_contact: trimmedZelle || null,
-      });
-      setVendor(updated);
-      setPaymentSaved(true);
-    } catch (err) {
-      setPaymentError(err instanceof ApiError ? err.message : "Couldn't save that.");
-    } finally {
-      setSavingPayment(false);
     }
   }
 
@@ -308,34 +272,26 @@ function EarningsInner() {
         </p>
       )}
 
+      {/* This used to be its own copy of the Payment details form
+          (VendorPaymentFields, independently saved) — now just a status line
+          with a link, since /vendor-profile is the one place that edits it. */}
       {!ESCROW_ENABLED ? (
         <>
           <h2 className="serif mt-10 text-2xl text-ink">Payment details</h2>
-          <Card className="mt-5 p-6">
-            <form onSubmit={savePaymentDetails} className="grid gap-4">
-              <VendorPaymentFields
-                paymentMethod={paymentMethod}
-                venmoHandle={venmoHandle}
-                zelleContact={zelleContact}
-                onPaymentMethodChange={setPaymentMethod}
-                onVenmoHandleChange={setVenmoHandle}
-                onZelleContactChange={setZelleContact}
-              />
-              {paymentError ? (
-                <p
-                  role="alert"
-                  className="rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold"
-                >
-                  {paymentError}
-                </p>
-              ) : null}
-              {paymentSaved ? (
-                <p className="rounded-lg bg-green/10 px-3 py-2 text-sm text-green">Saved.</p>
-              ) : null}
-              <Button type="submit" size="md" disabled={savingPayment} className="justify-self-start">
-                {savingPayment ? "Saving…" : "Save"}
-              </Button>
-            </form>
+          <Card className="mt-5 flex flex-wrap items-center justify-between gap-3 p-6">
+            <p className="text-sm text-ink-soft">
+              {vendor.venmo_handle || vendor.zelle_contact
+                ? `Clients pay you via ${[
+                    vendor.venmo_handle ? "Venmo" : null,
+                    vendor.zelle_contact ? "Zelle" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" or ")}.`
+                : "No Venmo or Zelle on file yet — clients won't know how to pay you."}
+            </p>
+            <LinkButton href="/vendor-profile" variant="ghost" size="md">
+              Edit
+            </LinkButton>
           </Card>
         </>
       ) : null}

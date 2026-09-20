@@ -44,8 +44,8 @@ test.describe("authentication", () => {
   test("redirects a signed-out visitor away from a protected page, preserving the return path", async ({
     page,
   }) => {
-    await page.goto("my-availability/");
+    await page.goto("vendor-profile/");
 
-    await expect(page).toHaveURL(/\/app\/login\/?\?next=\/my-availability/);
+    await expect(page).toHaveURL(/\/app\/login\/?\?next=\/vendor-profile/);
   });
 });

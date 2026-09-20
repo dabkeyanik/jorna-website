@@ -1,21 +1,20 @@
 "use client";
 
+// The Availability section on /vendor-profile, folded in from the old
+// /my-availability route. Self-contained: it fetches/saves through
+// getMyAvailability/setMyAvailability (lib/jorna.ts) rather than
+// updateMyVendor, so it keeps its own save button instead of joining the
+// page's single combined form.
+
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
-import { getMyAvailability, getMyVendor, setMyAvailability } from "@/lib/jorna";
-import { WEEKDAYS, type AvailabilitySlot, type VendorDetail } from "@/lib/types";
+import { getMyAvailability, setMyAvailability } from "@/lib/jorna";
+import { WEEKDAYS, type AvailabilitySlot } from "@/lib/types";
 import { Button, Card, LinkButton, TimeField } from "@/components/ui";
-import { VendorNav } from "@/components/VendorNav";
 
 type Window = { start_time: string; end_time: string };
 
-export default function MyAvailabilityPage() {
-  const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
-
-  const [vendor, setVendor] = useState<VendorDetail | null>(null);
+export function AvailabilityFields() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,35 +24,26 @@ export default function MyAvailabilityPage() {
   const [byDay, setByDay] = useState<Window[][]>(() => WEEKDAYS.map(() => []));
 
   useEffect(() => {
-    if (!authLoading && !user) router.replace("/login?next=/my-availability");
-  }, [authLoading, user, router]);
-
-  useEffect(() => {
-    if (!user) return;
     let cancelled = false;
-    Promise.all([getMyVendor(), getMyAvailability().catch(() => [] as AvailabilitySlot[])])
-      .then(([mine, slots]) => {
+    getMyAvailability()
+      .then((slots) => {
         if (cancelled) return;
-        setVendor(mine);
-        if (mine) {
-          const grid: Window[][] = WEEKDAYS.map(() => []);
-          for (const s of slots) {
-            if (s.day_of_week >= 0 && s.day_of_week < 7) {
-              grid[s.day_of_week].push({ start_time: s.start_time, end_time: s.end_time });
-            }
+        const grid: Window[][] = WEEKDAYS.map(() => []);
+        for (const s of slots) {
+          if (s.day_of_week >= 0 && s.day_of_week < 7) {
+            grid[s.day_of_week].push({ start_time: s.start_time, end_time: s.end_time });
           }
-          setByDay(grid);
         }
+        setByDay(grid);
       })
-      .catch((err) =>
-        !cancelled &&
-        setError(err instanceof ApiError ? err.message : "Couldn't load your hours."),
-      )
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof ApiError ? err.message : "Couldn't load your hours.");
+      })
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, []);
 
   function mutate(day: number, fn: (windows: Window[]) => Window[]) {
     setByDay((prev) => prev.map((w, i) => (i === day ? fn(w) : w)));
@@ -68,7 +58,6 @@ export default function MyAvailabilityPage() {
     mutate(day, (w) => w.map((win, i) => (i === idx ? { ...win, [field]: value } : win)));
 
   async function save() {
-    if (!vendor) return;
     // Reject any window that ends before it starts before hitting the server.
     for (let d = 0; d < 7; d++) {
       for (const win of byDay[d]) {
@@ -94,38 +83,19 @@ export default function MyAvailabilityPage() {
     }
   }
 
-  if (authLoading || !user || loading) {
-    return <p className="py-20 text-center text-ink-soft">Loading…</p>;
-  }
-
-  if (!vendor) {
-    return (
-      <div className="mx-auto w-[min(560px,100%-2rem)] py-20 text-center">
-        <h1 className="serif text-3xl text-maroon dark:text-gold">
-          You&apos;re not selling on Jorna yet
-        </h1>
-        <LinkButton href="/vendor-profile" className="mt-6">
-          Create vendor profile
-        </LinkButton>
-      </div>
-    );
+  if (loading) {
+    return <p className="py-6 text-center text-ink-soft">Loading…</p>;
   }
 
   return (
-    <div className="mx-auto w-[min(680px,100%-2rem)] py-10">
-      <VendorNav />
-      <header>
-        <span className="eyebrow">Selling</span>
-        <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold sm:text-5xl">
-          Your weekly hours
-        </h1>
-        <p className="mt-2 text-ink-soft">
-          When you&apos;re generally available. Leave a day empty if you don&apos;t
-          take bookings then.
-        </p>
-      </header>
+    <div>
+      <p className="text-sm text-ink-soft">
+        When you&apos;re generally available. Leave a day empty if you don&apos;t take
+        bookings then. Google Calendar sync — busy times pulled in automatically, and
+        your Jorna bookings added back — lives on your calendar page.
+      </p>
 
-      <div className="mt-7 grid gap-3">
+      <div className="mt-4 grid gap-3">
         {WEEKDAYS.map((day, d) => (
           <Card key={day} className="p-4">
             <div className="flex items-center justify-between gap-3">
@@ -170,28 +140,18 @@ export default function MyAvailabilityPage() {
       </div>
 
       {error ? (
-        <p className="mt-5 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
+        <p className="mt-4 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
           {error}
         </p>
       ) : null}
       {saved ? (
-        <p className="mt-5 rounded-lg bg-green/10 px-3 py-2 text-sm text-green">
-          Hours saved.
-        </p>
+        <p className="mt-4 rounded-lg bg-green/10 px-3 py-2 text-sm text-green">Hours saved.</p>
       ) : null}
 
-      <div className="mt-6">
-        <Button size="lg" disabled={busy} onClick={save}>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <Button type="button" disabled={busy} onClick={save}>
           {busy ? "Saving…" : "Save hours"}
         </Button>
-      </div>
-
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-card-edge bg-panel p-4">
-        <p className="text-xs text-ink-faint">
-          These are your recurring weekly hours. Google Calendar sync — busy
-          times pulled in automatically, and your Jorna bookings added back —
-          lives on your calendar page.
-        </p>
         <LinkButton href="/my-calendar" variant="ghost" size="md">
           Go to Calendar
         </LinkButton>

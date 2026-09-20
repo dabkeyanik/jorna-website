@@ -122,7 +122,6 @@ export const VENDOR_TABS: NavItem[] = [
       "/my-dashboard",
       "/my-bookings",
       "/my-calendar",
-      "/my-availability",
       "/my-earnings",
       "/vendor-profile",
       "/marketplace",
@@ -130,8 +129,6 @@ export const VENDOR_TABS: NavItem[] = [
       "/home",
       "/browse",
       "/my-pipeline",
-      "/my-clients",
-      "/my-leads",
       "/contracts",
     ],
   },
@@ -176,7 +173,7 @@ export const VENDOR_DESKTOP_TABS: NavItem[] = [
     href: "/my-calendar",
     label: "Calendar",
     icon: icon(I.dashboard),
-    match: ["/my-calendar", "/my-availability"],
+    match: ["/my-calendar"],
   },
   {
     href: "/my-earnings",
@@ -197,19 +194,9 @@ export const VENDOR_DESKTOP_TABS: NavItem[] = [
     href: "/my-pipeline",
     label: "Pipeline",
     icon: icon(I.pipeline),
+    // Leads and Clients are view tabs on this page now (folded in from
+    // their own former routes), not separate nav entries.
     match: ["/my-pipeline"],
-  },
-  {
-    href: "/my-clients",
-    label: "Clients",
-    icon: icon(I.clients),
-    match: ["/my-clients"],
-  },
-  {
-    href: "/my-leads",
-    label: "Leads",
-    icon: icon(I.leads),
-    match: ["/my-leads"],
   },
   NEEDS_YOU,
   MESSAGES,

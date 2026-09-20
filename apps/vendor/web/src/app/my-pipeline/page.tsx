@@ -4,9 +4,17 @@
 // Confirmed -> Deposit received -> Done. Every stage is derived client-side
 // from data already fetched (see lib/vendorPlan.ts's pipelineStage) — there
 // is no backend "stage" field to keep in sync.
+//
+// Also the single home for the vendor's Leads and Clients views (folded in
+// from the old /my-leads and /my-clients routes) — both are alternate
+// slices of data this page already needs (leads) or is small enough to fetch
+// on demand (clients), so they're view tabs here rather than separate nav
+// destinations. Board keeps its own read-only preview of open leads in the
+// Inquiry column; the Leads tab is where they're actually created/edited.
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { getMyVendor, listLeads, listVendorBookings } from "@/lib/jorna";
@@ -19,6 +27,8 @@ import {
 import type { Lead, VendorBooking, VendorDetail } from "@/lib/types";
 import { Button, Card, LinkButton } from "@/components/ui";
 import { VendorNav } from "@/components/VendorNav";
+import { LeadsPanel } from "@/components/LeadsPanel";
+import { ClientsPanel } from "@/components/ClientsPanel";
 
 function money(cents: number): string {
   return `$${Math.round(cents / 100).toLocaleString()}`;
@@ -30,6 +40,14 @@ const STAGES: { value: PipelineStage; label: string }[] = [
   { value: "confirmed", label: "Confirmed" },
   { value: "deposit_received", label: "Deposit received" },
   { value: "done", label: "Done" },
+];
+
+type View = "board" | "leads" | "clients";
+
+const VIEWS: { value: View; label: string }[] = [
+  { value: "board", label: "Board" },
+  { value: "leads", label: "Leads" },
+  { value: "clients", label: "Clients" },
 ];
 
 function BookingCard({ b }: { b: VendorBooking }) {
@@ -74,9 +92,11 @@ function LeadCard({ lead }: { lead: Lead }) {
   );
 }
 
-export default function MyPipelinePage() {
+function MyPipelineInner() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const params = useSearchParams();
+  const view: View = (params.get("view") as View | null) ?? "board";
 
   const [vendor, setVendor] = useState<VendorDetail | null>(null);
   const [bookings, setBookings] = useState<VendorBooking[]>([]);
@@ -96,8 +116,9 @@ export default function MyPipelinePage() {
       listLeads().then((r) => r.items).catch(() => []),
     ]);
     setBookings(b);
-    // Only leads not yet turned into a booking belong on the board.
-    setLeads(l.filter((lead) => !lead.converted_booking_id));
+    // The full list, converted included: the Leads tab shows conversion
+    // history, the Board below filters this down to open leads itself.
+    setLeads(l);
   }, []);
 
   useEffect(() => {
@@ -134,6 +155,7 @@ export default function MyPipelinePage() {
     );
   }
 
+  const openLeads = leads.filter((lead) => !lead.converted_booking_id);
   const live = bookings.filter((b) => !isDeadVendorBooking(b));
   const stats = pipelineStats(live);
   const byStage: Record<PipelineStage, VendorBooking[]> = {
@@ -158,68 +180,104 @@ export default function MyPipelinePage() {
         </LinkButton>
       </header>
 
+      <div className="mt-6 flex flex-wrap gap-2">
+        {VIEWS.map((v) => (
+          <Link
+            key={v.value}
+            href={v.value === "board" ? "/my-pipeline" : `/my-pipeline?view=${v.value}`}
+            className={`rounded-full border px-3.5 py-1.5 text-sm transition ${
+              view === v.value
+                ? "border-gold bg-gold/15 text-maroon dark:text-gold"
+                : "border-card-edge bg-ground-2 text-ink-soft hover:border-gold/50"
+            }`}
+          >
+            {v.label}
+          </Link>
+        ))}
+      </div>
+
       {error ? (
         <p role="alert" className="mt-6 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
           {error}
         </p>
       ) : null}
 
-      <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="p-4">
-          <p className="text-xs uppercase tracking-wide text-ink-faint">Open inquiries</p>
-          <p className="serif mt-1 text-2xl text-ink">{stats.openInquiries + leads.length}</p>
-          <p className="mt-1 text-xs text-ink-faint">Leads not yet booked</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs uppercase tracking-wide text-ink-faint">Awaiting client</p>
-          <p className="serif mt-1 text-2xl text-ink">{stats.awaitingClient}</p>
-          <p className="mt-1 text-xs text-ink-faint">Link sent, not signed yet</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs uppercase tracking-wide text-ink-faint">Deposits still owed</p>
-          <p className="serif mt-1 text-2xl text-maroon dark:text-gold">
-            {money(stats.depositsOwedCents)}
-          </p>
-          <p className="mt-1 text-xs text-ink-faint">Across open bookings</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs uppercase tracking-wide text-ink-faint">Confirmed events</p>
-          <p className="serif mt-1 text-2xl text-green">{stats.confirmedEvents}</p>
-        </Card>
-      </div>
+      {view === "leads" ? (
+        <div className="mt-7">
+          <LeadsPanel leads={leads} onLeadsChange={setLeads} />
+        </div>
+      ) : view === "clients" ? (
+        <div className="mt-7">
+          <ClientsPanel />
+        </div>
+      ) : (
+        <>
+          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Card className="p-4">
+              <p className="text-xs uppercase tracking-wide text-ink-faint">Open inquiries</p>
+              <p className="serif mt-1 text-2xl text-ink">{stats.openInquiries + openLeads.length}</p>
+              <p className="mt-1 text-xs text-ink-faint">Leads not yet booked</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-xs uppercase tracking-wide text-ink-faint">Awaiting client</p>
+              <p className="serif mt-1 text-2xl text-ink">{stats.awaitingClient}</p>
+              <p className="mt-1 text-xs text-ink-faint">Link sent, not signed yet</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-xs uppercase tracking-wide text-ink-faint">Deposits still owed</p>
+              <p className="serif mt-1 text-2xl text-maroon dark:text-gold">
+                {money(stats.depositsOwedCents)}
+              </p>
+              <p className="mt-1 text-xs text-ink-faint">Across open bookings</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-xs uppercase tracking-wide text-ink-faint">Confirmed events</p>
+              <p className="serif mt-1 text-2xl text-green">{stats.confirmedEvents}</p>
+            </Card>
+          </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-5">
-        {STAGES.map((stage) => {
-          const items = byStage[stage.value];
-          const isInquiry = stage.value === "inquiry";
-          const count = isInquiry ? items.length + leads.length : items.length;
-          return (
-            <div key={stage.value}>
-              <div className="mb-3 flex items-center gap-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-                  {stage.label}
-                </p>
-                <span className="rounded-full bg-ground-2 px-2 py-0.5 text-xs text-ink-faint">
-                  {count}
-                </span>
-              </div>
-              <div className="grid gap-2.5">
-                {isInquiry && leads.map((lead) => <LeadCard key={lead.lead_id} lead={lead} />)}
-                {items.map((b) => (
-                  <BookingCard key={b.booking_id} b={b} />
-                ))}
-                {count === 0 ? <p className="text-xs text-ink-faint">Nothing here.</p> : null}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+          <div className="mt-8 grid gap-6 lg:grid-cols-5">
+            {STAGES.map((stage) => {
+              const items = byStage[stage.value];
+              const isInquiry = stage.value === "inquiry";
+              const count = isInquiry ? items.length + openLeads.length : items.length;
+              return (
+                <div key={stage.value}>
+                  <div className="mb-3 flex items-center gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                      {stage.label}
+                    </p>
+                    <span className="rounded-full bg-ground-2 px-2 py-0.5 text-xs text-ink-faint">
+                      {count}
+                    </span>
+                  </div>
+                  <div className="grid gap-2.5">
+                    {isInquiry && openLeads.map((lead) => <LeadCard key={lead.lead_id} lead={lead} />)}
+                    {items.map((b) => (
+                      <BookingCard key={b.booking_id} b={b} />
+                    ))}
+                    {count === 0 ? <p className="text-xs text-ink-faint">Nothing here.</p> : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-      <div className="mt-8 flex justify-center">
-        <Button variant="ghost" onClick={() => router.push("/my-bookings")}>
-          Manage bookings & confirm payments →
-        </Button>
-      </div>
+          <div className="mt-8 flex justify-center">
+            <Button variant="ghost" onClick={() => router.push("/my-bookings")}>
+              Manage bookings & confirm payments →
+            </Button>
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+export default function MyPipelinePage() {
+  return (
+    <Suspense fallback={<p className="py-20 text-center text-ink-soft">Loading…</p>}>
+      <MyPipelineInner />
+    </Suspense>
   );
 }

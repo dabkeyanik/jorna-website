@@ -198,6 +198,38 @@ export function mockVendorBooking(overrides: Record<string, unknown> = {}) {
   };
 }
 
+export function mockLead(overrides: Record<string, unknown> = {}) {
+  return {
+    lead_id: "lead-1",
+    vendor_id: "vendor-1",
+    name: "Anjali Rao",
+    phone: null,
+    email: null,
+    event_date_iso: "fall 2027",
+    note: "Reached out on Instagram. 200+ guests, venue TBD.",
+    status: "new",
+    converted_booking_id: null,
+    created_at: "2026-08-01T00:00:00Z",
+    updated_at: "2026-08-01T00:00:00Z",
+    ...overrides,
+  };
+}
+
+export function mockVendorClient(overrides: Record<string, unknown> = {}) {
+  return {
+    key: "client-1",
+    user_id: "client-1",
+    name: "Priya Shah",
+    email: null,
+    phone: null,
+    event_count: 1,
+    lifetime_value_cents: 250000,
+    is_guest: false,
+    repeat_client: false,
+    ...overrides,
+  };
+}
+
 export function mockBundleDetail(overrides: Record<string, unknown> = {}) {
   return {
     bundle_id: "bundle-1",

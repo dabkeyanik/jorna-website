@@ -746,7 +746,7 @@ export function listingHealth(opts: {
       consequence:
         "Hosts filtering by a date can't tell whether you're free, so you're easy to skip.",
       cta: "Set hours",
-      href: "/my-availability",
+      href: "/vendor-profile",
       severity: "warning",
     });
   }

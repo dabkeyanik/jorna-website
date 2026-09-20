@@ -708,8 +708,10 @@ export default function VendorCalendarPage() {
         />
       ) : null}
 
-      {/* Not in the nav any more, but still what a host filtering by a date is
-          matched against, so it keeps a way in from here. */}
+      {/* Editing now lives on /vendor-profile (folded in from the old
+          /my-availability route) — this stays as a status summary + link,
+          since it's still what a host filtering by a date is matched
+          against, next to the grid it constrains. */}
       <section className="mt-8">
         <h2 className="eyebrow mb-3">Weekly hours</h2>
         <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
@@ -718,7 +720,7 @@ export default function VendorCalendarPage() {
               ? "You haven't set any. Hosts filtering by a date can't tell whether you're free."
               : `Set on ${new Set(availability.map((s) => s.day_of_week)).size} of 7 days.`}
           </p>
-          <LinkButton href="/my-availability" variant="ghost" size="md">
+          <LinkButton href="/vendor-profile" variant="ghost" size="md">
             {availability.length === 0 ? "Set your hours" : "Edit hours"}
           </LinkButton>
         </Card>

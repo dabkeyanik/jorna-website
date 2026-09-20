@@ -19,3 +19,14 @@
 # lead there. Deep links, emailed check-in and RSVP links, Stripe return URLs
 # and the Supabase auth callback all keep working untouched.
 /    /app/    200
+
+# Old vendor routes, folded into other pages (2026-09) — real redirects
+# (301, not a rewrite like the rule above) so old bookmarks/links still land
+# somewhere live. Both with and without the trailing slash: trailingSlash
+# is on in next.config.ts, but a request can arrive either way.
+/app/my-leads           /app/my-pipeline?view=leads     301
+/app/my-leads/          /app/my-pipeline?view=leads     301
+/app/my-clients         /app/my-pipeline?view=clients   301
+/app/my-clients/        /app/my-pipeline?view=clients   301
+/app/my-availability    /app/vendor-profile             301
+/app/my-availability/   /app/vendor-profile             301

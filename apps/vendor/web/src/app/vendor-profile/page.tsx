@@ -23,6 +23,7 @@ import {
 import { Button, Card, LinkButton, Stars } from "@/components/ui";
 import { VendorNav } from "@/components/VendorNav";
 import { ServicesManager } from "@/components/ServicesManager";
+import { AvailabilityFields } from "@/components/AvailabilityFields";
 import {
   VendorIdentityFields,
   VendorPaymentFields,
@@ -291,6 +292,16 @@ export default function VendorProfilePage() {
           </Button>
         </div>
       </form>
+
+      {/* Availability saves through a different endpoint (setMyAvailability,
+          not updateMyVendor) than everything above, so it keeps its own save
+          button rather than joining the form. Folded in from the old
+          /my-availability route — same page a host filtering by date is
+          matched against, so it belongs beside the rest of the listing. */}
+      <h2 className="serif mt-10 text-2xl text-ink">Availability</h2>
+      <Card className="mt-5 p-6">
+        <AvailabilityFields />
+      </Card>
 
       {/* Reputation, beside the bio and photos it's a consequence of. It was on
           the dashboard, which is otherwise entirely operational — what needs me,

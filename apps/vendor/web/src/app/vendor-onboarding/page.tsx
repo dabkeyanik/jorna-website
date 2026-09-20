@@ -444,7 +444,7 @@ export default function VendorOnboardingPage() {
                 Set up payments
               </LinkButton>
             ) : null}
-            <LinkButton href="/my-availability" variant={ESCROW_ENABLED ? "ghost" : "primary"} size="lg">
+            <LinkButton href="/vendor-profile" variant={ESCROW_ENABLED ? "ghost" : "primary"} size="lg">
               Set weekly hours
             </LinkButton>
           </div>

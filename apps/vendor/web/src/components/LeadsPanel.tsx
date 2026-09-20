@@ -1,32 +1,29 @@
 "use client";
 
-// Informal, off-platform prospects a vendor wants to track before they're a
-// real booking — "DM'd on Instagram, maybe October, no venue yet." A lead
-// isn't a Booking (no committed date/price yet); converting one creates a
-// real Contract and the lead stays around as CRM history of how that client
-// was won. Leads also show up read-only in the Inquiry column of
-// /my-pipeline — this page is where they're actually created/edited.
+// The Leads view inside /my-pipeline. Informal, off-platform prospects a
+// vendor wants to track before they're a real booking — "DM'd on Instagram,
+// maybe October, no venue yet." A lead isn't a Booking (no committed
+// date/price yet); converting one creates a real Contract and the lead
+// stays around as CRM history of how that client was won. The Board view
+// (my-pipeline's own page.tsx) renders the same, unconverted leads
+// read-only in its Inquiry column — this panel is where they're actually
+// created/edited/deleted.
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth";
+import { useState } from "react";
 import { ApiError } from "@/lib/api";
-import { createLead, deleteLead, getMyVendor, listLeads, updateLead } from "@/lib/jorna";
-import type { Lead, LeadStatus, VendorDetail } from "@/lib/types";
+import { createLead, deleteLead, updateLead } from "@/lib/jorna";
+import type { Lead, LeadStatus } from "@/lib/types";
 import { Button, Card, Field, LinkButton } from "@/components/ui";
-import { VendorNav } from "@/components/VendorNav";
 
 const STATUS_OPTIONS: LeadStatus[] = ["new", "contacted", "quoted", "won", "lost"];
 
-export default function MyLeadsPage() {
-  const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
-
-  const [vendor, setVendor] = useState<VendorDetail | null>(null);
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
+export function LeadsPanel({
+  leads,
+  onLeadsChange,
+}: {
+  leads: Lead[];
+  onLeadsChange: (updater: (prev: Lead[]) => Lead[]) => void;
+}) {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -35,31 +32,7 @@ export default function MyLeadsPage() {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!authLoading && !user) router.replace("/login?next=/my-leads&role=vendor");
-  }, [authLoading, user, router]);
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    getMyVendor()
-      .then(async (mine) => {
-        if (cancelled) return;
-        setVendor(mine);
-        if (!mine) return;
-        const res = await listLeads();
-        if (cancelled) return;
-        setLeads(res.items);
-      })
-      .catch((err) =>
-        !cancelled && setError(err instanceof ApiError ? err.message : "Couldn't load your leads."),
-      )
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
+  const [error, setError] = useState<string | null>(null);
 
   async function submitLead(e: React.FormEvent) {
     e.preventDefault();
@@ -77,7 +50,7 @@ export default function MyLeadsPage() {
         event_date_iso: eventDate.trim() || null,
         note: note.trim() || null,
       });
-      setLeads((prev) => [lead, ...prev]);
+      onLeadsChange((prev) => [lead, ...prev]);
       setName("");
       setPhone("");
       setEmail("");
@@ -95,7 +68,7 @@ export default function MyLeadsPage() {
     setBusyId(lead.lead_id);
     try {
       const updated = await updateLead(lead.lead_id, { status });
-      setLeads((prev) => prev.map((l) => (l.lead_id === updated.lead_id ? updated : l)));
+      onLeadsChange((prev) => prev.map((l) => (l.lead_id === updated.lead_id ? updated : l)));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't update that lead.");
     } finally {
@@ -107,7 +80,7 @@ export default function MyLeadsPage() {
     setBusyId(lead.lead_id);
     try {
       await deleteLead(lead.lead_id);
-      setLeads((prev) => prev.filter((l) => l.lead_id !== lead.lead_id));
+      onLeadsChange((prev) => prev.filter((l) => l.lead_id !== lead.lead_id));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't delete that lead.");
     } finally {
@@ -115,48 +88,33 @@ export default function MyLeadsPage() {
     }
   }
 
-  if (authLoading || !user || loading) {
-    return <p className="py-20 text-center text-ink-soft">Loading…</p>;
-  }
-
-  if (!vendor) {
-    return (
-      <div className="mx-auto w-[min(560px,100%-2rem)] py-20 text-center">
-        <h1 className="serif text-3xl text-maroon dark:text-gold">
-          You&apos;re not selling on Jorna yet
-        </h1>
-        <LinkButton href="/vendor-onboarding" className="mt-6">
-          Set up your listing
-        </LinkButton>
-      </div>
-    );
-  }
-
   return (
-    <div className="mx-auto w-[min(720px,100%-2rem)] py-10">
-      <VendorNav />
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <span className="eyebrow">Selling</span>
-          <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold">Leads</h1>
-          <p className="mt-3 text-ink-soft">Prospects who reached out off-platform, before there&apos;s a real booking.</p>
-        </div>
+    <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="text-ink-soft">
+          Prospects who reached out off-platform, before there&apos;s a real booking.
+        </p>
         <Button onClick={() => setShowForm((s) => !s)}>{showForm ? "Cancel" : "+ New lead"}</Button>
-      </header>
+      </div>
 
       {error ? (
-        <p role="alert" className="mt-6 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
+        <p role="alert" className="mt-4 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
           {error}
         </p>
       ) : null}
 
       {showForm ? (
-        <Card className="mt-6 p-5">
+        <Card className="mt-4 p-5">
           <form onSubmit={submitLead} className="grid gap-3">
             <Field label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Phone (optional)" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              <Field label="Email (optional)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Field
+                label="Email (optional)"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
             <Field
               label="Tentative date (optional)"
@@ -178,9 +136,9 @@ export default function MyLeadsPage() {
       ) : null}
 
       {leads.length === 0 && !showForm ? (
-        <p className="mt-8 text-ink-soft">No leads yet — log one when someone reaches out off-platform.</p>
+        <p className="mt-6 text-ink-soft">No leads yet — log one when someone reaches out off-platform.</p>
       ) : (
-        <div className="mt-7 grid gap-2.5">
+        <div className="mt-5 grid gap-2.5">
           {leads.map((lead) => (
             <Card key={lead.lead_id} className="p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
