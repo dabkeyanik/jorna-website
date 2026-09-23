@@ -61,7 +61,7 @@ const ITEMS: SidebarItem[] = [
     icon: icon(I.messages),
     match: (p) => prefix("/messages")(p) || prefix("/conversation")(p),
   },
-  { href: "/vendor-profile", label: "Settings", icon: icon(I.gear), match: prefix("/vendor-profile") },
+  { href: "/vendor-profile", label: "Profile", icon: icon(I.profile), match: prefix("/vendor-profile") },
 ];
 
 export function VendorSidebar({ children }: { children: React.ReactNode }) {
@@ -121,7 +121,7 @@ export function VendorSidebar({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   // On a phone the nav is a sideways-scrolling row, and the later items
-  // (Earnings, Messages, Settings) start off-screen — so landing on one showed
+  // (Earnings, Messages, Profile) start off-screen — so landing on one showed
   // no lit tab at all. Bring the current one into view. A no-op at lg, where
   // nothing overflows.
   const navRef = useRef<HTMLElement>(null);
