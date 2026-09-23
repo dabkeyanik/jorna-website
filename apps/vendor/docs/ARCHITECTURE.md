@@ -63,6 +63,12 @@ site root, a settled decision as of 2026-08-22, not an interim state. See
 `web/src/app/page.tsx` as the actual behavior** if this doc and the code
 ever disagree after a future change.
 
+Signed-in **vendors** don't see Home at all: `components/VendorHomeRedirect.tsx`
+(wrapped around Home in `home/page.tsx`, so it covers `/`, `/app/` and
+`/app/home/` alike) sends them to `/my-dashboard`. It deliberately never
+blanks the page for signed-out visitors, so the static export of `/` keeps
+its real marketing copy for search engines.
+
 ## Request/data flow
 
 1. Every `/app/*` page is a client component tree rendered behind

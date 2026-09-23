@@ -46,6 +46,7 @@ import { searchVendors } from "@/lib/jorna";
 import type { VendorSearchItem } from "@/lib/types";
 import { LinkButton } from "@/components/ui";
 import { VendorCard, VendorCardSkeleton } from "@/components/VendorCard";
+import { VendorHomeRedirect } from "@/components/VendorHomeRedirect";
 import { Eyebrow } from "@/components/marketing/Eyebrow";
 import { IconArrow, IconCalendar, IconShield, IconUsers } from "@/components/marketing/icons";
 
@@ -90,7 +91,18 @@ const LEARN_MORE = [
   },
 ];
 
+// Signed-in vendors skip this page for their dashboard — see
+// VendorHomeRedirect. Wrapping here rather than in app/page.tsx covers every
+// address Home is served at (/, /app/, /app/home/).
 export default function HomePage() {
+  return (
+    <VendorHomeRedirect>
+      <HomeContent />
+    </VendorHomeRedirect>
+  );
+}
+
+function HomeContent() {
   const { user, loading } = useAuth();
 
   const [vendors, setVendors] = useState<VendorSearchItem[] | null>(null);

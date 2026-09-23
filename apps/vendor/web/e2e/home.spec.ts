@@ -1,6 +1,6 @@
 import { test, expect } from "./support/fixtures";
 import { loginAs } from "./support/fixtures";
-import { mockVendorSearchResponse } from "./support/mock-data";
+import { mockVendorDetail, mockVendorSearchResponse } from "./support/mock-data";
 
 test.describe("home (marketing) page", () => {
   test("renders for a signed-out visitor and shows the live vendor showcase", async ({
@@ -56,5 +56,34 @@ test.describe("home (marketing) page", () => {
     await page.goto("");
 
     await expect(page.getByRole("link", { name: "Get started", exact: true })).toBeVisible();
+  });
+
+  // Home is a pitch a vendor has already bought — see VendorHomeRedirect.
+  test("a signed-in vendor landing on the site root goes to their dashboard", async ({
+    page,
+    api,
+  }) => {
+    await loginAs(page, api);
+    const vendor = mockVendorDetail();
+    api.get("/vendors/me", vendor);
+    api.get("/vendors/search", mockVendorSearchResponse());
+    api.get(`/bookings/vendor/${vendor.vendor_id}`, { items: [], total: 0, limit: 100, offset: 0 });
+    api.get("/leads", { items: [], total: 0 });
+
+    await page.goto("");
+
+    await expect(page).toHaveURL(/\/my-dashboard\/?$/);
+    await expect(page.getByText("Your entire celebration team")).not.toBeVisible();
+  });
+
+  test("a signed-in client still gets Home at the site root", async ({ page, api }) => {
+    await loginAs(page, api);
+    api.error("GET", "/vendors/me", 404, "Not a vendor");
+    api.get("/vendors/search", mockVendorSearchResponse());
+
+    await page.goto("");
+
+    await expect(page.getByText("Your entire celebration team")).toBeVisible();
+    await expect(page).not.toHaveURL(/my-dashboard/);
   });
 });

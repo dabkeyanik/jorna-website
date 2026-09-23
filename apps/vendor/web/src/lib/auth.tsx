@@ -23,6 +23,17 @@ import type { TokenPair, User } from "./types";
 const ACCESS_KEY = "jorna_access";
 const REFRESH_KEY = "jorna_refresh";
 
+/**
+ * Whether this browser holds a session token, read synchronously — before
+ * AuthProvider's `/me` round-trip settles `user`. Lets a page that behaves
+ * differently for signed-in visitors hold its content back from the first
+ * frame instead of flashing the signed-out version. Only a hint: the token
+ * may turn out to be dead, so `useAuth()` stays the source of truth.
+ */
+export function hasStoredSession(): boolean {
+  return typeof window !== "undefined" && localStorage.getItem(ACCESS_KEY) != null;
+}
+
 interface RegisterInput {
   email: string;
   password: string;
