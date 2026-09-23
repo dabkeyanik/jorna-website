@@ -7,21 +7,16 @@
 // backend's docs/DECISIONS.md #13 for the full design.
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { createContract, getMyVendor, listServices } from "@/lib/jorna";
 import type { Contract, ServiceItem, VendorDetail } from "@/lib/types";
-import { Button, Card, Field } from "@/components/ui";
+import { Button, Card, Field, LinkButton } from "@/components/ui";
 import { contractDefaultsToStrings } from "@/components/VendorProfileFields";
 import { listTemplates, saveTemplate, type ContractTemplate } from "@/lib/contractTemplates";
-
-function guestBookingLink(token: string): string {
-  // basePath is "/app" (next.config.ts) and doesn't rewrite a plain string
-  // the way it rewrites next/link — same convention as home/page.tsx's own
-  // literal "/app" prefix.
-  return `${window.location.origin}/app/booking-link?t=${token}`;
-}
+import { guestBookingLink } from "@/lib/contractLink";
 
 export default function NewContractPage() {
   const { user, loading: authLoading } = useAuth();
@@ -216,6 +211,9 @@ export default function NewContractPage() {
           }}>
             Create another
           </Button>
+          <LinkButton href="/contracts" variant="ghost">
+            View all contracts
+          </LinkButton>
         </div>
       </div>
     );
@@ -224,7 +222,9 @@ export default function NewContractPage() {
   return (
     <div className="mx-auto w-[min(640px,100%-2rem)]">
       <header>
-        <span className="eyebrow">Contracts</span>
+        <Link href="/contracts" className="eyebrow hover:text-gold">
+          ← All contracts
+        </Link>
         <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold">New booking</h1>
         <p className="mt-3 text-ink-soft">
           You set the event and price. Your client fills in their own details and signs when you

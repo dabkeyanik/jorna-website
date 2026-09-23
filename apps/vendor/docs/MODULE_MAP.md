@@ -112,6 +112,13 @@ always "none, verify manually" until a test runner is added.
   `(vendor)/my-dashboard/`, `(vendor)/contracts/`, `(vendor)/clients/`,
   `web/src/components/ServicesManager.tsx`, `VendorCard.tsx`, `VendorNav.tsx`,
   `VendorSidebar.tsx`, `ClientsPanel.tsx`, `LeadsPanel.tsx`.
+- **Contracts list (2026-09):** `(vendor)/contracts/page.tsx` — every
+  contract sent, filterable by whose move it is, with copy-link / view-as-
+  client. No list endpoint: it filters `listVendorBookings` to rows with a
+  `contract_token`; status is `vendorPlan.ts`'s `contractStatus`. Confirming
+  a deposit/payment still happens on `my-bookings/`, which this page links
+  to. The sidebar's Contracts item now lands here, not on `contracts/new/`.
+  `lib/contractLink.ts` builds the share URL for both pages.
 - **Named contract templates (2026-09):** `web/src/lib/contractTemplates.ts`
   — deposit/cancellation/overtime/equipment/travel presets, saved/loaded from
   `(vendor)/contracts/new/` and managed from `(vendor)/vendor-profile/`. Pure

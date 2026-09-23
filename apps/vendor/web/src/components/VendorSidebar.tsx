@@ -50,7 +50,7 @@ const prefix = (p: string) => (pathname: string) =>
 const ITEMS: SidebarItem[] = [
   { href: "/my-dashboard", label: "Dashboard", icon: icon(I.dashboard), match: prefix("/my-dashboard") },
   { href: "/my-bookings", label: "Bookings", icon: icon(I.pipeline), match: prefix("/my-bookings") },
-  { href: "/contracts/new", label: "Contracts", icon: icon(I.document), match: prefix("/contracts") },
+  { href: "/contracts", label: "Contracts", icon: icon(I.document), match: prefix("/contracts") },
   { href: "/clients", label: "Clients", icon: icon(I.clients), match: prefix("/clients") },
   { href: "/vendor-profile", label: "Settings", icon: icon(I.gear), match: prefix("/vendor-profile") },
 ];

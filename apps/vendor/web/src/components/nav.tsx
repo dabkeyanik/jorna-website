@@ -188,7 +188,7 @@ export const VENDOR_DESKTOP_TABS: NavItem[] = [
     match: ["/my-bookings"],
   },
   {
-    href: "/contracts/new",
+    href: "/contracts",
     label: "Contracts",
     icon: icon(I.document),
     match: ["/contracts"],

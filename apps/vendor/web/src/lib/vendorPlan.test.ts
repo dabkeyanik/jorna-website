@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { pipelineStage, pipelineStats, vendorTasks } from "./vendorPlan";
+import {
+  contractNeedsVendor,
+  contractStatus,
+  pipelineStage,
+  pipelineStats,
+  vendorTasks,
+} from "./vendorPlan";
 import type { VendorBooking } from "./types";
 
 function booking(overrides: Partial<VendorBooking> = {}): VendorBooking {
@@ -214,5 +220,75 @@ describe("pipelineStats", () => {
       depositsOwedCents: 50_000,
       confirmedEvents: 1,
     });
+  });
+});
+
+describe("contractStatus", () => {
+  const contract = (overrides: Partial<VendorBooking> = {}) =>
+    booking({ contract_token: "tok", is_guest_booking: true, user_id: null, ...overrides });
+
+  it("waits on details before the guest has filled anything in", () => {
+    expect(contractStatus(contract())).toBe("awaiting_details");
+  });
+
+  it("waits on a signature once details are in", () => {
+    expect(contractStatus(contract({ guest_name: "Anjali Rao" }))).toBe("awaiting_signature");
+  });
+
+  it("is owed a deposit after signing when one is configured", () => {
+    expect(
+      contractStatus(
+        contract({ guest_name: "A", signed_at: "2026-05-01T00:00:00Z", deposit_percent: 25 }),
+      ),
+    ).toBe("deposit_due");
+  });
+
+  it("hands the move to the vendor once the guest says the deposit is sent", () => {
+    const status = contractStatus(
+      contract({
+        guest_name: "A",
+        signed_at: "2026-05-01T00:00:00Z",
+        deposit_percent: 25,
+        deposit_marked_paid_at: "2026-05-02T00:00:00Z",
+      }),
+    );
+    expect(status).toBe("confirm_deposit");
+    expect(contractNeedsVendor(status)).toBe(true);
+  });
+
+  it("skips straight to the balance when there's no deposit", () => {
+    expect(
+      contractStatus(contract({ guest_name: "A", signed_at: "2026-05-01T00:00:00Z" })),
+    ).toBe("balance_due");
+  });
+
+  it("asks the vendor to confirm a balance the guest marked paid", () => {
+    expect(
+      contractStatus(
+        contract({
+          guest_name: "A",
+          signed_at: "2026-05-01T00:00:00Z",
+          payment_status: "marked_paid",
+        }),
+      ),
+    ).toBe("confirm_payment");
+  });
+
+  it("is paid exactly when the pipeline calls it done", () => {
+    const b = contract({
+      guest_name: "A",
+      signed_at: "2026-05-01T00:00:00Z",
+      deposit_percent: 25,
+      deposit_confirmed_received_at: "2026-05-03T00:00:00Z",
+      payment_status: "confirmed_paid",
+    });
+    expect(pipelineStage(b)).toBe("done");
+    expect(contractStatus(b)).toBe("paid");
+  });
+
+  it("is cancelled when the booking is dead, whatever else is set", () => {
+    expect(
+      contractStatus(contract({ status: "cancelled", signed_at: "2026-05-01T00:00:00Z" })),
+    ).toBe("cancelled");
   });
 });

@@ -327,6 +327,48 @@ export function pipelineStats(bookings: VendorBooking[]): PipelineStats {
   return { openInquiries, awaitingClient, depositsOwedCents, confirmedEvents };
 }
 
+// ── Contracts list ─────────────────────────────────────────────────────
+
+/**
+ * Where one contract stands, in the finer grain /contracts needs. The
+ * pipeline's five stages answer "how far along is this deal"; a contracts
+ * list is where a vendor goes to chase one, so it also has to say *whose
+ * move it is* — "Confirmed" alone doesn't tell them whether the client
+ * owes a deposit or has already said they sent it.
+ *
+ * Same timestamps pipelineStage reads, same "done" rule, so a contract can't
+ * read Paid here while sitting in a different column on the board.
+ */
+export type ContractStatus =
+  | "awaiting_details"
+  | "awaiting_signature"
+  | "deposit_due"
+  | "confirm_deposit"
+  | "balance_due"
+  | "confirm_payment"
+  | "paid"
+  | "cancelled";
+
+export function contractStatus(b: VendorBooking): ContractStatus {
+  if (isDeadVendorBooking(b)) return "cancelled";
+  if (pipelineStage(b) === "done") return "paid";
+
+  // The guest fills in their own details before signing (/booking-link), so
+  // a missing name means they haven't opened the link and got going yet —
+  // worth telling apart from "filled in, just hasn't signed".
+  if (!b.signed_at) return b.guest_name ? "awaiting_signature" : "awaiting_details";
+
+  if (b.deposit_percent != null && !b.deposit_confirmed_received_at) {
+    return b.deposit_marked_paid_at ? "confirm_deposit" : "deposit_due";
+  }
+  return b.payment_status === "marked_paid" ? "confirm_payment" : "balance_due";
+}
+
+/** The statuses where the vendor, not the client, owes the next move. */
+export function contractNeedsVendor(status: ContractStatus): boolean {
+  return status === "confirm_deposit" || status === "confirm_payment";
+}
+
 /**
  * What the vendor still has to do.
  *
