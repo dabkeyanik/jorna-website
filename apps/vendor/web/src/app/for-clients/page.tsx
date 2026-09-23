@@ -61,7 +61,7 @@ export default function ForClientsPage() {
                 <LinkButton href={primary.href} size="lg">
                   {primary.label}
                 </LinkButton>
-                <LinkButton href="/marketplace" variant="ghost" size="lg">
+                <LinkButton href="/browse" variant="ghost" size="lg">
                   Browse vendors
                 </LinkButton>
               </>
@@ -137,7 +137,7 @@ export default function ForClientsPage() {
                   <LinkButton href={primary.href} size="lg">
                     Start planning
                   </LinkButton>
-                  <LinkButton href="/marketplace" variant="ghost" size="lg">
+                  <LinkButton href="/browse" variant="ghost" size="lg">
                     Browse vendors
                   </LinkButton>
                 </>

@@ -1,4 +1,5 @@
 import { test, expect } from "./support/fixtures";
+import { loginAs } from "./support/fixtures";
 import { mockVendorSearchResponse } from "./support/mock-data";
 
 test.describe("home (marketing) page", () => {
@@ -18,6 +19,32 @@ test.describe("home (marketing) page", () => {
     // actually rendered.
     await expect(page.getByText("Anjali Kapoor")).toBeVisible();
     await expect(page.getByText("Full Day Wedding Photography")).toBeVisible();
+
+    // "Browse vendors" is a signed-in-client nav item now (NO_VENDOR_TABS),
+    // not something advertised to a stranger who hasn't signed up — see
+    // docs/DECISIONS.md. Home's own in-page buttons still say "Browse
+    // vendors" (unaffected), so this specifically checks the header's own
+    // persistent nav, not the page content.
+    await expect(
+      page.getByRole("navigation", { name: "About Jorna" }).getByRole("link", { name: "Browse vendors" }),
+    ).not.toBeVisible();
+  });
+
+  test("a signed-in client (not a vendor) sees Browse vendors in the header nav", async ({
+    page,
+    api,
+  }) => {
+    await loginAs(page, api);
+    api.error("GET", "/vendors/me", 404, "Not a vendor");
+    api.get("/vendors/search", mockVendorSearchResponse());
+
+    await page.goto("home/");
+
+    const link = page.getByRole("navigation", { name: "Primary" }).getByRole("link", {
+      name: "Browse vendors",
+    });
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute("href", "/app/browse/");
   });
 
   test("still renders the marketing content if the vendor showcase fails to load", async ({

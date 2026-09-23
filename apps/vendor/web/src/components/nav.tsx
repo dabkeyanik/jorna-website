@@ -98,7 +98,17 @@ export const MESSAGES: NavItem = {
 // created an account but hasn't finished vendor-onboarding, or is still
 // signed in during that flow. Route them at that, not at three dead links.
 export const NO_VENDOR_TABS: NavItem[] = [
-  { href: "/home", label: "Home", icon: icon(I.home), match: ["/home", "/browse"] },
+  { href: "/home", label: "Home", icon: icon(I.home), match: ["/home"] },
+  // Signed-in only, on purpose — a visitor who hasn't planned anything yet
+  // sees "How it works"/"For clients" on Home instead (SiteHeader's
+  // signed-out nav). The marketplace is for someone already planning a
+  // celebration, not a general storefront advertised to a stranger.
+  {
+    href: "/browse",
+    label: "Browse vendors",
+    icon: icon(I.marketplace),
+    match: ["/browse"],
+  },
   {
     href: "/vendor-onboarding",
     label: "Get started",
@@ -133,7 +143,6 @@ export const VENDOR_TABS: NavItem[] = [
       "/my-calendar",
       "/my-earnings",
       "/vendor-profile",
-      "/marketplace",
       "/vendor",
       "/home",
       "/browse",
@@ -209,7 +218,7 @@ export const VENDOR_DESKTOP_TABS: NavItem[] = [
     // Services live on this page now, so there is no separate tab for them.
     // "/vendor" is the public listing view — the same thing a client sees, so
     // it belongs here rather than leaving the bar unlit.
-    match: ["/vendor-profile", "/vendor", "/marketplace"],
+    match: ["/vendor-profile", "/vendor", "/browse"],
   },
   NEEDS_YOU,
   MESSAGES,

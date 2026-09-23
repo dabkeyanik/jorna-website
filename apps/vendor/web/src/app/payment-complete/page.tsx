@@ -64,7 +64,7 @@ function PaymentCompleteInner() {
       <p className="mx-auto mt-4 max-w-[46ch] text-ink-soft">{body}</p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <LinkButton href="/bundles">Back to the dashboard</LinkButton>
-        <LinkButton href="/marketplace" variant="ghost">
+        <LinkButton href="/browse" variant="ghost">
           Keep browsing
         </LinkButton>
       </div>

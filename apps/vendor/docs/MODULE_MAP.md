@@ -181,7 +181,9 @@ always "none, verify manually" until a test runner is added.
 
 ## Marketplace / browse / search
 
-- **Code:** `web/src/app/browse/`, `marketplace/`, `service/`,
+- **Code:** `web/src/app/browse/` (the only real page here — `marketplace/`
+  never existed as a route; see docs/DECISIONS.md for the 2026-09 fix to
+  the 18 `href="/marketplace"` links that had been 404ing), `service/`,
   `vendor-profile/`, `web/src/lib/categoryTiles.tsx`, `celebrations.ts`.
 - **Depends on:** `lib/jorna.ts` (`searchVendors` and related).
 

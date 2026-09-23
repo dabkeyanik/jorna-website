@@ -309,3 +309,33 @@ they were never separately indexable URLs, only in-page scroll targets, and
 the only place that linked to them (`SiteHeader`) was updated in the same
 change. A stray bookmark to `/home#how` still loads Home fine; it just lands
 at the top instead of scrolling down, since that `id` no longer exists.
+
+---
+
+## Decision: "Browse vendors" moved out of the signed-out header; fixed 18 links pointing at a route that doesn't exist
+
+### Context
+"Browse vendors" was in `SiteHeader`'s signed-out nav, linking to
+`/marketplace` — which has no page (`web/src/app/marketplace/` doesn't
+exist; only `browse/` does) and no redirect in `public/_redirects` either.
+Confirmed 404 in production. All 18 places in the app that linked to
+`/marketplace` (Home's hero/showcase/closing-CTA, `/for-clients`,
+`/how-it-works`, `/messages`, `/activity`, `/profile`, `/service`,
+`/payment-complete`, `/vendor`, plus three `match` arrays in `nav.tsx`) had
+the same bug — every "Browse vendors" button in the app was dead.
+
+### Decision
+Two changes: (1) every `href="/marketplace"` became `href="/browse"`, and
+the `nav.tsx` `match` arrays were cleaned up to reference `/browse` only,
+not both; (2) "Browse vendors" no longer shows in `SiteHeader`'s signed-out
+nav at all — the marketplace is for someone already planning a celebration,
+not a general storefront advertised to a visitor who hasn't signed up. It's
+now a `NO_VENDOR_TABS` entry instead (`nav.tsx`), so a signed-in client sees
+it in their persistent nav; a signed-out visitor sees Home's three
+"learn more" pages instead.
+
+### Consequences
+None of Home's own in-page "Browse vendors" buttons (hero, vendor showcase,
+closing CTA) were removed — only the persistent header tab. A signed-out
+visitor can still reach `/browse` by clicking any of those, just not from
+the header on every page.

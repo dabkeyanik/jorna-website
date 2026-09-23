@@ -92,7 +92,7 @@ export default function ActivityPage() {
                 <LinkButton href="/plan" size="md">
                   Plan an event
                 </LinkButton>
-                <LinkButton href="/marketplace" variant="ghost" size="md">
+                <LinkButton href="/browse" variant="ghost" size="md">
                   Browse vendors
                 </LinkButton>
               </>

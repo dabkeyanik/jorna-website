@@ -195,7 +195,7 @@ export default function MessagesPage() {
                 plan — either one starts a conversation.
               </p>
               <div className="mt-5 flex flex-wrap justify-center gap-2">
-                <LinkButton href="/marketplace" variant="ghost">
+                <LinkButton href="/browse" variant="ghost">
                   Browse vendors
                 </LinkButton>
                 <LinkButton href="/bundles" variant="ghost">

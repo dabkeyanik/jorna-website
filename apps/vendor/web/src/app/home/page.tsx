@@ -150,7 +150,7 @@ export default function HomePage() {
                   <LinkButton href={primary.href} size="lg">
                     {primary.label}
                   </LinkButton>
-                  <LinkButton href="/marketplace" variant="ghost" size="lg">
+                  <LinkButton href="/browse" variant="ghost" size="lg">
                     Browse vendors
                   </LinkButton>
                 </>
@@ -208,7 +208,7 @@ export default function HomePage() {
                 </h2>
               </div>
               <Link
-                href="/marketplace"
+                href="/browse"
                 className="inline-flex items-center gap-2 text-sm font-medium text-maroon transition hover:text-gold dark:text-gold"
               >
                 See all vendors {IconArrow}
@@ -322,7 +322,7 @@ export default function HomePage() {
                   <LinkButton href={user ? "/plan" : primary.href} size="lg">
                     Start planning
                   </LinkButton>
-                  <LinkButton href="/marketplace" variant="ghost" size="lg">
+                  <LinkButton href="/browse" variant="ghost" size="lg">
                     Browse vendors
                   </LinkButton>
                 </>
