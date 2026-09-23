@@ -20,7 +20,6 @@ import {
 } from "@/lib/types";
 import { paymentsSetup, vendorMoney } from "@/lib/vendorPlan";
 import { Button, Card, Field, LinkButton } from "@/components/ui";
-import { VendorNav } from "@/components/VendorNav";
 
 function money(cents: number) {
   return `$${Math.round(cents / 100).toLocaleString()}`;
@@ -174,8 +173,7 @@ function EarningsInner() {
   const cash = vendorMoney(earnings);
 
   return (
-    <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-10">
-      <VendorNav />
+    <div>
       <header>
         <span className="eyebrow">Selling</span>
         <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold sm:text-5xl">

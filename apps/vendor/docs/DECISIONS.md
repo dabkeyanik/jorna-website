@@ -277,6 +277,19 @@ a deliberate, disclosed tradeoff, not an oversight — moving Calendar/Earnings
 into the sidebar too, or giving the whole app one nav system, is future work
 if the sidebar's scope grows past its initial five destinations.
 
+**Update (2026-09-23):** that future work happened. Calendar and Earnings
+moved into the `(vendor)/` route group, and Messages got a sidebar item —
+eight destinations in all — so a vendor no longer drops out of the sidebar
+to reach any seller page. Messages is shared with clients and can't join the
+route group, so it gets the sidebar only when the viewer is a vendor
+(`ChromeGate`'s `useVendorShell`, `VendorShellIfVendor`); while the role is
+still loading, that page shows a placeholder rather than rendering bare and
+remounting inside the sidebar a moment later. `VendorNav` (the phone
+pill-strip those two pages used) was deleted. On phones the sidebar's items
+are now one sideways-scrolling row, with the current one scrolled into view,
+instead of a vertical stack eight rows tall. A vendor still sees the shared
+header on client-facing pages they visit (a public listing, `/browse`).
+
 ---
 
 ## Decision: Home trimmed to a landing page; How it works / For clients / For vendors split into their own pages

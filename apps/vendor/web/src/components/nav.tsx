@@ -57,6 +57,7 @@ export const I = {
   document: (
     <path d="M6 3h9l3 3v15H6V3Zm9 0v3h3M9 12h6M9 16h6" />
   ),
+  earnings: <path d="M4 6.5h16v11H4v-11Zm8 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM7 9.5v5M17 9.5v5" />,
   gear: (
     <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3H9.8l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4.4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.07-.4.1-.8.1-1.2Z" />
   ),
@@ -129,8 +130,8 @@ export const VENDOR_TABS: NavItem[] = [
     href: "/my-dashboard",
     label: "Dashboard",
     icon: icon(I.dashboard),
-    // Every seller page hangs off the dashboard now, reached through VendorNav,
-    // so they all keep this tab current. They used to light Profile, back when
+    // Every seller page hangs off the dashboard now, reached through the
+    // vendor sidebar, so they all keep this tab current. They used to light Profile, back when
     // Profile was the only tab that owned them — two tabs matching the same
     // path would light both.
     // Browsing is in here too, now that Home is gone: a vendor reading the
@@ -161,7 +162,8 @@ export const VENDOR_TABS: NavItem[] = [
  * A vendor page used to carry two navigations: this bar with one Dashboard tab
  * in it, and a second strip of six directly underneath — the same word twice,
  * a hand's width apart. The header has room for the lot on a desktop, so it
- * takes the lot, and VendorNav drops to phones (see VendorNav, md:hidden).
+ * takes the lot. (The second strip, VendorNav, is gone entirely since every
+ * seller page moved behind VendorSidebar.)
  *
  * Phones keep VENDOR_TABS. Nine icons across 390px is 43px each, and the tab
  * bar's own note puts the floor at about 68 — there, the two navigations are at

@@ -39,7 +39,6 @@ import {
 } from "@/lib/vendorPlan";
 import { WEEKDAYS, type AvailabilitySlot, type VendorBooking } from "@/lib/types";
 import { Button, Card, LinkButton } from "@/components/ui";
-import { VendorNav } from "@/components/VendorNav";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -463,7 +462,7 @@ export default function VendorCalendarPage() {
   const withWork = days.filter((d) => d.inMonth && d.status !== "free").length;
 
   return (
-    <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-10">
+    <div>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <span className="eyebrow">Vendor</span>
@@ -488,14 +487,10 @@ export default function VendorCalendarPage() {
         </div>
       </header>
 
-      <div className="mt-6">
-        <VendorNav />
-      </div>
-
       {/* Calendar and what's ahead, side by side where there's room. The list
           used to sit below the fold under the Google card and the weekly-hours
           card, which is a long way from the grid it refers to. */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+      <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
       {/* The anchor is the wrapper, not the Card — Card takes className and
           children only, and widening a shared component for one scroll target
           is the wrong end to change. */}
@@ -726,8 +721,8 @@ export default function VendorCalendarPage() {
         </Card>
       </section>
 
-      {/* No "all your bookings" footer: VendorNav carries that link at the top
-          of every vendor page, and the upcoming list above already leads into
+      {/* No "all your bookings" footer: the sidebar carries that link on
+          every vendor page, and the upcoming list above already leads into
           the individual ones. */}
     </div>
   );

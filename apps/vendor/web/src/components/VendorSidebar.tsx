@@ -1,7 +1,7 @@
 "use client";
 
 // The persistent shell for the vendor-facing app (see app/(vendor)/layout.tsx):
-// a fixed left rail with the five sidebar destinations, ported from the Figma
+// a fixed left rail with every seller destination, ported from the Figma
 // Make prototype "sprint-center" (2026-09-22) that made the vendor dashboard
 // the app's primary surface instead of one destination in the shared header
 // nav (see docs/DECISIONS.md for the full reasoning).
@@ -21,9 +21,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { getMyVendor } from "@/lib/jorna";
+import { getMyVendor, getUnreadCount } from "@/lib/jorna";
 import { loadAttention } from "@/lib/attention";
 import { getEffectiveTheme, toggleTheme, type Theme } from "@/lib/theme";
 import { categoryLabel, type VendorDetail } from "@/lib/types";
@@ -52,6 +52,15 @@ const ITEMS: SidebarItem[] = [
   { href: "/my-bookings", label: "Bookings", icon: icon(I.pipeline), match: prefix("/my-bookings") },
   { href: "/contracts", label: "Contracts", icon: icon(I.document), match: prefix("/contracts") },
   { href: "/clients", label: "Clients", icon: icon(I.clients), match: prefix("/clients") },
+  { href: "/my-calendar", label: "Calendar", icon: icon(I.calendar), match: prefix("/my-calendar") },
+  { href: "/my-earnings", label: "Earnings", icon: icon(I.earnings), match: prefix("/my-earnings") },
+  // A thread lives at /conversation, so it keeps Messages lit too.
+  {
+    href: "/messages",
+    label: "Messages",
+    icon: icon(I.messages),
+    match: (p) => prefix("/messages")(p) || prefix("/conversation")(p),
+  },
   { href: "/vendor-profile", label: "Settings", icon: icon(I.gear), match: prefix("/vendor-profile") },
 ];
 
@@ -60,6 +69,7 @@ export function VendorSidebar({ children }: { children: React.ReactNode }) {
   const { logout } = useAuth();
   const [vendor, setVendor] = useState<VendorDetail | null>(null);
   const [bookingsBadge, setBookingsBadge] = useState(0);
+  const [messagesBadge, setMessagesBadge] = useState(0);
   // Undefined until mounted: the effective theme depends on localStorage +
   // matchMedia, neither readable during server-less-but-still-first-render,
   // so the toggle's icon/label render nothing until this settles rather than
@@ -98,6 +108,29 @@ export function VendorSidebar({ children }: { children: React.ReactNode }) {
     };
   }, [pathname]);
 
+  // Its own request, same as the header's Messages badge (nav.tsx) — unread
+  // count isn't something lib/attention derives.
+  useEffect(() => {
+    let cancelled = false;
+    getUnreadCount()
+      .then((r) => !cancelled && setMessagesBadge(r.unread_count))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
+
+  // On a phone the nav is a sideways-scrolling row, and the later items
+  // (Earnings, Messages, Settings) start off-screen — so landing on one showed
+  // no lit tab at all. Bring the current one into view. A no-op at lg, where
+  // nothing overflows.
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    navRef.current
+      ?.querySelector('[aria-current="page"]')
+      ?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [pathname]);
+
   const name = [vendor?.f_name, vendor?.l_name].filter(Boolean).join(" ");
 
   return (
@@ -106,7 +139,7 @@ export function VendorSidebar({ children }: { children: React.ReactNode }) {
         style={{ background: RAIL_BG, borderColor: RAIL_BORDER }}
         className="flex shrink-0 flex-col border-b lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:border-b-0 lg:border-r"
       >
-        <div className="flex items-center justify-between gap-2 px-5 py-5">
+        <div className="flex items-center gap-3 px-5 py-5">
           <Link href="/my-dashboard" className="serif text-2xl" style={{ color: RAIL_GOLD }}>
             Jorna
           </Link>
@@ -115,24 +148,44 @@ export function VendorSidebar({ children }: { children: React.ReactNode }) {
             onClick={() => setThemeState(toggleTheme())}
             aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             style={{ color: RAIL_INK_SOFT, borderColor: RAIL_BORDER }}
-            className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition hover:brightness-125"
+            className="ml-auto flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition hover:brightness-125"
           >
             {theme === "dark" ? "☀" : "☾"}
             <span className="hidden sm:inline">{theme === "dark" ? "Light" : "Dark"}</span>
           </button>
+          <button
+            type="button"
+            onClick={logout}
+            style={{ color: RAIL_INK_SOFT }}
+            className="text-xs font-medium underline-offset-2 hover:underline lg:hidden"
+          >
+            Sign out
+          </button>
         </div>
 
-        <nav className="flex flex-col gap-0.5 px-3 py-2" aria-label="Vendor">
+        {/* Below lg the rail sits on top of the page, where eight stacked rows
+            would push the content a screen down — so there it's one row that
+            scrolls sideways instead. */}
+        <nav
+          className="flex gap-0.5 overflow-x-auto px-3 pb-3 lg:flex-col lg:overflow-visible lg:pb-2 lg:pt-2"
+          aria-label="Vendor"
+          ref={navRef}
+        >
           {ITEMS.map((item) => {
             const active = item.match(pathname);
-            const badge = item.href === "/my-bookings" ? bookingsBadge : 0;
+            const badge =
+              item.href === "/my-bookings"
+                ? bookingsBadge
+                : item.href === "/messages"
+                  ? messagesBadge
+                  : 0;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 style={{ background: active ? RAIL_BG_ACTIVE : "transparent" }}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition hover:brightness-125"
+                className="flex shrink-0 items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition hover:brightness-125 lg:gap-3"
               >
                 <span style={{ color: active ? RAIL_GOLD : RAIL_INK_SOFT }}>{item.icon}</span>
                 <span style={{ color: active ? RAIL_GOLD : RAIL_INK }}>{item.label}</span>
@@ -150,7 +203,9 @@ export function VendorSidebar({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="mt-auto border-t px-4 py-4" style={{ borderColor: RAIL_BORDER }}>
+        {/* The account card is desktop-only: on a phone the rail is a header
+            strip, so sign-out moves up beside the theme toggle instead. */}
+        <div className="mt-auto hidden border-t px-4 py-4 lg:block" style={{ borderColor: RAIL_BORDER }}>
           <div className="flex items-center gap-3">
             <Avatar src={vendor?.pfp_url} name={name} size={40} />
             <div className="min-w-0 flex-1">

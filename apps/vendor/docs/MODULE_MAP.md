@@ -41,14 +41,16 @@ always "none, verify manually" until a test runner is added.
 - **Responsible for:** header/footer chrome (including the mobile hamburger
   menu) and generic UI primitives used across pages.
 - **Code:** `web/src/components/SiteHeader.tsx`, `SiteFooter.tsx`,
-  `MobileNavMenu.tsx`, `VendorNav.tsx`, `nav.tsx`, `ui.tsx`,
-  `ClientOnlyRoute.tsx`, `ChromeGate.tsx`.
+  `MobileNavMenu.tsx`, `nav.tsx`, `ui.tsx`,
+  `ClientOnlyRoute.tsx`, `ChromeGate.tsx`, `VendorShellIfVendor.tsx`.
 - **Depends on:** `lib/auth.tsx` (role-aware nav), `lib/role.ts`.
-- **Consumers:** every page, via the root layout — except the five
-  vendor-shell routes, where `ChromeGate` hides this chrome in favour of
-  `VendorSidebar` (see "Vendor flow" below). `VendorNav.tsx` (the phone
-  pill-strip) now only renders on `/my-calendar` and `/my-earnings`, the two
-  vendor pages that stayed outside the sidebar shell.
+- **Consumers:** every page, via the root layout — except the vendor-shell
+  routes, where `ChromeGate` hides this chrome in favour of `VendorSidebar`
+  (see "Vendor flow" below). `/messages` and `/conversation` are shared with
+  clients, so there it depends on the viewer: `ChromeGate`'s
+  `useVendorShell()` hides the header for a vendor, and each route's
+  `layout.tsx` wraps the page in `VendorShellIfVendor`, which draws the
+  sidebar for a vendor only.
 
 ## API client layer
 
@@ -97,20 +99,23 @@ always "none, verify manually" until a test runner is added.
   bookings, contracts, clients, earnings, and the vendor equivalent of the
   task-rules module.
 - **Sidebar shell (2026-09-22):** `web/src/app/(vendor)/layout.tsx` +
-  `web/src/components/VendorSidebar.tsx` wrap five routes — `my-dashboard/`,
-  `my-bookings/`, `contracts/`, `clients/` (new), `vendor-profile/` — all
+  `web/src/components/VendorSidebar.tsx` wrap every seller route —
+  `my-dashboard/`, `my-bookings/`, `contracts/`, `clients/`, `my-calendar/`,
+  `my-earnings/`, `vendor-profile/` — all
   moved under the `(vendor)/` route group (same URLs; route groups add no
   path segment). `my-dashboard/` now also holds the pipeline kanban board and
   the Leads view (`?view=leads`), folded in from the deleted `/my-pipeline`
   route; `clients/` is a new standalone page (`ClientsPanel` is now
-  prop-driven, not self-fetching). `my-calendar/` and `my-earnings/` are
-  **not** in the sidebar and keep the old header nav + `VendorNav.tsx`. See
+  prop-driven, not self-fetching). Calendar and Earnings joined the shell
+  later (2026-09-23) and Messages got a sidebar slot for vendors; the old
+  phone pill-strip, `VendorNav.tsx`, was deleted with them. See
   `docs/DECISIONS.md` for the full reasoning.
 - **Code:** `web/src/lib/vendorPlan.ts` (task rules, incl. `pipelineStage`/
   `pipelineStats`), `web/src/app/vendor/`, `(vendor)/vendor-profile/`,
-  `my-availability/`, `(vendor)/my-bookings/`, `my-calendar/`, `my-earnings/`,
+  `my-availability/`, `(vendor)/my-bookings/`, `(vendor)/my-calendar/`,
+  `(vendor)/my-earnings/`,
   `(vendor)/my-dashboard/`, `(vendor)/contracts/`, `(vendor)/clients/`,
-  `web/src/components/ServicesManager.tsx`, `VendorCard.tsx`, `VendorNav.tsx`,
+  `web/src/components/ServicesManager.tsx`, `VendorCard.tsx`,
   `VendorSidebar.tsx`, `ClientsPanel.tsx`, `LeadsPanel.tsx`.
 - **Contracts list (2026-09):** `(vendor)/contracts/page.tsx` — every
   contract sent, filterable by whose move it is, with copy-link / view-as-
