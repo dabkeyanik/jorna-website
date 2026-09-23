@@ -294,85 +294,118 @@ function EarningsInner() {
         </>
       ) : null}
 
-      {/* Money */}
+      {/* Money. Escrow disabled: every payment goes client → vendor directly,
+          so Jorna never holds or releases anything — "Paid out", "Held in
+          escrow", disputes, refunds and the fee note all describe money that
+          no longer passes through here. What's left is the direct track. */}
+      {earnings && !ESCROW_ENABLED ? (
+        <div className="mt-7 grid gap-3 sm:grid-cols-3">
+          <Stat
+            label="Paid directly"
+            value={money(earnings.self_reported_cents)}
+            hint="Confirmed received by you"
+            tone="green"
+          />
+          <Stat
+            label="Awaiting your confirmation"
+            value={money(earnings.self_reported_pending_cents)}
+            hint={
+              earnings.self_reported_pending_count === 1
+                ? "1 client says they've paid"
+                : `${earnings.self_reported_pending_count} clients say they've paid`
+            }
+            tone="gold"
+          />
+          <Stat
+            label="Upcoming"
+            value={money(earnings.upcoming_cents)}
+            hint={`${earnings.upcoming_count} accepted, not yet paid`}
+          />
+        </div>
+      ) : null}
+
       {earnings ? (
         <>
-          <div className="mt-7 grid gap-3 sm:grid-cols-3">
-            <Stat
-              label="Paid out"
-              value={money(earnings.total_released_cents)}
-              hint="Released to you after the event"
-              tone="green"
-            />
-            <Stat
-              label="Held in escrow"
-              value={money(earnings.in_escrow_cents)}
-              hint="Yours once you and the client confirm"
-              tone="gold"
-            />
-            <Stat
-              label="Upcoming"
-              value={money(earnings.upcoming_cents)}
-              hint={`${earnings.upcoming_count} accepted, not yet paid`}
-            />
-          </div>
-
-          {earnings.disputed_cents > 0 || earnings.refunded_cents > 0 ? (
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {earnings.disputed_cents > 0 ? (
+          {ESCROW_ENABLED ? (
+            <>
+              <div className="mt-7 grid gap-3 sm:grid-cols-3">
                 <Stat
-                  label="Under review"
-                  value={money(earnings.disputed_cents)}
-                  hint="Frozen while a dispute is resolved"
-                />
-              ) : null}
-              {earnings.refunded_cents > 0 ? (
-                <Stat
-                  label="Refunded"
-                  value={money(earnings.refunded_cents)}
-                  hint="Returned to the client"
-                />
-              ) : null}
-            </div>
-          ) : null}
-
-          {/* Manual track — paid directly, Venmo/Zelle. Self-reported, so kept
-              apart from "Paid out" above rather than folded in as if verified. */}
-          {earnings.self_reported_cents > 0 || earnings.self_reported_pending_count > 0 ? (
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {earnings.self_reported_cents > 0 ? (
-                <Stat
-                  label="Paid directly"
-                  value={money(earnings.self_reported_cents)}
-                  hint="Confirmed by you — not through Jorna"
+                  label="Paid out"
+                  value={money(earnings.total_released_cents)}
+                  hint="Released to you after the event"
                   tone="green"
                 />
-              ) : null}
-              {earnings.self_reported_pending_count > 0 ? (
                 <Stat
-                  label="Awaiting your confirmation"
-                  value={money(earnings.self_reported_pending_cents)}
-                  hint={
-                    earnings.self_reported_pending_count === 1
-                      ? "1 client says they've paid"
-                      : `${earnings.self_reported_pending_count} clients say they've paid`
-                  }
+                  label="Held in escrow"
+                  value={money(earnings.in_escrow_cents)}
+                  hint="Yours once you and the client confirm"
                   tone="gold"
                 />
-              ) : null}
-            </div>
-          ) : null}
+                <Stat
+                  label="Upcoming"
+                  value={money(earnings.upcoming_cents)}
+                  hint={`${earnings.upcoming_count} accepted, not yet paid`}
+                />
+              </div>
 
-          {/* The rate is derived from what has actually been taken. The API
-              publishes no percentage — only a per-booking platform_fee_cents —
-              so a hardcoded one would be a guess that goes quietly wrong the
-              day it changes, and there's nothing to derive before the first
-              booking. */}
-          <p className="mt-3 text-xs text-ink-faint">
-            Amounts are what reaches you — Jorna&apos;s fee is already deducted
-            ({money(earnings.platform_fees_cents)} so far
-            {cash?.feePercent != null ? `, ${cash.feePercent}% of gross` : ""}).
-          </p>
+              {earnings.disputed_cents > 0 || earnings.refunded_cents > 0 ? (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {earnings.disputed_cents > 0 ? (
+                    <Stat
+                      label="Under review"
+                      value={money(earnings.disputed_cents)}
+                      hint="Frozen while a dispute is resolved"
+                    />
+                  ) : null}
+                  {earnings.refunded_cents > 0 ? (
+                    <Stat
+                      label="Refunded"
+                      value={money(earnings.refunded_cents)}
+                      hint="Returned to the client"
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+
+              {/* Manual track — paid directly, Venmo/Zelle. Self-reported, so kept
+                  apart from "Paid out" above rather than folded in as if verified. */}
+              {earnings.self_reported_cents > 0 || earnings.self_reported_pending_count > 0 ? (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {earnings.self_reported_cents > 0 ? (
+                    <Stat
+                      label="Paid directly"
+                      value={money(earnings.self_reported_cents)}
+                      hint="Confirmed by you — not through Jorna"
+                      tone="green"
+                    />
+                  ) : null}
+                  {earnings.self_reported_pending_count > 0 ? (
+                    <Stat
+                      label="Awaiting your confirmation"
+                      value={money(earnings.self_reported_pending_cents)}
+                      hint={
+                        earnings.self_reported_pending_count === 1
+                          ? "1 client says they've paid"
+                          : `${earnings.self_reported_pending_count} clients say they've paid`
+                      }
+                      tone="gold"
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+
+              {/* The rate is derived from what has actually been taken. The API
+                  publishes no percentage — only a per-booking platform_fee_cents —
+                  so a hardcoded one would be a guess that goes quietly wrong the
+                  day it changes, and there's nothing to derive before the first
+                  booking. */}
+              <p className="mt-3 text-xs text-ink-faint">
+                Amounts are what reaches you — Jorna&apos;s fee is already deducted
+                ({money(earnings.platform_fees_cents)} so far
+                {cash?.feePercent != null ? `, ${cash.feePercent}% of gross` : ""}).
+              </p>
+            </>
+          ) : null}
 
           <section className="mt-9">
             <div className="flex flex-wrap items-baseline justify-between gap-3">

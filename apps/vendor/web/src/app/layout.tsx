@@ -10,7 +10,7 @@ import { ChromeGate } from "@/components/ChromeGate";
 export const metadata: Metadata = {
   title: "Jorna — Plan your celebration",
   description:
-    "Plan your whole South Asian celebration in one place — a matched team of vendors, booked and paid for safely through escrow.",
+    "Plan your whole South Asian celebration in one place — a matched team of vendors, with every booking agreed in writing.",
 };
 
 // viewportFit: "cover" is required for env(safe-area-inset-*) to resolve to

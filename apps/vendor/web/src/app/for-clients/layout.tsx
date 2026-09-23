@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "For clients — Jorna",
   description:
-    "Your payment sits in escrow until after the celebration, released only once you confirm — safe to pay months in advance.",
+    "Every price, deposit and deadline agreed in a signed contract before you pay — then pay your vendor directly, with every payment recorded.",
 };
 
 export default function ForClientsLayout({ children }: { children: React.ReactNode }) {

@@ -290,8 +290,8 @@ export default function VendorOnboardingPage() {
             Finish up as a client first
           </h1>
           <p className="mx-auto mt-3 max-w-md text-ink-soft">
-            You have an open request, an upcoming booking, or money still in
-            escrow. An account can only be a client or a seller, not both — wrap
+            You have an open request, an upcoming booking, or a payment still
+            settling. An account can only be a client or a seller, not both — wrap
             that up (or wait for it to settle) before switching to a seller
             account.
           </p>

@@ -504,6 +504,12 @@ export interface VendorMoney {
   upcomingCount: number;
   disputedCents: number;
   refundedCents: number;
+  /** Venmo/Zelle money the vendor has confirmed receiving — self-reported,
+   *  never seen by Jorna, so kept apart from releasedCents. */
+  paidDirectlyCents: number;
+  /** Clients say they've paid directly; the vendor hasn't confirmed yet. */
+  awaitingConfirmationCents: number;
+  awaitingConfirmationCount: number;
   feesCents: number;
   /**
    * The platform's actual cut, as a percentage, worked out from what it has
@@ -525,6 +531,9 @@ export function vendorMoney(e: Earnings | null): VendorMoney | null {
     upcomingCount: e.upcoming_count ?? 0,
     disputedCents: e.disputed_cents ?? 0,
     refundedCents: e.refunded_cents ?? 0,
+    paidDirectlyCents: e.self_reported_cents ?? 0,
+    awaitingConfirmationCents: e.self_reported_pending_cents ?? 0,
+    awaitingConfirmationCount: e.self_reported_pending_count ?? 0,
     feesCents: e.platform_fees_cents ?? 0,
     feePercent: gross > 0 ? Math.round((fees / gross) * 1000) / 10 : null,
   };

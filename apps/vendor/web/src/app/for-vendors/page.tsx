@@ -13,7 +13,7 @@ import { IconCheck } from "@/components/marketing/icons";
 const VENDOR_PERKS = [
   "Free to list — you only pay when you get booked",
   "Jorna matches you to hosts planning the events you serve",
-  "Guaranteed payment through escrow on every booking",
+  "Get paid directly by Venmo or Zelle — no card fees",
   "Set your own rates, availability, and negotiation preferences",
   "One inbox for every client conversation",
 ];
@@ -41,8 +41,8 @@ export default function ForVendorsPage() {
               </h1>
               <p className="mt-4 leading-relaxed text-ground/75 md:text-lg">
                 Jorna brings the hosts to you. No chasing leads, no awkward payment
-                conversations — every booking is protected and paid through escrow once
-                the event is done.
+                conversations — your deposit, cancellation and overtime terms are in a
+                signed contract before anyone pays.
               </p>
               <ul className="mt-8 space-y-3">
                 {VENDOR_PERKS.map((perk) => (

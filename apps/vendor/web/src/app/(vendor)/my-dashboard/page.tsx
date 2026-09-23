@@ -481,7 +481,7 @@ function VendorDashboardInner() {
         </h1>
         <p className="mx-auto mt-3 max-w-[44ch] text-ink-soft">
           You don&apos;t have a vendor profile yet. Set one up to list packages, take
-          bookings, and get paid through escrow.
+          bookings, and get paid.
         </p>
         <LinkButton href="/vendor-profile" className="mt-6">
           Start selling
@@ -737,29 +737,57 @@ function VendorDashboardInner() {
               Full ledger
             </Link>
           </div>
-          <div className="flex flex-col gap-2.5 sm:flex-row lg:flex-col">
-            <Bucket
-              label="Released"
-              cents={cash.releasedCents}
-              dot="bg-green"
-              value="text-green"
-            />
-            <Bucket
-              label="In escrow"
-              cents={cash.inEscrowCents}
-              dot="bg-gold"
-              value="text-gold"
-            />
-            <Bucket
-              label="Upcoming"
-              cents={cash.upcomingCents}
-              count={cash.upcomingCount}
-              dot="bg-ink-faint"
-              value="text-ink-soft"
-            />
-          </div>
+          {/* Escrow disabled: Jorna holds nothing, so Released/In escrow (and
+              disputes/refunds below) can't apply — show the direct-payment
+              track instead, same numbers /my-earnings leads with. */}
+          {!ESCROW_ENABLED ? (
+            <div className="flex flex-col gap-2.5 sm:flex-row lg:flex-col">
+              <Bucket
+                label="Paid directly"
+                cents={cash.paidDirectlyCents}
+                dot="bg-green"
+                value="text-green"
+              />
+              <Bucket
+                label="To confirm"
+                cents={cash.awaitingConfirmationCents}
+                count={cash.awaitingConfirmationCount}
+                dot="bg-gold"
+                value="text-gold"
+              />
+              <Bucket
+                label="Upcoming"
+                cents={cash.upcomingCents}
+                count={cash.upcomingCount}
+                dot="bg-ink-faint"
+                value="text-ink-soft"
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2.5 sm:flex-row lg:flex-col">
+              <Bucket
+                label="Released"
+                cents={cash.releasedCents}
+                dot="bg-green"
+                value="text-green"
+              />
+              <Bucket
+                label="In escrow"
+                cents={cash.inEscrowCents}
+                dot="bg-gold"
+                value="text-gold"
+              />
+              <Bucket
+                label="Upcoming"
+                cents={cash.upcomingCents}
+                count={cash.upcomingCount}
+                dot="bg-ink-faint"
+                value="text-ink-soft"
+              />
+            </div>
+          )}
 
-          {cash.disputedCents > 0 || cash.refundedCents > 0 ? (
+          {ESCROW_ENABLED && (cash.disputedCents > 0 || cash.refundedCents > 0) ? (
             <p className="mt-2.5 rounded-xl border border-maroon/40 bg-maroon/[0.06] px-3.5 py-2.5 text-sm text-maroon dark:text-gold">
               {cash.disputedCents > 0
                 ? `${centsToMoney(cash.disputedCents)} is under dispute and can't move yet.`
@@ -989,8 +1017,8 @@ function EventCard({
   const m = event.money;
   const totals = [
     m.upcoming > 0 ? `${money(m.upcoming)} upcoming` : null,
-    m.inEscrow > 0 ? `${money(m.inEscrow)} in escrow` : null,
-    m.released > 0 ? `${money(m.released)} released` : null,
+    ESCROW_ENABLED && m.inEscrow > 0 ? `${money(m.inEscrow)} in escrow` : null,
+    ESCROW_ENABLED && m.released > 0 ? `${money(m.released)} released` : null,
   ].filter(Boolean);
 
   return (

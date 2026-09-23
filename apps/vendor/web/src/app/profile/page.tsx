@@ -192,14 +192,14 @@ export default function ProfilePage() {
           <div className="grid gap-2">
             <Row href="/my-bookings" title="Requests" sub="Accept or decline booking requests" />
             <Row href="/vendor-profile" title="Hours" sub="Your weekly availability" />
-            <Row href="/my-earnings" title="Earnings" sub="Payouts, escrow, and payment setup" />
+            <Row href="/my-earnings" title="Earnings" sub="What you've been paid, and how clients pay you" />
             <Row href="/vendor-profile" title="Your listing" sub="Packages, prices and how clients see you" />
           </div>
         ) : (
           <Card className="p-5">
             <p className="text-sm text-ink-soft">
               Offer your packages on Jorna — get discovered by people who are
-              actively planning, and get paid safely through escrow.
+              actively planning, and get paid directly by Venmo or Zelle.
             </p>
             <LinkButton href="/vendor-onboarding" className="mt-4">
               Start selling

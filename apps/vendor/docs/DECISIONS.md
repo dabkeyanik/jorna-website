@@ -229,6 +229,21 @@ a vendor who already had `payment_method: "stripe"` on file, since the
 backend's booking-time override is what actually keeps new bookings off
 Stripe regardless of what a vendor's profile still says.
 
+**Update (2026-09-23):** the escrow wording that was still visible with the
+flag off is gone too. In-app money UI is gated on the same flag (so flipping
+it back restores it): `/my-earnings` and `/my-dashboard`'s Money section
+show Paid directly / Awaiting your confirmation / Upcoming instead of Paid
+out / Held in escrow / disputes / refunds / the platform-fee note, via new
+`paidDirectly*`/`awaitingConfirmation*` fields on `vendorMoney()`. Marketing
+copy (Home, How it works, For clients, For vendors, page descriptions) was
+rewritten outright rather than flagged, to describe what's true today: terms
+agreed in a signed contract, the client paying the vendor directly by
+Venmo/Zelle, and each payment recorded on the booking. It makes no claim of
+Jorna holding or protecting money, so re-enabling escrow would mean
+rewriting that copy again, not just flipping the flag. Left as-is: text only
+reachable with escrow money on file (`/payment-complete`, `/profile`'s
+delete-account guard, `/my-bookings`' Stripe release step).
+
 ---
 
 ## Decision: persistent vendor sidebar, replacing the shared header nav for most seller pages

@@ -21,7 +21,7 @@ test.describe("marketing pages (How it works / For clients / For vendors)", () =
     await page.getByRole("link", { name: "For clients", exact: true }).click();
     await expect(page).toHaveURL(/\/for-clients\/?$/);
     await expect(
-      page.getByRole("heading", { name: "Safe to pay months in advance." }),
+      page.getByRole("heading", { name: "Clear terms before you pay." }),
     ).toBeVisible();
 
     await page.goto("");

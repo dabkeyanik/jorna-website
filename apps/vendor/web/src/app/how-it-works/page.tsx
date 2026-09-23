@@ -30,8 +30,8 @@ const STEPS = [
   {
     n: "03",
     icon: IconShield,
-    title: "Book and pay safely",
-    body: "Pick a team, adjust it, then pay into escrow. Your money is held until the event happens and both sides confirm.",
+    title: "Book with terms in writing",
+    body: "Pick a team, adjust it, then sign each vendor's contract. You pay them directly by Venmo or Zelle, and every payment is recorded on your booking.",
   },
 ];
 

@@ -7,7 +7,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "How it works — Jorna",
   description:
-    "Describe your celebration, compare three complete vendor teams, and book with your payment held safely in escrow.",
+    "Describe your celebration, compare three complete vendor teams, and book with every term agreed in writing.",
 };
 
 export default function HowItWorksLayout({ children }: { children: React.ReactNode }) {

@@ -60,12 +60,12 @@ const FAQ_ITEMS = [
     a: "Both. Start from a generated bundle and swap any vendor in it, or skip bundles entirely and book one at a time from the Marketplace.",
   },
   {
-    q: "What if a vendor cancels or doesn't show up?",
-    a: "Because the money sits in escrow, a vendor who doesn't show up can't be paid. If one cancels, the payment is refunded rather than released.",
+    q: "How do I pay vendors?",
+    a: "Directly, by Venmo or Zelle, on the schedule in the contract you signed. Mark each payment as sent and your vendor confirms it arrived, so every payment is recorded on your booking.",
   },
   {
-    q: "How long does money stay in escrow?",
-    a: "From when you pay until after the event, once both sides confirm it went ahead. The booking shows its status the whole time, so you always know where your money is.",
+    q: "What if a vendor cancels?",
+    a: "Your contract sets out the cancellation window you both agreed to before signing. Because you pay the vendor directly, a refund is between you and them — the signed terms are what you both go by.",
   },
 ];
 
@@ -81,13 +81,13 @@ const LEARN_MORE = [
     href: "/for-clients",
     icon: IconShield,
     title: "For clients",
-    body: "Your payment is held in escrow until after the celebration — safe to pay months ahead.",
+    body: "Every price, deposit and deadline in a signed contract before you pay a thing.",
   },
   {
     href: "/for-vendors",
     icon: IconUsers,
     title: "For vendors",
-    body: "List your packages, get matched to hosts, and get paid through escrow on every booking.",
+    body: "List your packages, get matched to hosts, and get paid directly by Venmo or Zelle.",
   },
 ];
 
@@ -153,8 +153,8 @@ function HomeContent() {
             <p className="mt-6 max-w-[56ch] text-lg leading-relaxed text-ink-soft md:text-xl">
               Describe your wedding, sangeet, or mehndi. Jorna assembles three complete
               vendor teams for you to compare — venue, catering, DJ, photographer, and
-              more — and holds your payments safely in escrow until the celebration is
-              done.
+              more — with every price and deposit agreed in a signed contract before
+              you pay.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               {loading ? null : (
