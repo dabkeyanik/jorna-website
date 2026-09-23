@@ -13,6 +13,7 @@ import { CELEBRATIONS } from "@/lib/celebrations";
 import { LinkButton } from "@/components/ui";
 import { Eyebrow } from "@/components/marketing/Eyebrow";
 import { CELEBRATION_ICONS, IconCalendar, IconCelebration, IconShield, IconUsers } from "@/components/marketing/icons";
+import { clientAppUrl } from "@/lib/clientApp";
 
 const STEPS = [
   {
@@ -89,7 +90,7 @@ const EXAMPLE_BUNDLES: ExampleBundle[] = [
 export default function HowItWorksPage() {
   const { user, loading } = useAuth();
   const primary = user
-    ? { href: "/plan", label: "Build a bundle" }
+    ? { href: clientAppUrl("/plan"), label: "Build a bundle" }
     : { href: "/login?mode=register", label: "Get started — it's free" };
 
   return (
@@ -217,7 +218,7 @@ export default function HowItWorksPage() {
                       </span>
                     </div>
                     <Link
-                      href="/plan"
+                      href={clientAppUrl("/plan")}
                       className={`mt-5 flex w-full items-center justify-center rounded-full py-3 text-sm font-semibold transition ${
                         bundle.highlight
                           ? "bg-ground text-maroon hover:brightness-95"

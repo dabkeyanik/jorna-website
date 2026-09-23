@@ -13,6 +13,7 @@ import {
 import { openConversationSocket } from "@/lib/chat";
 import type { ConversationSummary, GroupMessage } from "@/lib/types";
 import { ModerationMenu } from "@/components/ModerationMenu";
+import { clientAppUrl } from "@/lib/clientApp";
 
 function clockTime(iso: string): string {
   const t = Date.parse(iso.endsWith("Z") || /[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}Z`);
@@ -85,8 +86,8 @@ function OfferCard({
         <Link
           href={
             conversation?.bundle_id && conversation.booking_id
-              ? `/bundle?id=${conversation.bundle_id}#booking-${conversation.booking_id}`
-              : "/bundles"
+              ? clientAppUrl(`/bundle?id=${conversation.bundle_id}#booking-${conversation.booking_id}`)
+              : clientAppUrl("/bundles")
           }
           className="mt-2 inline-block text-xs font-medium text-maroon hover:underline dark:text-gold"
         >

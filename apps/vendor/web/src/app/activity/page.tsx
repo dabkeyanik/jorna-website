@@ -15,6 +15,7 @@ import { loadAttention, type AttentionItem } from "@/lib/attention";
 import { loadIsVendor } from "@/lib/role";
 import { PushOptIn } from "@/components/PushOptIn";
 import { Button, Card, LinkButton } from "@/components/ui";
+import { clientAppUrl } from "@/lib/clientApp";
 
 export default function ActivityPage() {
   const { user, loading: authLoading } = useAuth();
@@ -89,7 +90,7 @@ export default function ActivityPage() {
               </>
             ) : (
               <>
-                <LinkButton href="/plan" size="md">
+                <LinkButton href={clientAppUrl("/plan")} size="md">
                   Plan an event
                 </LinkButton>
                 <LinkButton href="/browse" variant="ghost" size="md">

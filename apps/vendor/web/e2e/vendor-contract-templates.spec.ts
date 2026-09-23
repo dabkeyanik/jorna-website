@@ -25,7 +25,7 @@ test.describe("contract templates (/contracts/new, /vendor-profile)", () => {
     await expect(page.getByRole("heading", { name: "New booking" })).toBeVisible();
 
     await page.getByLabel("Deposit (%)").fill("50");
-    await page.getByLabel("Cancellation window (hours)").fill("720");
+    await page.getByLabel("Cancellation window (days)").fill("30");
     await page.getByLabel("Overtime rate ($/hr)").fill("150");
 
     await page.getByRole("button", { name: "Save these terms as a template" }).click();

@@ -44,6 +44,9 @@ always "none, verify manually" until a test runner is added.
   `MobileNavMenu.tsx`, `nav.tsx`, `ui.tsx`,
   `ClientOnlyRoute.tsx`, `ChromeGate.tsx`, `VendorShellIfVendor.tsx`.
 - **Depends on:** `lib/auth.tsx` (role-aware nav), `lib/role.ts`.
+- **Client-app links:** anything a *client* follows to planning/booking
+  (`/book`, `/plan`, `/bundle`, `/bundles`) goes through `lib/clientApp.ts`'s
+  `clientAppUrl()` to book.jornaevents.com — those routes don't exist here.
 - **Consumers:** every page, via the root layout — except the vendor-shell
   routes, where `ChromeGate` hides this chrome in favour of `VendorSidebar`
   (see "Vendor flow" below). `/messages` and `/conversation` are shared with

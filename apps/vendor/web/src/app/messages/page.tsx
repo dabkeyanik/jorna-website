@@ -9,6 +9,7 @@ import { listConversations } from "@/lib/jorna";
 import { loadIsVendor } from "@/lib/role";
 import type { ConversationSummary } from "@/lib/types";
 import { Card, Chip, LinkButton } from "@/components/ui";
+import { clientAppUrl } from "@/lib/clientApp";
 
 function timeAgo(iso?: string | null): string {
   if (!iso) return "";
@@ -198,7 +199,7 @@ export default function MessagesPage() {
                 <LinkButton href="/browse" variant="ghost">
                   Browse vendors
                 </LinkButton>
-                <LinkButton href="/bundles" variant="ghost">
+                <LinkButton href={clientAppUrl("/bundles")} variant="ghost">
                   Dashboard
                 </LinkButton>
               </div>

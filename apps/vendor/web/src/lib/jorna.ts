@@ -825,6 +825,11 @@ export function updateContract(bookingId: string, updates: ContractUpdateInput):
   return apiFetch<Contract>(`/contracts/${bookingId}`, { method: "PATCH", body: updates });
 }
 
+/** Withdraw an unsigned contract, freeing its date. Signed ones 400. */
+export function voidContract(bookingId: string): Promise<Contract> {
+  return apiFetch<Contract>(`/contracts/${bookingId}/void`, { method: "POST" });
+}
+
 // ── Clients CRM ─────────────────────────────────────────────────────
 
 export function getVendorClients(): Promise<{ items: VendorClient[]; total: number }> {

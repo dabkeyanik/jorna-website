@@ -157,6 +157,23 @@ function BookingLinkInner() {
   }
 
   const vendorName = booking.vendor_display_name ?? "your vendor";
+
+  // Voided by the vendor. The backend still serves the link so this can say
+  // so, instead of the generic "not valid" a dead token gets.
+  if (booking.status === "rejected") {
+    return (
+      <Shell>
+        <p className="eyebrow">Withdrawn</p>
+        <h1 className="serif mt-2 text-2xl text-maroon dark:text-gold">
+          {vendorName} withdrew this booking offer
+        </h1>
+        <p className="mt-3 text-ink-soft">
+          Nothing was signed and nothing is owed. If you still want to book, ask{" "}
+          {vendorName} to send you a new link.
+        </p>
+      </Shell>
+    );
+  }
   const depositDue =
     booking.deposit_percent != null && booking.deposit_amount_cents != null
       ? money(booking.deposit_amount_cents)
@@ -280,7 +297,7 @@ function BookingLinkInner() {
               label="Guest count"
               type="number"
               min={1}
-              hint="Helps your vendor plan. Doesn't change your price."
+              hint="Helps your vendor plan. Your price is the total shown above."
               value={guestCount}
               onChange={(e) => setGuestCount(e.target.value)}
             />

@@ -27,6 +27,7 @@ import {
 import { GAP_LABELS, describeGaps, requiredFields } from "@/lib/planning";
 import { Avatar, Card, LinkButton, Stars } from "@/components/ui";
 import { AskVendor } from "@/components/AskVendor";
+import { clientAppUrl } from "@/lib/clientApp";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -330,7 +331,7 @@ function PricePanel({ service }: { service: ServiceItem }) {
       </div>
 
       <div className="mt-5 grid gap-2">
-        <LinkButton href={`/book?service=${service.service_id}`} size="lg">
+        <LinkButton href={clientAppUrl(`/book?service=${service.service_id}`)} size="lg">
           Request this package
         </LinkButton>
         {/* Beside the request, not instead of it. A client who isn't ready to

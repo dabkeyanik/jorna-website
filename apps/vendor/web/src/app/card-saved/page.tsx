@@ -11,16 +11,16 @@
 // come back for it.
 
 import { Suspense, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { CARD_RETURN_KEY, syncSavedCard, type SavedCard } from "@/lib/jorna";
 import { Button } from "@/components/ui";
+import { clientAppUrl } from "@/lib/clientApp";
 
 type Phase = "working" | "saved" | "cancelled" | "failed";
 
 function CardSavedInner() {
   const { user, loading } = useAuth();
-  const router = useRouter();
   const params = useSearchParams();
   const cancelled = params.get("status") === "cancel";
 
@@ -79,7 +79,9 @@ function CardSavedInner() {
           } catch {
             // Storage unavailable. The dashboard is a fine second choice.
           }
-          router.push(destination);
+          // The pages that send a client to Stripe live in the client app
+          // now (lib/clientApp), so the way back does too.
+          window.location.assign(clientAppUrl(destination));
         }}
       >
         Back to your plan

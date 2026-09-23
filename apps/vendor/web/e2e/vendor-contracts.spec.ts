@@ -61,7 +61,7 @@ test.describe("vendor contracts list (/contracts)", () => {
       "href",
       "/app/my-bookings/",
     );
-    await expect(rows.nth(1)).toContainText("Sent — not opened yet");
+    await expect(rows.nth(1)).toContainText("Awaiting signature");
 
     await page.getByRole("tab", { name: "Waiting on client" }).click();
     await expect(page.getByText("Meera Iyer")).not.toBeVisible();

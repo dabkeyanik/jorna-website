@@ -1070,6 +1070,8 @@ export interface Contract {
   guest_phone: string | null;
   signer_name: string | null;
   signed_at: string | null;
+  /** "approved" while live; "rejected" once the vendor voids it. */
+  status: string;
   contract_token: string;
   vendor_display_name: string | null;
 }
@@ -1086,6 +1088,11 @@ export interface ContractCreateInput {
   overtime_rate_cents?: number | null;
   addon_rate_cents?: number | null;
   contract_terms?: ContractTerms | null;
+  /** Optional up front — the client can still correct them before signing. */
+  guest_name?: string | null;
+  guest_email?: string | null;
+  guest_phone?: string | null;
+  location?: string | null;
 }
 
 export type ContractUpdateInput = Partial<ContractCreateInput>;
@@ -1119,6 +1126,9 @@ export interface GuestBooking {
   signer_name: string | null;
   signed_at: string | null;
   payment_status: string;
+  /** "rejected" once the vendor has voided it — the link still opens, but
+   *  nothing on it can be acted on. */
+  status?: string;
   deposit_marked_paid_at: string | null;
   deposit_confirmed_received_at: string | null;
 }

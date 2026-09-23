@@ -11,6 +11,7 @@ import { disableWebPushForThisDevice } from "@/lib/push";
 import { vendorMoney } from "@/lib/vendorPlan";
 import type { VendorDetail } from "@/lib/types";
 import { Button, Card, LinkButton } from "@/components/ui";
+import { clientAppUrl } from "@/lib/clientApp";
 
 // Dollars, like everything in MoneyBreakdown — those sums are booking.price,
 // not the cents the Stripe fields carry.
@@ -179,7 +180,7 @@ export default function ProfilePage() {
         <p className="eyebrow mb-3">Your celebrations</p>
         <div className="grid gap-2">
           <Row href="/activity" title="Needs you" sub="Everything waiting on you, in one place" />
-          <Row href="/bundles" title="Dashboard" sub="Your celebrations and what each still needs" />
+          <Row href={clientAppUrl("/bundles")} title="Dashboard" sub="Your celebrations and what each still needs" />
           <Row href="/browse" title="Browse vendors" sub="Find and book more" />
           <Row href="/blocked" title="Blocked" sub="People you've blocked" />
         </div>

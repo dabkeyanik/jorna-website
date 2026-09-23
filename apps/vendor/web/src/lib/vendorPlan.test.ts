@@ -227,11 +227,8 @@ describe("contractStatus", () => {
   const contract = (overrides: Partial<VendorBooking> = {}) =>
     booking({ contract_token: "tok", is_guest_booking: true, user_id: null, ...overrides });
 
-  it("waits on details before the guest has filled anything in", () => {
-    expect(contractStatus(contract())).toBe("awaiting_details");
-  });
-
-  it("waits on a signature once details are in", () => {
+  it("waits on a signature until signed, whether or not details are in", () => {
+    expect(contractStatus(contract())).toBe("awaiting_signature");
     expect(contractStatus(contract({ guest_name: "Anjali Rao" }))).toBe("awaiting_signature");
   });
 

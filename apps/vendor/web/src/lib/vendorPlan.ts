@@ -340,7 +340,6 @@ export function pipelineStats(bookings: VendorBooking[]): PipelineStats {
  * read Paid here while sitting in a different column on the board.
  */
 export type ContractStatus =
-  | "awaiting_details"
   | "awaiting_signature"
   | "deposit_due"
   | "confirm_deposit"
@@ -353,10 +352,10 @@ export function contractStatus(b: VendorBooking): ContractStatus {
   if (isDeadVendorBooking(b)) return "cancelled";
   if (pipelineStage(b) === "done") return "paid";
 
-  // The guest fills in their own details before signing (/booking-link), so
-  // a missing name means they haven't opened the link and got going yet —
-  // worth telling apart from "filled in, just hasn't signed".
-  if (!b.signed_at) return b.guest_name ? "awaiting_signature" : "awaiting_details";
+  // No "hasn't opened it yet" state: that used to be read off a missing
+  // guest_name, but a vendor can fill the name in themselves now, and
+  // nothing records whether the link was ever opened.
+  if (!b.signed_at) return "awaiting_signature";
 
   if (b.deposit_percent != null && !b.deposit_confirmed_received_at) {
     return b.deposit_marked_paid_at ? "confirm_deposit" : "deposit_due";

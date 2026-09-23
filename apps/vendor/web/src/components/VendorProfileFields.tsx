@@ -376,13 +376,19 @@ export function VendorContractDefaultsFields({
           value={depositPercent}
           onChange={(e) => onDepositPercentChange(e.target.value)}
         />
+        {/* Hours underneath (the backend's unit), days on screen — same as
+            /contracts/new. */}
         <Field
-          label="Cancellation window (hours)"
+          label="Cancellation window (days)"
           type="number"
           min={0}
-          placeholder="e.g. 720"
-          value={cancellationWindowHours}
-          onChange={(e) => onCancellationWindowHoursChange(e.target.value)}
+          placeholder="e.g. 30"
+          value={
+            cancellationWindowHours ? String(Math.round(Number(cancellationWindowHours) / 24)) : ""
+          }
+          onChange={(e) =>
+            onCancellationWindowHoursChange(e.target.value ? String(Number(e.target.value) * 24) : "")
+          }
         />
         <Field
           label="Overtime rate ($/hr)"

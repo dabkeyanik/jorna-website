@@ -16,6 +16,7 @@ import { useAuth } from "@/lib/auth";
 import { LinkButton } from "@/components/ui";
 import { Eyebrow } from "@/components/marketing/Eyebrow";
 import { IconLock, IconShield, IconUsers } from "@/components/marketing/icons";
+import { clientAppUrl } from "@/lib/clientApp";
 
 const PAYMENT_STAGES = [
   { label: "Contract", status: "Signed", desc: "Price and terms agreed first", tone: "maroon" },
@@ -45,7 +46,7 @@ const TRUST_POINTS = [
 export default function ForClientsPage() {
   const { user, loading } = useAuth();
   const primary = user
-    ? { href: "/plan", label: "Build a bundle" }
+    ? { href: clientAppUrl("/plan"), label: "Build a bundle" }
     : { href: "/login?mode=register", label: "Get started — it's free" };
 
   return (

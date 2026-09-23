@@ -41,6 +41,7 @@ import {
   VendorReachFields,
 } from "@/components/VendorProfileFields";
 import { ServicesManager } from "@/components/ServicesManager";
+import { clientAppUrl } from "@/lib/clientApp";
 
 type Step = "blocked" | "identity" | "reach" | "service" | "done";
 
@@ -296,7 +297,7 @@ export default function VendorOnboardingPage() {
             account.
           </p>
           <div className="mt-8">
-            <LinkButton href="/bundles" size="lg">
+            <LinkButton href={clientAppUrl("/bundles")} size="lg">
               Go to your celebrations
             </LinkButton>
           </div>

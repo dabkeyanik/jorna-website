@@ -49,6 +49,7 @@ import { VendorCard, VendorCardSkeleton } from "@/components/VendorCard";
 import { VendorHomeRedirect } from "@/components/VendorHomeRedirect";
 import { Eyebrow } from "@/components/marketing/Eyebrow";
 import { IconArrow, IconCalendar, IconShield, IconUsers } from "@/components/marketing/icons";
+import { clientAppUrl } from "@/lib/clientApp";
 
 const FAQ_ITEMS = [
   {
@@ -137,7 +138,7 @@ function HomeContent() {
   // Signed-in visitors get the same page, pointed at the app rather than at a
   // sign-up they've already done.
   const primary = user
-    ? { href: "/plan", label: "Build a bundle" }
+    ? { href: clientAppUrl("/plan"), label: "Build a bundle" }
     : { href: "/login?mode=register", label: "Get started — it's free" };
 
   return (
@@ -331,7 +332,7 @@ function HomeContent() {
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               {loading ? null : (
                 <>
-                  <LinkButton href={user ? "/plan" : primary.href} size="lg">
+                  <LinkButton href={user ? clientAppUrl("/plan") : primary.href} size="lg">
                     Start planning
                   </LinkButton>
                   <LinkButton href="/browse" variant="ghost" size="lg">

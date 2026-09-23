@@ -17,14 +17,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
-import { getMyVendor, listVendorBookings } from "@/lib/jorna";
+import { getMyVendor, listVendorBookings, voidContract } from "@/lib/jorna";
 import type { VendorBooking, VendorDetail } from "@/lib/types";
 import { contractNeedsVendor, contractStatus, type ContractStatus } from "@/lib/vendorPlan";
 import { guestBookingLink } from "@/lib/contractLink";
 import { Button, Card, LinkButton } from "@/components/ui";
 
 const STATUS: Record<ContractStatus, { label: string; tone: string }> = {
-  awaiting_details: { label: "Sent — not opened yet", tone: "bg-panel text-ink-soft" },
   awaiting_signature: { label: "Awaiting signature", tone: "bg-[#8b7bd8]/15 text-[#6a5bc0] dark:text-[#b3a8ee]" },
   deposit_due: { label: "Signed — deposit due", tone: "bg-gold/15 text-ink" },
   confirm_deposit: { label: "Confirm deposit", tone: "bg-maroon/10 text-maroon dark:text-gold" },
@@ -78,6 +77,8 @@ export default function ContractsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [confirmVoidId, setConfirmVoidId] = useState<string | null>(null);
+  const [voidingId, setVoidingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login?next=/contracts&role=vendor");
@@ -112,6 +113,24 @@ export default function ContractsPage() {
       setTimeout(() => setCopiedId((id) => (id === b.booking_id ? null : id)), 2000);
     } catch {
       /* clipboard can be denied — "View as client" still opens the link */
+    }
+  }
+
+  // Frees the date an unsigned contract was holding. Updates the row in
+  // place from the response rather than refetching everything.
+  async function voidOne(b: VendorBooking) {
+    setVoidingId(b.booking_id);
+    setError(null);
+    try {
+      const res = await voidContract(b.booking_id);
+      setContracts((prev) =>
+        prev.map((c) => (c.booking_id === b.booking_id ? { ...c, status: res.status } : c)),
+      );
+      setConfirmVoidId(null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't void that contract.");
+    } finally {
+      setVoidingId(null);
     }
   }
 
@@ -275,8 +294,35 @@ export default function ContractsPage() {
                         </a>
                       </>
                     ) : null}
+                    {status === "awaiting_signature" ? (
+                      <Button variant="quiet" onClick={() => setConfirmVoidId(b.booking_id)}>
+                        Void
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
+
+                {confirmVoidId === b.booking_id ? (
+                  <div className="mt-3 rounded-lg bg-panel p-3">
+                    <p className="text-sm text-ink-soft">
+                      Void this contract? The link stops working and{" "}
+                      {prettyDate(b.date_iso) ?? "the date"} opens up for other bookings.
+                      {b.guest_email ? " Your client will get an email saying it was withdrawn." : ""}
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <Button
+                        size="md"
+                        disabled={voidingId === b.booking_id}
+                        onClick={() => voidOne(b)}
+                      >
+                        {voidingId === b.booking_id ? "Voiding…" : "Void contract"}
+                      </Button>
+                      <Button variant="ghost" size="md" onClick={() => setConfirmVoidId(null)}>
+                        Keep it
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </Card>
             );
           })

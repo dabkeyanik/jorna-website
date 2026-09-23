@@ -20,6 +20,7 @@ import { loadIsVendor } from "@/lib/role";
 import { Card, LinkButton, Stars } from "@/components/ui";
 import { ModerationMenu } from "@/components/ModerationMenu";
 import { AskVendor } from "@/components/AskVendor";
+import { clientAppUrl } from "@/lib/clientApp";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -156,7 +157,7 @@ function ServiceRow({ service, canBook }: { service: ServiceItem; canBook: boole
                 it. */}
             {canBook ? (
               <LinkButton
-                href={`/book?service=${service.service_id}`}
+                href={clientAppUrl(`/book?service=${service.service_id}`)}
                 size="md"
                 className="relative z-10 ml-auto"
               >
@@ -411,7 +412,7 @@ function VendorInner() {
               and budget.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
-              <LinkButton href="/plan">Build my bundle</LinkButton>
+              <LinkButton href={clientAppUrl("/plan")}>Build my bundle</LinkButton>
               <AskVendor vendorId={vendor.vendor_id} />
             </div>
           </div>

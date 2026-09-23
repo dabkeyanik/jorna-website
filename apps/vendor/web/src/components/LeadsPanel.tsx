@@ -170,7 +170,7 @@ export function LeadsPanel({
               </div>
               {!lead.converted_booking_id ? (
                 <div className="mt-3 flex gap-2">
-                  <LinkButton href="/contracts/new" variant="ghost" size="md">
+                  <LinkButton href={`/contracts/new?lead=${lead.lead_id}`} variant="ghost" size="md">
                     Set up booking →
                   </LinkButton>
                   <Button

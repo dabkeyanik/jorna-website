@@ -367,3 +367,38 @@ None of Home's own in-page "Browse vendors" buttons (hero, vendor showcase,
 closing CTA) were removed — only the persistent header tab. A signed-out
 visitor can still reach `/browse` by clicking any of those, just not from
 the header on every page.
+
+---
+
+## Decision: Client-app links leave for book.jornaevents.com; contract Phase 0 fixes (2026-09-23)
+
+### Context
+An audit of the package → contract → booking flows found that every client
+route this repo still linked to — `/book`, `/plan`, `/bundle`, `/bundles` —
+was deleted when this repo was forked into the vendor app, so a customer's
+"Book this" on jornaevents.com 404'd. The client app lives in the
+`jorna-website` repo at book.jornaevents.com. The same audit found contract
+bugs: a per-person package's rate was pre-filled as the whole contract's
+total, an unsigned contract held its date forever with no way to void it,
+a vendor couldn't say who a contract was for, and a lead's "Set up booking"
+opened a blank form without converting the lead.
+
+### Decision
+- `lib/clientApp.ts`'s `clientAppUrl()` builds absolute links into the client
+  app (`NEXT_PUBLIC_CLIENT_APP_URL`, default `https://book.jornaevents.com`);
+  every client-route link uses it. The product decision (user, 2026-09-23)
+  was to send customers there rather than remove booking from this site.
+- `/contracts/new` takes optional client name/email/phone, venue and an end
+  date; a per-unit package asks "how many" and totals rate × quantity; the
+  cancellation window is entered in days (stored in hours, as before, and
+  the same on `/vendor-profile`'s defaults). `?lead=<id>` pre-fills from a
+  lead and submits via `convertLead`.
+- `/contracts` can **Void** an unsigned contract (backend
+  `POST /contracts/{id}/void`), and `/booking-link` shows a voided link as
+  withdrawn. `contractStatus` dropped `awaiting_details`: it was inferred
+  from a missing `guest_name`, which the vendor can now fill in themselves.
+
+Later phases (tentative holds on send, line items/add-ons, payment
+schedules, account-synced templates, e-sign audit trail, marketplace
+requests becoming proposals) are planned, not built — decisions for them
+were recorded with the user on 2026-09-23.
