@@ -25,7 +25,10 @@ always "none, verify manually" until a test runner is added.
   nav chrome, and the root-route special case that makes `/` serve the app's
   Home page.
 - **Code:** `web/src/app/layout.tsx`, `web/src/app/page.tsx`,
-  `web/src/app/home/`, `public/_redirects`.
+  `web/src/app/home/`, `public/_redirects`. Home's three "learn more" pages
+  — `how-it-works/`, `for-clients/`, `for-vendors/` (split out of Home's own
+  scroll 2026-09, see `docs/DECISIONS.md`) — share `components/marketing/`
+  (`Eyebrow.tsx`, `icons.tsx`).
 - **Entry points:** `RootLayout` wraps every page with `AuthProvider`,
   `SiteHeader`, `SiteFooter`, `PushRuntime`. Mobile nav is
   `MobileNavMenu.tsx` (a slide-out sheet, not a bottom tab bar — it replaced
@@ -39,9 +42,13 @@ always "none, verify manually" until a test runner is added.
   menu) and generic UI primitives used across pages.
 - **Code:** `web/src/components/SiteHeader.tsx`, `SiteFooter.tsx`,
   `MobileNavMenu.tsx`, `VendorNav.tsx`, `nav.tsx`, `ui.tsx`,
-  `ClientOnlyRoute.tsx`.
+  `ClientOnlyRoute.tsx`, `ChromeGate.tsx`.
 - **Depends on:** `lib/auth.tsx` (role-aware nav), `lib/role.ts`.
-- **Consumers:** every page, via the root layout.
+- **Consumers:** every page, via the root layout — except the five
+  vendor-shell routes, where `ChromeGate` hides this chrome in favour of
+  `VendorSidebar` (see "Vendor flow" below). `VendorNav.tsx` (the phone
+  pill-strip) now only renders on `/my-calendar` and `/my-earnings`, the two
+  vendor pages that stayed outside the sidebar shell.
 
 ## API client layer
 
@@ -87,12 +94,30 @@ always "none, verify manually" until a test runner is added.
 ## Vendor flow
 
 - **Responsible for:** vendor profile/services management, availability,
-  bookings, earnings, and the vendor equivalent of the task-rules module.
-- **Code:** `web/src/lib/vendorPlan.ts` (task rules), `web/src/app/vendor/`,
-  `vendor-profile/`, `my-availability/`, `my-bookings/`, `my-calendar/`,
-  `my-earnings/`, `my-dashboard/` (the vendor dashboard — ported from
-  `VENDOR_DASHBOARD_BRIEF.md`, see that doc's shipped-note), `web/src/components/ServicesManager.tsx`,
-  `VendorCard.tsx`, `VendorNav.tsx`.
+  bookings, contracts, clients, earnings, and the vendor equivalent of the
+  task-rules module.
+- **Sidebar shell (2026-09-22):** `web/src/app/(vendor)/layout.tsx` +
+  `web/src/components/VendorSidebar.tsx` wrap five routes — `my-dashboard/`,
+  `my-bookings/`, `contracts/`, `clients/` (new), `vendor-profile/` — all
+  moved under the `(vendor)/` route group (same URLs; route groups add no
+  path segment). `my-dashboard/` now also holds the pipeline kanban board and
+  the Leads view (`?view=leads`), folded in from the deleted `/my-pipeline`
+  route; `clients/` is a new standalone page (`ClientsPanel` is now
+  prop-driven, not self-fetching). `my-calendar/` and `my-earnings/` are
+  **not** in the sidebar and keep the old header nav + `VendorNav.tsx`. See
+  `docs/DECISIONS.md` for the full reasoning.
+- **Code:** `web/src/lib/vendorPlan.ts` (task rules, incl. `pipelineStage`/
+  `pipelineStats`), `web/src/app/vendor/`, `(vendor)/vendor-profile/`,
+  `my-availability/`, `(vendor)/my-bookings/`, `my-calendar/`, `my-earnings/`,
+  `(vendor)/my-dashboard/`, `(vendor)/contracts/`, `(vendor)/clients/`,
+  `web/src/components/ServicesManager.tsx`, `VendorCard.tsx`, `VendorNav.tsx`,
+  `VendorSidebar.tsx`, `ClientsPanel.tsx`, `LeadsPanel.tsx`.
+- **Named contract templates (2026-09):** `web/src/lib/contractTemplates.ts`
+  — deposit/cancellation/overtime/equipment/travel presets, saved/loaded from
+  `(vendor)/contracts/new/` and managed from `(vendor)/vendor-profile/`. Pure
+  `localStorage`, per-browser not per-account — there's no backend template
+  concept, only the single `default_*` fields on `VendorDetail`. See
+  `HONEYBOOK_PARITY_PLAN.md` §1.1 for why.
 - **First-time setup:** `web/src/app/vendor-onboarding/` — a resumable
   3-step wizard (identity+bio, reach, first service) that both the
   register-as-vendor flow and "Start selling" route to instead of

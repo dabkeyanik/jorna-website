@@ -20,8 +20,8 @@ import {
   type VendorDetail,
   type VendorSpecialization,
 } from "@/lib/types";
+type GuestCountMode = NonNullable<VendorDetail["default_guest_count_mode"]>;
 import { Button, Card, LinkButton, Stars } from "@/components/ui";
-import { VendorNav } from "@/components/VendorNav";
 import { ServicesManager } from "@/components/ServicesManager";
 import { AvailabilityFields } from "@/components/AvailabilityFields";
 import {
@@ -31,6 +31,11 @@ import {
   VendorContractDefaultsFields,
   contractDefaultsToStrings,
 } from "@/components/VendorProfileFields";
+import {
+  deleteTemplate,
+  listTemplates,
+  type ContractTemplate,
+} from "@/lib/contractTemplates";
 
 function prettyDate(iso?: string | null): string | null {
   if (!iso || iso === "TBD") return null;
@@ -68,10 +73,21 @@ export default function VendorProfilePage() {
   const [overtimeRate, setOvertimeRate] = useState("");
   const [equipmentPower, setEquipmentPower] = useState("");
   const [travel, setTravel] = useState("");
+  const [guestCountMode, setGuestCountMode] = useState<GuestCountMode>("optional");
+  const [templates, setTemplates] = useState<ContractTemplate[]>([]);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login?next=/vendor-profile&role=vendor");
   }, [authLoading, user, router]);
+
+  useEffect(() => {
+    setTemplates(listTemplates());
+  }, []);
+
+  function removeTemplate(id: string) {
+    deleteTemplate(id);
+    setTemplates((prev) => prev.filter((t) => t.id !== id));
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -106,6 +122,7 @@ export default function VendorProfilePage() {
         setOvertimeRate(defaults.overtimeRate);
         setEquipmentPower(defaults.equipmentPower);
         setTravel(defaults.travel);
+        setGuestCountMode(defaults.guestCountMode as GuestCountMode);
         // Both best-effort: the profile stays editable when either fails.
         const [r, svc] = await Promise.all([
           getVendorReviews(mine.vendor_id).catch(() => null),
@@ -168,6 +185,7 @@ export default function VendorProfilePage() {
           equipmentPower.trim() || travel.trim()
             ? { equipment_power: equipmentPower.trim() || undefined, travel: travel.trim() || undefined }
             : null,
+        default_guest_count_mode: guestCountMode,
       });
       setVendor(updated);
       setSaved(true);
@@ -183,8 +201,7 @@ export default function VendorProfilePage() {
   }
 
   return (
-    <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-10">
-      <VendorNav />
+    <div>
       {/* Everything a client sees, in one place: what you sell, who you are,
           and what people have said. Services used to be a page of their own,
           so setting up meant finding two — and neither was the whole listing. */}
@@ -263,11 +280,13 @@ export default function VendorProfilePage() {
               overtimeRate={overtimeRate}
               equipmentPower={equipmentPower}
               travel={travel}
+              guestCountMode={guestCountMode}
               onDepositPercentChange={setDepositPercent}
               onCancellationWindowHoursChange={setCancellationWindowHours}
               onOvertimeRateChange={setOvertimeRate}
               onEquipmentPowerChange={setEquipmentPower}
               onTravelChange={setTravel}
+              onGuestCountModeChange={setGuestCountMode}
             />
           </div>
         </Card>
@@ -292,6 +311,35 @@ export default function VendorProfilePage() {
           </Button>
         </div>
       </form>
+
+      {/* Not part of the profile save above — these live entirely in this
+          browser's localStorage (lib/contractTemplates.ts), not on the
+          vendor's account, so there's no endpoint to include them in. See
+          HONEYBOOK_PARITY_PLAN.md §1.1 for why that's a deliberate cut. */}
+      {templates.length > 0 ? (
+        <>
+          <h2 className="serif mt-10 text-2xl text-ink">Saved contract templates</h2>
+          <Card className="mt-5 p-6">
+            <p className="text-sm text-ink-soft">
+              Saved on this device — used from the template picker on{" "}
+              <span className="font-medium text-ink">Contracts → New booking</span>.
+            </p>
+            <div className="mt-4 grid gap-2">
+              {templates.map((t) => (
+                <div
+                  key={t.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5"
+                >
+                  <span className="text-sm font-medium text-ink">{t.name}</span>
+                  <Button variant="ghost" size="md" onClick={() => removeTemplate(t.id)}>
+                    Delete template
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </>
+      ) : null}
 
       {/* Availability saves through a different endpoint (setMyAvailability,
           not updateMyVendor) than everything above, so it keeps its own save

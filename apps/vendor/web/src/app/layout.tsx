@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { PushRuntime } from "@/components/PushRuntime";
 import { SentryRuntime } from "@/components/SentryRuntime";
+import { ChromeGate } from "@/components/ChromeGate";
 
 export const metadata: Metadata = {
   title: "Jorna — Plan your celebration",
@@ -29,9 +30,15 @@ export default function RootLayout({
       <body className="flex min-h-full flex-col">
         <SentryRuntime />
         <AuthProvider>
-          <SiteHeader />
+          {/* Suppressed on the vendor-shell routes, which render their own
+              persistent sidebar (VendorSidebar) instead — see ChromeGate. */}
+          <ChromeGate>
+            <SiteHeader />
+          </ChromeGate>
           <main className="flex-1">{children}</main>
-          <SiteFooter />
+          <ChromeGate>
+            <SiteFooter />
+          </ChromeGate>
           {/* Foreground web-push listener; no-op unless signed in + permitted. */}
           <PushRuntime />
         </AuthProvider>

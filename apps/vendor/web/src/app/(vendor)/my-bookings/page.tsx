@@ -16,7 +16,7 @@ import {
   setBookingStatus,
 } from "@/lib/jorna";
 import { checkInAtVenue, LocationError } from "@/lib/checkin";
-import { paymentsSetup } from "@/lib/vendorPlan";
+import { isDeadVendorBooking, paymentsSetup } from "@/lib/vendorPlan";
 import {
   BOOKING_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
@@ -29,7 +29,6 @@ import {
   type VendorDetail,
 } from "@/lib/types";
 import { Button, Card, LinkButton } from "@/components/ui";
-import { VendorNav } from "@/components/VendorNav";
 import { NegotiationPanel } from "@/components/NegotiationPanel";
 import { DateChangeRequest } from "@/components/DateChangeRequest";
 import { MessageVendorButton } from "@/components/MessageVendorButton";
@@ -104,6 +103,7 @@ export default function MyBookingsPage() {
   const [confirmDecline, setConfirmDecline] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("pending");
+  const [query, setQuery] = useState("");
   // Whether accepting here would actually get this vendor paid — the Stripe
   // gate used to only surface on /my-dashboard, so a vendor who works from
   // this page could accept any number of bookings without ever seeing it.
@@ -263,8 +263,21 @@ export default function MyBookingsPage() {
     );
   }
 
-  const shown = bookings.filter((b) => matches(filter, b));
+  const q = query.trim().toLowerCase();
+  const shown = bookings
+    .filter((b) => matches(filter, b))
+    .filter(
+      (b) =>
+        !q ||
+        [clientDisplayName(b), b.service_name, b.event_name].some((v) =>
+          v?.toLowerCase().includes(q),
+        ),
+    );
   const pendingCount = bookings.filter((b) => matches("pending", b)).length;
+  const confirmedCount = bookings.filter((b) => matches("upcoming", b)).length;
+  const totalContractedAmount = bookings
+    .filter((b) => !isDeadVendorBooking(b))
+    .reduce((sum, b) => sum + priceLine(b).amount, 0);
   const setup = paymentsSetup(stripe);
   // Stripe's gate has nothing to say to a vendor who already chose Direct —
   // they don't need it — so this stays false for that track instead of
@@ -275,8 +288,7 @@ export default function MyBookingsPage() {
     stripeChecked && !setup.ready && vendor.payment_method !== "manual";
 
   return (
-    <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-10">
-      <VendorNav />
+    <div>
       <header>
         <span className="eyebrow">Selling</span>
         <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold sm:text-5xl">
@@ -288,6 +300,27 @@ export default function MyBookingsPage() {
             : "Nothing waiting on you right now."}
         </p>
       </header>
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="p-4">
+          <p className="text-xs uppercase tracking-wide text-ink-faint">Total bookings</p>
+          <p className="serif mt-1 text-2xl text-ink">{bookings.length}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs uppercase tracking-wide text-ink-faint">Confirmed / active</p>
+          <p className="serif mt-1 text-2xl text-green">{confirmedCount}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs uppercase tracking-wide text-ink-faint">Pending inquiry</p>
+          <p className="serif mt-1 text-2xl text-gold">{pendingCount}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs uppercase tracking-wide text-ink-faint">Total contracted</p>
+          <p className="serif mt-1 text-2xl text-maroon dark:text-gold">
+            {money(totalContractedAmount)}
+          </p>
+        </Card>
+      </div>
 
       {paymentsBlocked ? (
         <div className="mt-6 rounded-lg border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-ink-soft">
@@ -301,20 +334,29 @@ export default function MyBookingsPage() {
         </div>
       ) : null}
 
-      <div className="mt-6 flex flex-wrap gap-2">
-        {FILTERS.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => setFilter(f.value)}
-            className={`rounded-full border px-3.5 py-1.5 text-sm transition ${
-              filter === f.value
-                ? "border-gold bg-gold/15 text-maroon dark:text-gold"
-                : "border-card-edge bg-ground-2 text-ink-soft hover:border-gold/50"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          {FILTERS.map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setFilter(f.value)}
+              className={`rounded-full border px-3.5 py-1.5 text-sm transition ${
+                filter === f.value
+                  ? "border-gold bg-gold/15 text-maroon dark:text-gold"
+                  : "border-card-edge bg-ground-2 text-ink-soft hover:border-gold/50"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search bookings…"
+          className="w-full max-w-xs rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2 text-sm text-ink outline-none transition focus:border-gold focus:ring-2 focus:ring-gold/30"
+        />
       </div>
 
       {error ? (

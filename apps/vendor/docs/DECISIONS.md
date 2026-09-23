@@ -228,3 +228,84 @@ A vendor row saved while the flag was off always has `payment_method:
 a vendor who already had `payment_method: "stripe"` on file, since the
 backend's booking-time override is what actually keeps new bookings off
 Stripe regardless of what a vendor's profile still says.
+
+---
+
+## Decision: persistent vendor sidebar, replacing the shared header nav for most seller pages
+
+### Context
+The vendor side of the app (pipeline, bookings, contracts, listing) used to
+share `SiteHeader`'s top nav and `VendorNav`'s phone pill-strip with the
+client-facing marketing/marketplace pages — the same chrome for two very
+different products. `my-dashboard/page.tsx` had an explicit note from its own
+2026-07-27 port explaining why a left sidebar from that Figma design was
+*not* carried over: "the app has a header nav and a phone tab bar already,
+and a third shell would make the vendor side feel like a different product."
+
+A second Figma Make prototype ("sprint-center", 2026-09-22) made the case the
+other way: a persistent sidebar (Dashboard/Bookings/Contracts/Clients/
+Settings) that makes the vendor dashboard the app's primary surface for a
+vendor, not one destination in a nav shared with the marketing site.
+
+### Decision
+Reversed the 2026-07-27 call. `VendorSidebar` (`web/src/components/
+VendorSidebar.tsx`) now wraps five vendor routes via a route group
+(`web/src/app/(vendor)/layout.tsx`): `/my-dashboard`, `/my-bookings`,
+`/contracts/new`, `/clients` (new), `/vendor-profile`. `ChromeGate`
+(`web/src/components/ChromeGate.tsx`) hides `SiteHeader`/`SiteFooter` on
+those routes by pathname — the one conditional-chrome check in the app.
+`/my-pipeline` (the kanban board + Leads/Clients tabs) was folded into
+`/my-dashboard`; Clients was promoted to its own route; Leads stayed a
+`?view=leads` tab on Dashboard (no sidebar slot for it in the new design).
+`/my-calendar` and `/my-earnings` are **not** in the sidebar (only 5 items in
+the design) and keep using the old header nav + `VendorNav`.
+
+The marketing Home page at `/` is unchanged — this is a rebuild of the
+signed-in vendor experience, not a reversal of the separate "root is the
+marketing Home" decision above.
+
+The sidebar also introduces the app's first manual light/dark toggle
+(`web/src/lib/theme.ts`) — `globals.css`'s `data-theme` mechanism existed
+already but nothing before this ever set it; the app only ever followed
+`prefers-color-scheme`.
+
+### Consequences
+A vendor now has two different navigation chromes depending on which page
+they're on (sidebar on the five shell routes, shared header everywhere else,
+including Calendar/Earnings and any client-facing page they visit). This is
+a deliberate, disclosed tradeoff, not an oversight — moving Calendar/Earnings
+into the sidebar too, or giving the whole app one nav system, is future work
+if the sidebar's scope grows past its initial five destinations.
+
+---
+
+## Decision: Home trimmed to a landing page; How it works / For clients / For vendors split into their own pages
+
+### Context
+Home was one long scroll: hero, a 3-step "How it works" section, an
+illustrative bundle showcase, a live vendor showcase, a "For vendors" pitch
+card, an escrow/trust section, an FAQ, and a closing CTA. SiteHeader's
+signed-out nav linked into two of these as `#how`/`#vendors` anchors. There
+was no dedicated "for clients" case being made anywhere — most of Home was
+already client-facing content, but nothing stated the trust/escrow pitch on
+its own terms the way the vendor card made the vendor case.
+
+### Decision
+Three real pages now exist: `/how-it-works` (the 3-step explanation plus the
+bundle example and celebration picker that make it concrete), `/for-clients`
+(new — the escrow/trust content, given its own page rather than a mid-scroll
+section), and `/for-vendors` (the existing pitch card, given room to be a
+full page). Home is trimmed to: hero, the live vendor showcase (real data,
+kept as Home's proof), a "learn more" section of three cards linking to the
+pages above, the FAQ, and the closing CTA. SiteHeader's signed-out nav
+(`SiteHeader.tsx`) links to the three real pages instead of `#how`/`#vendors`
+anchors, and gained a fourth link ("For clients") it didn't have before.
+Shared bits (`Eyebrow`, the marketing icon set) moved to
+`components/marketing/` since four pages now use them instead of one.
+
+### Consequences
+No redirects were added for the old `/home#how`/`/home#vendors` anchors —
+they were never separately indexable URLs, only in-page scroll targets, and
+the only place that linked to them (`SiteHeader`) was updated in the same
+change. A stray bookmark to `/home#how` still loads Home fine; it just lands
+at the top instead of scrolling down, since that `id` no longer exists.

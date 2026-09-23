@@ -89,7 +89,14 @@ test.describe("vendor onboarding", () => {
     await page.getByRole("link", { name: "I'll add packages later" }).click();
 
     // A route change with no reload — the moment the fixed effect re-checks.
-    await expect(page.getByRole("link", { name: "Earnings" })).toBeVisible();
+    // "I'll add packages later" lands on /vendor-profile, one of the sidebar-
+    // shell routes (see docs/DECISIONS.md) — the shared header (and its
+    // "Get started"/"Earnings" links) is hidden there in favour of
+    // VendorSidebar, so the vendor-tabs switch shows up as the sidebar
+    // itself appearing rather than a header link changing.
+    await expect(
+      page.getByRole("navigation", { name: "Vendor" }).getByRole("link", { name: "Dashboard" }),
+    ).toBeVisible();
     await expect(page.getByRole("link", { name: "Get started" })).not.toBeVisible();
   });
 

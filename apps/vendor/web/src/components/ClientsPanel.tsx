@@ -1,15 +1,13 @@
 "use client";
 
-// The Clients view inside /my-pipeline: a vendor's own CRM, every client
-// they've ever booked, grouped by account when there is one, or by
-// name+phone for a guest booking (no account to key on) — see the
-// backend's contract_service.get_vendor_clients. Fetches independently of
-// the Board/Leads views since it's the one dataset my-pipeline's page.tsx
-// doesn't already hold, and only when this view is actually selected.
+// The vendor's client CRM — every client they've ever booked, grouped by
+// account when there is one, or by name+phone for a guest booking (no
+// account to key on) — see the backend's contract_service.get_vendor_clients.
+// Promoted to its own top-level page (app/(vendor)/clients/page.tsx) as part
+// of the sidebar redesign; used to be a view tab inside /my-pipeline. Data-
+// driven by its parent (same pattern as LeadsPanel) so the page can compute
+// the stat tiles and search filter from the same fetch.
 
-import { useEffect, useState } from "react";
-import { ApiError } from "@/lib/api";
-import { getVendorClients } from "@/lib/jorna";
 import type { VendorClient } from "@/lib/types";
 import { Card } from "@/components/ui";
 
@@ -17,40 +15,9 @@ function money(cents: number): string {
   return `$${Math.round(cents / 100).toLocaleString()}`;
 }
 
-export function ClientsPanel() {
-  const [clients, setClients] = useState<VendorClient[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    getVendorClients()
-      .then((res) => {
-        if (!cancelled) setClients(res.items);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Couldn't load your clients.");
-      })
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (loading) {
-    return <p className="py-10 text-center text-ink-soft">Loading…</p>;
-  }
-
+export function ClientsPanel({ clients }: { clients: VendorClient[] }) {
   return (
     <div>
-      <p className="text-ink-soft">Everyone you&apos;ve booked, in one place.</p>
-
-      {error ? (
-        <p role="alert" className="mt-4 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
-          {error}
-        </p>
-      ) : null}
-
       {clients.length === 0 ? (
         <p className="mt-6 text-ink-soft">No clients yet — they&apos;ll show up here once you have a booking.</p>
       ) : (

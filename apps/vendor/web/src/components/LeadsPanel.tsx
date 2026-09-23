@@ -1,11 +1,12 @@
 "use client";
 
-// The Leads view inside /my-pipeline. Informal, off-platform prospects a
-// vendor wants to track before they're a real booking — "DM'd on Instagram,
-// maybe October, no venue yet." A lead isn't a Booking (no committed
-// date/price yet); converting one creates a real Contract and the lead
-// stays around as CRM history of how that client was won. The Board view
-// (my-pipeline's own page.tsx) renders the same, unconverted leads
+// The Leads view inside /my-dashboard (?view=leads) — folded in from the old
+// /my-pipeline route in the 2026-09 sidebar redesign. Informal, off-platform
+// prospects a vendor wants to track before they're a real booking — "DM'd on
+// Instagram, maybe October, no venue yet." A lead isn't a Booking (no
+// committed date/price yet); converting one creates a real Contract and the
+// lead stays around as CRM history of how that client was won. The Board
+// view (my-dashboard's own page.tsx) renders the same, unconverted leads
 // read-only in its Inquiry column — this panel is where they're actually
 // created/edited/deleted.
 

@@ -3,28 +3,24 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// The seller-side pages, on phones only.
+// The seller-side pages, on phones only — and, since the 2026-09 sidebar
+// redesign (see docs/DECISIONS.md), only rendered by the two vendor pages
+// that didn't move into that shell: /my-calendar and /my-earnings. Every
+// other seller destination (Dashboard, Bookings, Contracts, Clients,
+// Settings) now lives behind VendorSidebar instead, which replaces this
+// strip on those routes.
 //
-// The desktop header carries all of these now (VENDOR_DESKTOP_TABS) — this
-// strip sat directly beneath it with "Dashboard" in both, a hand's width apart.
-// A phone tab bar can't hold nine, so there this survives: the bar is at the
-// bottom of the screen and this is at the top of the content, which doesn't
-// read as the same row twice.
+// The desktop header still carries the full set (VENDOR_DESKTOP_TABS), so a
+// vendor on Calendar or Earnings can still reach the sidebar-shell pages from
+// there; this row exists for phones, which don't have that header row.
 //
 // basePath is applied by next/link, so hrefs stay app-relative.
-//
-// Bookings used to also be a tab in the main nav; it isn't any more — the
-// dashboard is the way into the seller side, and this row is how you move
-// around inside it. "All bookings" rather than "Requests" because the dashboard
-// already has a Requests section holding just the ones awaiting an answer, and
-// this page is the whole list.
 const TABS = [
   { href: "/my-dashboard", label: "Dashboard" },
-  { href: "/my-pipeline", label: "Pipeline" },
-  { href: "/my-bookings", label: "All bookings" },
+  { href: "/my-bookings", label: "Bookings" },
   { href: "/my-calendar", label: "Calendar" },
   { href: "/my-earnings", label: "Earnings" },
-  { href: "/vendor-profile", label: "Listing" },
+  { href: "/vendor-profile", label: "Settings" },
 ];
 
 export function VendorNav() {

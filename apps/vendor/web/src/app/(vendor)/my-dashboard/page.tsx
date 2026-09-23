@@ -1,18 +1,18 @@
 "use client";
 
-// The vendor dashboard, ported from the Figma Make design ("Design Revision
-// Request", 2026-07-27). It answers the three things a vendor opens the app
-// for: what needs me, when is my next job, and where is my money.
+// The vendor dashboard — the app's primary landing page for a vendor, and
+// (2026-09-22) home of the persistent sidebar shell (VendorSidebar, see
+// app/(vendor)/layout.tsx and docs/DECISIONS.md). Ported from two Figma Make
+// designs: the original task-oriented layout ("Design Revision Request",
+// 2026-07-27) — what needs me, when is my next job, where is my money — plus
+// the pipeline board and stat tiles from the "sprint-center" sidebar redesign
+// (2026-09-22), which folded in what used to be the separate /my-pipeline
+// route. Both Make exports write every colour as an inline
+// style="var(--maroon)"; the values match globals.css exactly but the names
+// don't, so both are rebuilt on the app's own utilities rather than pasted in.
 //
-// Ported rather than dropped in, the same way the marketing page was. The Make
-// export writes every colour as an inline style="var(--maroon)"; the values
-// match globals.css exactly but the names don't, so this is rebuilt on the
-// app's own utilities. The design's left sidebar is dropped too — the app has
-// a header nav and a phone tab bar already, and a third shell would make the
-// vendor side feel like a different product.
-//
-// Three things in the design were not carried over, because the API can't back
-// them:
+// Three things in the *first* design were not carried over, because the API
+// can't back them:
 //
 //   - "Expires in 18 h" on a request. Nothing expires: there is no expiry,
 //     deadline, or respond-by field anywhere in the schema.
@@ -25,9 +25,9 @@
 // lib/vendorPlan, which lib/attention also reads — so this and the "Needs you"
 // badge can't disagree.
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { ESCROW_ENABLED } from "@/lib/flags";
@@ -38,6 +38,7 @@ import {
   getMyVendor,
   getStripeStatus,
   getUnreadCount,
+  listLeads,
   listServices,
   listVendorBookings,
   respondToChange,
@@ -48,11 +49,15 @@ import { clearAttentionCache } from "@/lib/attention";
 import { checkInAtVenue, LocationError } from "@/lib/checkin";
 import {
   centsToMoney,
+  isDeadVendorBooking,
   listingHealth,
+  pipelineStage,
+  pipelineStats,
   vendorMoney,
   vendorEvents,
   vendorTasks,
   type HealthIssue,
+  type PipelineStage,
   type VendorEvent,
   type VendorMoney,
   type VendorTask,
@@ -62,15 +67,16 @@ import {
   priceLine,
   type AvailabilitySlot,
   type Earnings,
+  type Lead,
   type ServiceItem,
   type StripeStatus,
   type VendorBooking,
   type VendorDetail,
 } from "@/lib/types";
-import { Avatar, Button, LinkButton } from "@/components/ui";
-import { VendorNav } from "@/components/VendorNav";
+import { Avatar, Button, Card, LinkButton } from "@/components/ui";
 import { NegotiationPanel } from "@/components/NegotiationPanel";
 import { DateChangeRequest } from "@/components/DateChangeRequest";
+import { LeadsPanel } from "@/components/LeadsPanel";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -103,6 +109,7 @@ interface Snapshot {
   services?: ServiceItem[];
   availability?: AvailabilitySlot[];
   unread?: number;
+  leads?: Lead[];
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -194,14 +201,90 @@ function Bucket({
   );
 }
 
+// ── Pipeline board ───────────────────────────────────────────────────
+// Ported from the old /my-pipeline route (folded in 2026-09-22 — see
+// docs/DECISIONS.md). A pure client-side derivation over the same
+// `bookings` this page already fetches for "Your events" below — see
+// lib/vendorPlan.ts's pipelineStage for why there's no backend "stage"
+// column to keep in sync.
+
+const STAGES: { value: PipelineStage; label: string; dot: string }[] = [
+  { value: "inquiry", label: "Inquiry", dot: "bg-gold" },
+  { value: "awaiting_client", label: "Awaiting client", dot: "bg-[#8b7bd8]" },
+  { value: "confirmed", label: "Confirmed", dot: "bg-green" },
+  { value: "deposit_received", label: "Deposit received", dot: "bg-maroon dark:bg-gold" },
+  { value: "done", label: "Done", dot: "bg-ink-faint" },
+];
+
+type DashboardView = "board" | "leads";
+
+const VIEWS: { value: DashboardView; label: string }[] = [
+  { value: "board", label: "Board" },
+  { value: "leads", label: "Leads" },
+];
+
+function PipelineLeadRow({ lead }: { lead: Lead }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft px-4 py-3 first:border-t-0">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-ink">{lead.name}</p>
+        <p className="text-xs text-ink-faint">
+          {[lead.event_date_iso].filter(Boolean).join(" · ")}
+        </p>
+        {lead.note ? (
+          <p className="mt-1 text-xs text-ink-soft">&ldquo;{lead.note}&rdquo;</p>
+        ) : null}
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="rounded-full bg-ground-2 px-2 py-0.5 text-xs text-ink-faint">
+          Lead · no booking yet
+        </span>
+        <LinkButton href="/contracts/new" variant="ghost" size="md">
+          Set up booking →
+        </LinkButton>
+      </div>
+    </div>
+  );
+}
+
+function PipelineBookingRow({ b }: { b: VendorBooking }) {
+  const name = b.client_name || b.guest_name || "A client";
+  const price = priceLine(b);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft px-4 py-3 first:border-t-0">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-ink">{name}</p>
+        <p className="text-xs text-ink-faint">
+          {[b.service_name, b.date_iso].filter(Boolean).join(" · ")}
+        </p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="text-sm font-semibold text-maroon dark:text-gold">{money(price.amount)}</p>
+        {b.deposit_percent != null ? (
+          <p className="mt-0.5 text-xs text-ink-faint">
+            {b.deposit_confirmed_received_at
+              ? "Deposit confirmed"
+              : b.deposit_marked_paid_at
+                ? "Deposit marked paid"
+                : `Deposit due${b.deposit_amount_cents != null ? `: ${money(b.deposit_amount_cents / 100)}` : ""}`}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────────────
 
-export default function VendorDashboardPage() {
+function VendorDashboardInner() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const params = useSearchParams();
+  const view: DashboardView = (params.get("view") as DashboardView | null) ?? "board";
 
   const [vendor, setVendor] = useState<VendorDetail | null>(null);
   const [notVendor, setNotVendor] = useState(false);
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [bookings, setBookings] = useState<VendorBooking[]>([]);
   const [cash, setCash] = useState<VendorMoney | null>(null);
   // The whole status, not just whether it's complete: what Stripe is waiting on
@@ -230,7 +313,7 @@ export default function VendorDashboardPage() {
 
     // Each of these is a section of the page; one failing should cost that
     // section, not the dashboard.
-    const [bookings, earnings, stripe, services, availability, unread] =
+    const [bookings, earnings, stripe, services, availability, unread, leads] =
       await Promise.all([
         listVendorBookings(me.vendor_id, { limit: 100 })
           .then((r) => r.items)
@@ -249,10 +332,15 @@ export default function VendorDashboardPage() {
         getUnreadCount()
           .then((r) => r.unread_count)
           .catch(() => 0),
+        // The pipeline board's open-lead cards, and the Leads view tab (see
+        // "Pipeline board" above) — ported from the old /my-pipeline route.
+        listLeads()
+          .then((r) => r.items)
+          .catch(() => [] as Lead[]),
       ]);
 
     return {
-      vendor: me, bookings, earnings, stripe, services, availability, unread,
+      vendor: me, bookings, earnings, stripe, services, availability, unread, leads,
     };
   }, [user]);
 
@@ -270,6 +358,7 @@ export default function VendorDashboardPage() {
     setServices(snap.services ?? []);
     setAvailability(snap.availability ?? []);
     setUnread(snap.unread ?? 0);
+    setLeads(snap.leads ?? []);
     setLoading(false);
   }, []);
 
@@ -415,8 +504,20 @@ export default function VendorDashboardPage() {
   const health = listingHealth({ vendor, services, availability });
   const name = [vendor?.f_name, vendor?.l_name].filter(Boolean).join(" ");
 
+  const openLeads = leads.filter((lead) => !lead.converted_booking_id);
+  const liveBookings = bookings.filter((b) => !isDeadVendorBooking(b));
+  const stats = pipelineStats(bookings);
+  const byStage: Record<PipelineStage, VendorBooking[]> = {
+    inquiry: [],
+    awaiting_client: [],
+    confirmed: [],
+    deposit_received: [],
+    done: [],
+  };
+  for (const b of liveBookings) byStage[pipelineStage(b)].push(b);
+
   return (
-    <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-10">
+    <div>
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <Avatar src={vendor?.pfp_url} name={name} size={48} />
@@ -432,17 +533,105 @@ export default function VendorDashboardPage() {
             ) : null}
           </div>
         </div>
+        <LinkButton href="/contracts/new" size="lg">
+          + New booking
+        </LinkButton>
       </header>
 
-      <div className="mt-6">
-        <VendorNav />
+      <div className="mt-6 flex flex-wrap gap-2">
+        {VIEWS.map((v) => (
+          <Link
+            key={v.value}
+            href={v.value === "board" ? "/my-dashboard" : `/my-dashboard?view=${v.value}`}
+            className={`rounded-full border px-3.5 py-1.5 text-sm transition ${
+              view === v.value
+                ? "border-gold bg-gold/15 text-maroon dark:text-gold"
+                : "border-card-edge bg-ground-2 text-ink-soft hover:border-gold/50"
+            }`}
+          >
+            {v.label}
+          </Link>
+        ))}
       </div>
 
       {notice ? (
-        <p className="mb-6 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
+        <p className="mt-6 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
           {notice}
         </p>
       ) : null}
+
+      {view === "leads" ? (
+        <div className="mt-7">
+          <LeadsPanel leads={leads} onLeadsChange={setLeads} />
+        </div>
+      ) : (
+        <>
+          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Card className="p-4">
+              <p className="text-xs uppercase tracking-wide text-ink-faint">Open inquiries</p>
+              <p className="serif mt-1 text-2xl text-ink">{stats.openInquiries + openLeads.length}</p>
+              <p className="mt-1 text-xs text-ink-faint">Leads not yet booked</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-xs uppercase tracking-wide text-ink-faint">Awaiting client</p>
+              <p className="serif mt-1 text-2xl text-ink">{stats.awaitingClient}</p>
+              <p className="mt-1 text-xs text-ink-faint">Link sent, not signed yet</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-xs uppercase tracking-wide text-ink-faint">Deposits still owed</p>
+              <p className="serif mt-1 text-2xl text-maroon dark:text-gold">
+                {centsToMoney(stats.depositsOwedCents)}
+              </p>
+              <p className="mt-1 text-xs text-ink-faint">Across open bookings</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-xs uppercase tracking-wide text-ink-faint">Confirmed events</p>
+              <p className="serif mt-1 text-2xl text-green">{stats.confirmedEvents}</p>
+            </Card>
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center gap-1.5 text-xs text-ink-faint">
+            {STAGES.map((s, i) => (
+              <span key={s.value} className="flex items-center gap-1.5">
+                {s.label}
+                {i < STAGES.length - 1 ? <span aria-hidden="true">→</span> : null}
+              </span>
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-4">
+            {STAGES.map((stage) => {
+              const items = byStage[stage.value];
+              const isInquiry = stage.value === "inquiry";
+              const count = isInquiry ? items.length + openLeads.length : items.length;
+              return (
+                <Card key={stage.value} className="overflow-hidden p-0">
+                  <div className="flex items-center gap-2 bg-ground-2 px-4 py-2.5">
+                    <span aria-hidden="true" className={`size-2 rounded-full ${stage.dot}`} />
+                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                      {stage.label}
+                    </p>
+                    <span className="rounded-full bg-ground px-2 py-0.5 text-xs text-ink-faint">
+                      {count}
+                    </span>
+                  </div>
+                  {count === 0 ? (
+                    <p className="px-4 py-3 text-xs text-ink-faint">Nothing here.</p>
+                  ) : (
+                    <div>
+                      {isInquiry &&
+                        openLeads.map((lead) => <PipelineLeadRow key={lead.lead_id} lead={lead} />)}
+                      {items.map((b) => (
+                        <PipelineBookingRow key={b.booking_id} b={b} />
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {/* Two columns from lg up: the left is what a vendor works through, the
           right is what they refer to. Phones and tablets keep the single stack,
@@ -608,8 +797,16 @@ export default function VendorDashboardPage() {
 
       {/* No "all your bookings" footer. The same link is on the section above,
           where it's next to the six jobs it's offering to extend, and again in
-          VendorNav at the top of the page. Three routes to one list. */}
+          the sidebar's own Bookings destination. Three routes to one list. */}
     </div>
+  );
+}
+
+export default function VendorDashboardPage() {
+  return (
+    <Suspense fallback={<p className="py-20 text-center text-ink-soft">Loading…</p>}>
+      <VendorDashboardInner />
+    </Suspense>
   );
 }
 

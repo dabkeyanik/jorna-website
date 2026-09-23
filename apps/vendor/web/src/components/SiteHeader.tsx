@@ -32,7 +32,10 @@ export function SiteHeader() {
         {/* Signed out, the header was the wordmark and two buttons — which on a
             page that now reads as a marketing site left nothing to navigate
             with. These are the parts of it a visitor can actually reach: the
-            marketplace is public, and the rest are sections of the home page. */}
+            marketplace is public, and the other three are Home's own
+            "learn more" destinations (/how-it-works, /for-clients,
+            /for-vendors) — real pages since the 2026-09 Home trim, not
+            #-anchors into a longer scroll. See docs/DECISIONS.md. */}
         {!items && !loading ? (
           <nav
             className="hidden min-w-0 flex-1 items-center justify-end gap-5 md:flex lg:gap-6"
@@ -40,8 +43,9 @@ export function SiteHeader() {
           >
             {[
               { href: "/marketplace", label: "Browse vendors" },
-              { href: "/home#how", label: "How it works" },
-              { href: "/home#vendors", label: "For vendors" },
+              { href: "/how-it-works", label: "How it works" },
+              { href: "/for-clients", label: "For clients" },
+              { href: "/for-vendors", label: "For vendors" },
             ].map((link) => (
               <Link
                 key={link.href}

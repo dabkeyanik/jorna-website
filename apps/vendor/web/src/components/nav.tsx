@@ -32,7 +32,7 @@ export interface NavItem {
   match: string[];
 }
 
-const I = {
+export const I = {
   home: <path d="M3 11.5 12 4l9 7.5M5.5 10v9.5h13V10" />,
   build: (
     <path d="M12 3l1.8 4.7L18.5 9l-4.7 1.3L12 15l-1.8-4.7L5.5 9l4.7-1.3L12 3ZM18 14l.9 2.1 2.1.9-2.1.9L18 20l-.9-2.1L15 17l2.1-.9L18 14Z" />
@@ -51,6 +51,15 @@ const I = {
     <path d="M9 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM2.5 20a6.5 6.5 0 0 1 13 0M16 8.2a3 3 0 1 1 0 5.9M16.3 14.6c2.7.4 4.7 2.4 4.7 5.4" />
   ),
   leads: <path d="M4 4.5h16l-6.2 8v6.4l-3.6 1.6v-8L4 4.5Z" />,
+  calendar: (
+    <path d="M4 5.5h16v15H4v-15Zm0 4.5h16M8 3v4M16 3v4" />
+  ),
+  document: (
+    <path d="M6 3h9l3 3v15H6V3Zm9 0v3h3M9 12h6M9 16h6" />
+  ),
+  gear: (
+    <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3H9.8l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4.4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.07-.4.1-.8.1-1.2Z" />
+  ),
 };
 
 export const icon = (d: React.ReactNode, className = "size-6") => (
@@ -128,7 +137,7 @@ export const VENDOR_TABS: NavItem[] = [
       "/vendor",
       "/home",
       "/browse",
-      "/my-pipeline",
+      "/clients",
       "/contracts",
     ],
   },
@@ -166,13 +175,25 @@ export const VENDOR_DESKTOP_TABS: NavItem[] = [
   {
     href: "/my-bookings",
     label: "Bookings",
-    icon: icon(I.dashboard),
+    icon: icon(I.pipeline),
     match: ["/my-bookings"],
+  },
+  {
+    href: "/contracts/new",
+    label: "Contracts",
+    icon: icon(I.document),
+    match: ["/contracts"],
+  },
+  {
+    href: "/clients",
+    label: "Clients",
+    icon: icon(I.clients),
+    match: ["/clients"],
   },
   {
     href: "/my-calendar",
     label: "Calendar",
-    icon: icon(I.dashboard),
+    icon: icon(I.calendar),
     match: ["/my-calendar"],
   },
   {
@@ -183,20 +204,12 @@ export const VENDOR_DESKTOP_TABS: NavItem[] = [
   },
   {
     href: "/vendor-profile",
-    label: "Listing",
-    icon: icon(I.profile),
+    label: "Settings",
+    icon: icon(I.gear),
     // Services live on this page now, so there is no separate tab for them.
     // "/vendor" is the public listing view — the same thing a client sees, so
     // it belongs here rather than leaving the bar unlit.
     match: ["/vendor-profile", "/vendor", "/marketplace"],
-  },
-  {
-    href: "/my-pipeline",
-    label: "Pipeline",
-    icon: icon(I.pipeline),
-    // Leads and Clients are view tabs on this page now (folded in from
-    // their own former routes), not separate nav entries.
-    match: ["/my-pipeline"],
   },
   NEEDS_YOU,
   MESSAGES,

@@ -13,8 +13,8 @@ import { ApiError } from "@/lib/api";
 import { createContract, getMyVendor, listServices } from "@/lib/jorna";
 import type { Contract, ServiceItem, VendorDetail } from "@/lib/types";
 import { Button, Card, Field } from "@/components/ui";
-import { VendorNav } from "@/components/VendorNav";
 import { contractDefaultsToStrings } from "@/components/VendorProfileFields";
+import { listTemplates, saveTemplate, type ContractTemplate } from "@/lib/contractTemplates";
 
 function guestBookingLink(token: string): string {
   // basePath is "/app" (next.config.ts) and doesn't rewrite a plain string
@@ -43,6 +43,11 @@ export default function NewContractPage() {
   const [equipmentPower, setEquipmentPower] = useState("");
   const [travel, setTravel] = useState("");
 
+  const [templates, setTemplates] = useState<ContractTemplate[]>([]);
+  const [templateId, setTemplateId] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Contract | null>(null);
@@ -51,6 +56,10 @@ export default function NewContractPage() {
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login?next=/contracts/new&role=vendor");
   }, [authLoading, user, router]);
+
+  useEffect(() => {
+    setTemplates(listTemplates());
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -88,6 +97,33 @@ export default function NewContractPage() {
     setServiceId(id);
     const svc = services.find((s) => s.service_id === id);
     if (svc && !amount) setAmount(svc.price.toString());
+  }
+
+  function applyTemplate(id: string) {
+    setTemplateId(id);
+    const t = templates.find((tpl) => tpl.id === id);
+    if (!t) return;
+    setDepositPercent(t.depositPercent);
+    setCancellationWindowHours(t.cancellationWindowHours);
+    setOvertimeRate(t.overtimeRate);
+    setEquipmentPower(t.equipmentPower);
+    setTravel(t.travel);
+  }
+
+  function saveCurrentAsTemplate() {
+    if (!newTemplateName.trim()) return;
+    const t = saveTemplate({
+      name: newTemplateName.trim(),
+      depositPercent,
+      cancellationWindowHours,
+      overtimeRate,
+      equipmentPower,
+      travel,
+    });
+    setTemplates((prev) => [...prev, t]);
+    setTemplateId(t.id);
+    setNewTemplateName("");
+    setSavingTemplate(false);
   }
 
   async function submit(e: React.FormEvent) {
@@ -152,8 +188,7 @@ export default function NewContractPage() {
   if (created) {
     const link = guestBookingLink(created.contract_token);
     return (
-      <div className="mx-auto w-[min(640px,100%-2rem)] py-14">
-        <VendorNav />
+      <div className="mx-auto w-[min(640px,100%-2rem)]">
         <div className="text-center">
           <p className="eyebrow">Contract created</p>
           <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold">Send this link</h1>
@@ -187,8 +222,7 @@ export default function NewContractPage() {
   }
 
   return (
-    <div className="mx-auto w-[min(640px,100%-2rem)] py-10">
-      <VendorNav />
+    <div className="mx-auto w-[min(640px,100%-2rem)]">
       <header>
         <span className="eyebrow">Contracts</span>
         <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold">New booking</h1>
@@ -257,7 +291,24 @@ export default function NewContractPage() {
         </Card>
 
         <Card className="grid gap-3 p-5 sm:grid-cols-2">
-          <p className="sm:col-span-2 text-sm font-medium text-ink-soft">Contract terms</p>
+          <div className="flex flex-wrap items-center justify-between gap-2 sm:col-span-2">
+            <p className="text-sm font-medium text-ink-soft">Contract terms</p>
+            {templates.length > 0 ? (
+              <select
+                aria-label="Contract template"
+                value={templateId}
+                onChange={(e) => applyTemplate(e.target.value)}
+                className="rounded-lg border border-card-edge bg-ground-2 px-2.5 py-1.5 text-xs text-ink outline-none focus:border-gold"
+              >
+                <option value="">Load a template…</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+          </div>
           <Field
             label="Deposit (%)"
             type="number"
@@ -298,6 +349,43 @@ export default function NewContractPage() {
               value={travel}
               onChange={(e) => setTravel(e.target.value)}
             />
+          </div>
+
+          <div className="sm:col-span-2">
+            {savingTemplate ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  autoFocus
+                  value={newTemplateName}
+                  onChange={(e) => setNewTemplateName(e.target.value)}
+                  placeholder="Template name, e.g. Standard DJ package"
+                  className="min-w-0 flex-1 rounded-lg border border-card-edge bg-ground-2 px-2.5 py-1.5 text-sm text-ink outline-none focus:border-gold"
+                />
+                <Button
+                  type="button"
+                  size="md"
+                  onClick={saveCurrentAsTemplate}
+                  disabled={!newTemplateName.trim()}
+                >
+                  Save
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="md"
+                  onClick={() => {
+                    setSavingTemplate(false);
+                    setNewTemplateName("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button type="button" variant="ghost" size="md" onClick={() => setSavingTemplate(true)}>
+                Save these terms as a template
+              </Button>
+            )}
           </div>
         </Card>
 
