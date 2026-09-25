@@ -8,7 +8,7 @@ import { ESCROW_ENABLED } from "@/lib/flags";
 import {
   getMyVendor,
   getVendorReviews,
-  listServices,
+  listMyServices,
   listVendorCategories,
   updateMyVendor,
 } from "@/lib/jorna";
@@ -60,6 +60,7 @@ export default function VendorProfilePage() {
 
   // Form
   const [bio, setBio] = useState("");
+  const [yearsExperience, setYearsExperience] = useState("");
   const [specializations, setSpecializations] = useState<VendorSpecialization[]>([]);
   const [radius, setRadius] = useState("");
   const [longDistance, setLongDistance] = useState(false);
@@ -106,6 +107,7 @@ export default function VendorProfilePage() {
         }
         setVendor(mine);
         setBio(mine.bio ?? "");
+        setYearsExperience(mine.years_experience?.toString() ?? "");
         setSpecializations(vendorSpecializations(mine));
         setRadius(mine.travel_radius_miles?.toString() ?? "");
         setLongDistance(Boolean(mine.open_to_long_distance));
@@ -126,7 +128,8 @@ export default function VendorProfilePage() {
         // Both best-effort: the profile stays editable when either fails.
         const [r, svc] = await Promise.all([
           getVendorReviews(mine.vendor_id).catch(() => null),
-          listServices({ vendor_id: mine.vendor_id, limit: 100 }).catch(() => null),
+          // Hidden and archived included — this is the vendor's own list.
+          listMyServices(mine.vendor_id).catch(() => null),
         ]);
         if (cancelled) return;
         if (r) setReviews(r.items);
@@ -169,6 +172,7 @@ export default function VendorProfilePage() {
         category: primary.category,
         subcategory: primary.subcategory ?? null,
         specializations,
+        years_experience: yearsExperience ? Number(yearsExperience) : null,
         travel_radius_miles: radius ? Number(radius) : null,
         open_to_long_distance: longDistance,
         open_to_price_negotiation: locationNegotiable,
@@ -242,6 +246,8 @@ export default function VendorProfilePage() {
               bio={bio}
               onSpecializationsChange={updateSpecializations}
               onBioChange={setBio}
+              yearsExperience={yearsExperience}
+              onYearsExperienceChange={setYearsExperience}
             />
 
             <VendorReachFields

@@ -10,6 +10,12 @@
 //
 // Takes the vendor and the taxonomy rather than fetching them: the page above
 // already has both, and a second copy of either could disagree with the first.
+//
+// Phase 1 of the package overhaul (backend 0063) added what a real listing
+// needs beyond one price: a status (listed / private / archived), hours
+// included, a "what's included" list, priced add-ons, and optional contract
+// terms that override the vendor's defaults. Years in business moved to the
+// vendor's own profile — it was asked again on every package.
 
 import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
@@ -18,7 +24,7 @@ import {
   deleteService,
   deleteServiceImage,
   deleteServiceVideo,
-  listServices,
+  listMyServices,
   updateService,
   uploadServiceImages,
   uploadServiceVideos,
@@ -27,14 +33,16 @@ import {
 import {
   priceUnitLabel,
   usableMedia,
+  type AddOn,
   type MediaItem,
+  type PackageStatus,
   type ServiceItem,
   type TaxonomyCategory,
   type VendorDetail,
 } from "@/lib/types";
 import { geocodeUsAddress } from "@/lib/geocode";
 import { checkImageFiles, checkVideoFiles, describeRejections } from "@/lib/uploads";
-import { Button, Card, Field } from "./ui";
+import { Button, Card, Chip, Field } from "./ui";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -46,33 +54,25 @@ function money(n: number) {
 // shapes aren't interchangeable.
 type LocalPreview = { url: string; type: "image" | "video" };
 
-// experience is stored server-side as free text ("Text", not a number column)
-// so old listings can carry whatever a vendor once typed ("9+ years",
-// "over a decade"). The form only collects a whole number of years now, so
-// these two convert at the edges: parse a leading number back out for
-// editing (falls back to blank rather than guessing at prose), and format the
-// number into the sentence the backend — and everywhere else that displays
-// it — still expects.
-function parseExperienceYears(raw?: string | null): string {
-  if (!raw) return "";
-  const n = parseInt(raw, 10);
-  return Number.isNaN(n) ? "" : String(n);
-}
-
-function formatExperienceYears(raw: string): string {
-  const n = Math.max(0, Math.round(Number(raw) || 0));
-  return n === 1 ? "1 year" : `${n} years`;
-}
-
 // The rate's multiplier. "event" is a flat price — everything else needs a
 // quantity from the client at booking time before it can be paid.
 const PRICE_UNITS = [
-  { value: "event", label: "Price per event" },
+  { value: "event", label: "Flat price" },
   { value: "person", label: "Per person" },
-  { value: "performer", label: "Per performer" },
   { value: "hour", label: "Per hour" },
   { value: "day", label: "Per day" },
+  { value: "performer", label: "Per performer" },
 ];
+
+const ADD_ON_UNITS: { value: AddOn["price_unit"]; label: string }[] = [
+  { value: "event", label: "flat" },
+  { value: "person", label: "per person" },
+  { value: "hour", label: "per hour" },
+];
+
+/** An add-on row while it's being typed — price as text, same reason as
+ *  FormState.price below. */
+type AddOnDraft = { id?: string; name: string; price: string; price_unit: AddOn["price_unit"] };
 
 // Same as ServiceInput, but price is the raw text the vendor is typing, not
 // a number — a native number input's own min/step validation fights a vendor
@@ -80,23 +80,81 @@ const PRICE_UNITS = [
 // "0" rather than let the field sit empty mid-edit). Plain text sidesteps
 // that entirely; save() parses and validates it before this goes anywhere
 // near the API.
-type FormState = Omit<ServiceInput, "price"> & { price: string };
+//
+// The other numeric fields are text for the same reason; terms are shown in
+// the units a vendor thinks in (days, dollars) and converted in save().
+type FormState = Omit<
+  ServiceInput,
+  | "price"
+  | "experience"
+  | "included_hours"
+  | "inclusions"
+  | "add_ons"
+  | "deposit_percent"
+  | "cancellation_window_hours"
+  | "overtime_rate_cents"
+> & {
+  price: string;
+  included_hours: string;
+  /** One inclusion per line. */
+  inclusionsText: string;
+  add_ons: AddOnDraft[];
+  deposit_percent: string;
+  cancellation_days: string;
+  overtime_rate: string;
+};
 
 const blank: FormState = {
   name: "",
   price: "",
-  experience: "",
-  // Per hour, matching the iOS create screen — the same vendor should not get a
-  // different starting point depending on where they list. It is also the safer
-  // way round: a rate left hourly by mistake just blocks checkout until the
-  // client supplies hours, whereas an hourly rate left flat by mistake books a
-  // whole event at one hour's price, and amount_cents freezes at payment.
-  price_unit: "hour",
+  // No default: the vendor picks. It used to start on "per hour" (iOS parity,
+  // and the safer mistake), but a vendor typing a flat price could miss the
+  // dropdown entirely and list an hourly rate by accident. Asking is safer
+  // than either default.
+  price_unit: "",
   description: "",
   negotiable: false,
   require_guest_count: false,
   require_performer_count: false,
+  status: "active",
+  included_hours: "",
+  inclusionsText: "",
+  add_ons: [],
+  deposit_percent: "",
+  cancellation_days: "",
+  overtime_rate: "",
 };
+
+/** The editable form for an existing package — also what Duplicate starts
+ *  from. */
+function formFrom(s: ServiceItem): FormState {
+  return {
+    name: s.name,
+    price: String(s.price),
+    price_unit: s.price_unit ?? "event",
+    category: s.category ?? "",
+    subcategory: s.subcategory ?? "",
+    description: s.description ?? "",
+    negotiable: Boolean(s.negotiable),
+    require_guest_count: Boolean(s.require_guest_count),
+    require_performer_count: Boolean(s.require_performer_count),
+    location: s.location ?? "",
+    venue_latitude: s.venue_latitude ?? null,
+    venue_longitude: s.venue_longitude ?? null,
+    status: s.status === "hidden" ? "hidden" : "active",
+    included_hours: s.included_hours != null ? String(s.included_hours) : "",
+    inclusionsText: (s.inclusions ?? []).join("\n"),
+    add_ons: (s.add_ons ?? []).map((a) => ({ ...a, price: String(a.price) })),
+    deposit_percent: s.deposit_percent != null ? String(s.deposit_percent) : "",
+    cancellation_days:
+      s.cancellation_window_hours != null ? String(Math.round(s.cancellation_window_hours / 24)) : "",
+    overtime_rate: s.overtime_rate_cents != null ? String(s.overtime_rate_cents / 100) : "",
+  };
+}
+
+function hasCustomTerms(f: FormState): boolean {
+  return Boolean(f.deposit_percent || f.cancellation_days || f.overtime_rate);
+}
 
 export function ServicesManager({
   vendor,
@@ -133,6 +191,9 @@ export function ServicesManager({
   );
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  // Custom terms are a minority case — folded away unless the package has them.
+  const [showTerms, setShowTerms] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [uploadingFor, setUploadingFor] = useState<string | null>(null);
   const [uploadingVideoFor, setUploadingVideoFor] = useState<string | null>(null);
   // Photos/videos chosen while filling in a new service. They can only be sent
@@ -198,9 +259,12 @@ export function ServicesManager({
       : "border-card-edge hover:border-gold";
   }
 
-  async function refresh() {
-    const res = await listServices({ vendor_id: vendor.vendor_id, limit: 100 });
+  // The owner's list, hidden and archived packages included — the public
+  // list only has active ones.
+  async function refresh(): Promise<ServiceItem[]> {
+    const res = await listMyServices(vendor.vendor_id);
     setServices(res.items);
+    return res.items;
   }
 
   const subOptions =
@@ -214,32 +278,42 @@ export function ServicesManager({
     setNewPhotos([]);
     setNewVideos([]);
     setEditing("new");
+    setShowTerms(false);
     setError(null);
+    setNotice(null);
     // Otherwise a match from whatever venue was last geocoded — possibly a
     // different service entirely — leaks into this blank form.
     setMatched(null);
   }
 
   function startEdit(s: ServiceItem) {
-    setForm({
-      name: s.name,
-      price: String(s.price),
-      experience: parseExperienceYears(s.experience),
-      price_unit: s.price_unit ?? "event",
-      category: s.category ?? "",
-      subcategory: s.subcategory ?? "",
-      description: s.description ?? "",
-      negotiable: Boolean(s.negotiable),
-      require_guest_count: Boolean(s.require_guest_count),
-      require_performer_count: Boolean(s.require_performer_count),
-      location: s.location ?? "",
-      venue_latitude: s.venue_latitude ?? null,
-      venue_longitude: s.venue_longitude ?? null,
-    });
+    const f = formFrom(s);
+    setForm(f);
     setNewPhotos([]);
     setNewVideos([]);
     setEditing(s.service_id);
+    setShowTerms(hasCustomTerms(f));
     setError(null);
+    setNotice(null);
+    setMatched(null);
+  }
+
+  /** A new package pre-filled from an existing one — everything but the
+   *  media, which belongs to the original. */
+  function duplicate(s: ServiceItem) {
+    const f = formFrom(s);
+    setForm({
+      ...f,
+      name: `${s.name} (copy)`,
+      // New ids: these are new add-ons, not the original's.
+      add_ons: f.add_ons.map((a) => ({ name: a.name, price: a.price, price_unit: a.price_unit })),
+    });
+    setNewPhotos([]);
+    setNewVideos([]);
+    setEditing("new");
+    setShowTerms(hasCustomTerms(f));
+    setError(null);
+    setNotice(null);
     setMatched(null);
   }
 
@@ -298,9 +372,23 @@ export function ServicesManager({
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.price_unit) {
+      setError("Choose how this package is priced.");
+      return;
+    }
     const price = Number(form.price);
     if (!form.price.trim() || !(price > 0)) {
       setError("Enter a price greater than $0.");
+      return;
+    }
+    const addOns = form.add_ons.filter((a) => a.name.trim() || a.price.trim());
+    if (addOns.some((a) => !a.name.trim() || !(Number(a.price) > 0))) {
+      setError("Each add-on needs a name and a price greater than $0.");
+      return;
+    }
+    const deposit = form.deposit_percent ? Number(form.deposit_percent) : null;
+    if (deposit != null && !(deposit >= 0 && deposit <= 100)) {
+      setError("A deposit is between 0% and 100%.");
       return;
     }
     if (isVenue && (form.venue_latitude == null || form.venue_longitude == null)) {
@@ -313,12 +401,39 @@ export function ServicesManager({
     setError(null);
     try {
       const payload: ServiceInput = {
-        ...form,
+        name: form.name,
         price,
-        experience: formatExperienceYears(form.experience),
+        price_unit: form.price_unit,
+        category: form.category,
         subcategory: form.subcategory || null,
+        description: form.description,
+        negotiable: form.negotiable,
+        require_guest_count: form.require_guest_count,
+        require_performer_count: form.require_performer_count,
         location: form.location || null,
+        venue_latitude: form.venue_latitude,
+        venue_longitude: form.venue_longitude,
+        status: form.status,
+        included_hours: form.included_hours ? Number(form.included_hours) : null,
+        inclusions: form.inclusionsText
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean),
+        add_ons: addOns.map((a) => ({
+          ...(a.id ? { id: a.id } : {}),
+          name: a.name.trim(),
+          price: Number(a.price),
+          price_unit: a.price_unit,
+        })),
+        deposit_percent: deposit,
+        cancellation_window_hours: form.cancellation_days ? Number(form.cancellation_days) * 24 : null,
+        overtime_rate_cents: form.overtime_rate ? Math.round(Number(form.overtime_rate) * 100) : null,
       };
+      if (editing === "new") {
+        // New packages go to the end of the vendor's order.
+        const orders = services.map((x) => x.sort_order ?? -1);
+        payload.sort_order = (orders.length ? Math.max(...orders) : -1) + 1;
+      }
       const creating = editing === "new";
       if (creating) {
         const created = await createService(payload);
@@ -364,10 +479,54 @@ export function ServicesManager({
     setBusy(true);
     try {
       await deleteService(serviceId);
-      await refresh();
+      const items = await refresh();
       setConfirmDelete(null);
+      // The backend archives instead of deleting a package any booking uses.
+      // Say so, or it looks like Delete didn't work.
+      if (items.some((x) => x.service_id === serviceId)) {
+        setNotice("That package has bookings, so it was archived instead of deleted.");
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't delete that package.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setStatus(s: ServiceItem, status: PackageStatus) {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await updateService(s.service_id, { status });
+      await refresh();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't update that package.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Swap a package with its neighbour. Renumbers the whole visible list so
+   *  packages that never had an order (null) get one the first time. */
+  async function move(s: ServiceItem, direction: -1 | 1) {
+    const list = [...ordered];
+    const from = list.findIndex((x) => x.service_id === s.service_id);
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= list.length) return;
+    [list[from], list[to]] = [list[to], list[from]];
+    setBusy(true);
+    setError(null);
+    try {
+      await Promise.all(
+        list
+          .map((x, i) => ({ x, i }))
+          .filter(({ x, i }) => x.sort_order !== i)
+          .map(({ x, i }) => updateService(x.service_id, { sort_order: i })),
+      );
+      await refresh();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't reorder your packages.");
     } finally {
       setBusy(false);
     }
@@ -475,14 +634,21 @@ export function ServicesManager({
   function pickNewPhotos(files: FileList | null) {
     const { ok, rejected } = checkImageFiles(Array.from(files ?? []));
     if (rejected.length) setError(`Skipped: ${describeRejections(rejected)}.`);
-    setNewPhotos(ok);
+    // Adds to what's already picked — choosing again used to replace it.
+    setNewPhotos((prev) => [...prev, ...ok]);
   }
 
   async function pickNewVideos(files: FileList | null) {
     const { ok, rejected } = await checkVideoFiles(Array.from(files ?? []));
     if (rejected.length) setError(`Skipped: ${describeRejections(rejected)}.`);
-    setNewVideos(ok);
+    setNewVideos((prev) => [...prev, ...ok]);
   }
+
+  // Listed and private packages in the vendor's order (the backend already
+  // sorts by it); archived ones set apart underneath.
+  const ordered = services.filter((x) => x.status !== "archived");
+  const archived = services.filter((x) => x.status === "archived");
+  const unitNoun = PRICE_UNITS.find((u) => u.value === form.price_unit)?.label.toLowerCase();
 
   return (
     <section id="services" className="mt-9 scroll-mt-20">
@@ -496,13 +662,16 @@ export function ServicesManager({
         {editing === null ? <Button onClick={startNew}>Add a package</Button> : null}
       </div>
 
-      {error ? (
+      {error && editing === null ? (
         <p
           role="alert"
           className="mt-4 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold"
         >
           {error}
         </p>
+      ) : null}
+      {notice ? (
+        <p className="mt-4 rounded-lg bg-gold/10 px-3 py-2 text-sm text-ink-soft">{notice}</p>
       ) : null}
 
       {editing !== null ? (
@@ -519,32 +688,42 @@ export function ServicesManager({
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field
-                label="Price"
-                type="text"
-                inputMode="decimal"
-                placeholder="45"
-                value={form.price}
-                onChange={(e) => setForm({ ...form, price: e.target.value })}
-              />
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-ink-soft">
-                  Priced by
-                </span>
-                <select
-                  value={form.price_unit ?? "event"}
-                  onChange={(e) => setForm({ ...form, price_unit: e.target.value })}
-                  className="w-full rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5 text-ink outline-none focus:border-gold"
-                >
-                  {PRICE_UNITS.map((u) => (
-                    <option key={u.value} value={u.value}>
-                      {u.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <div>
+              <p className="mb-1.5 text-sm font-medium text-ink-soft">How is it priced?</p>
+              <div role="radiogroup" aria-label="How is it priced?" className="flex flex-wrap gap-2">
+                {PRICE_UNITS.map((u) => (
+                  <Chip
+                    key={u.value}
+                    active={form.price_unit === u.value}
+                    onClick={() => setForm({ ...form, price_unit: u.value })}
+                  >
+                    {u.label}
+                  </Chip>
+                ))}
+              </div>
             </div>
+
+            {form.price_unit ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field
+                  label={form.price_unit === "event" ? "Price" : `Price ${unitNoun}`}
+                  type="text"
+                  inputMode="decimal"
+                  placeholder={form.price_unit === "event" ? "1400" : "45"}
+                  value={form.price}
+                  onChange={(e) => setForm({ ...form, price: e.target.value })}
+                />
+                <Field
+                  label="Hours included (optional)"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="4"
+                  hint="How long the base price covers, if it's time-bound."
+                  value={form.included_hours}
+                  onChange={(e) => setForm({ ...form, included_hours: e.target.value })}
+                />
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block">
@@ -602,18 +781,6 @@ export function ServicesManager({
               ) : null}
             </div>
 
-            <Field
-              label="Years of experience"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              step={1}
-              placeholder="9"
-              required
-              value={form.experience}
-              onChange={(e) => setForm({ ...form, experience: e.target.value })}
-            />
-
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium text-ink-soft">
                 Description
@@ -622,10 +789,111 @@ export function ServicesManager({
                 rows={3}
                 value={form.description ?? ""}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="What's included."
+                placeholder="Your style, what the day looks like, who it suits."
                 className="w-full rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5 text-ink outline-none focus:border-gold"
               />
             </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-ink-soft">
+                What&apos;s included (optional)
+              </span>
+              <textarea
+                rows={3}
+                value={form.inclusionsText}
+                onChange={(e) => setForm({ ...form, inclusionsText: e.target.value })}
+                placeholder={"One per line, e.g.\nSound system and lighting\nTwo wireless mics"}
+                className="w-full rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5 text-ink outline-none focus:border-gold"
+              />
+            </label>
+
+            {/* Add-ons: priced extras a client can add on top of the package. */}
+            <div>
+              <p className="text-sm font-medium text-ink-soft">Add-ons (optional)</p>
+              <p className="mt-0.5 text-xs text-ink-faint">
+                Extras on top of the package price, like an extra hour or a second photographer.
+              </p>
+              {form.add_ons.length ? (
+                <div className="mt-2 grid gap-2">
+                  {form.add_ons.map((a, i) => (
+                    <div key={a.id ?? `new-${i}`} className="flex flex-wrap items-center gap-2">
+                      <input
+                        aria-label={`Add-on ${i + 1} name`}
+                        placeholder="Extra hour"
+                        value={a.name}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            add_ons: form.add_ons.map((x, j) =>
+                              j === i ? { ...x, name: e.target.value } : x,
+                            ),
+                          })
+                        }
+                        className="min-w-0 flex-1 rounded-xl border border-card-edge bg-ground-2 px-3 py-2 text-sm text-ink outline-none focus:border-gold"
+                      />
+                      <input
+                        aria-label={`Add-on ${i + 1} price`}
+                        inputMode="decimal"
+                        placeholder="$"
+                        value={a.price}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            add_ons: form.add_ons.map((x, j) =>
+                              j === i ? { ...x, price: e.target.value } : x,
+                            ),
+                          })
+                        }
+                        className="w-24 rounded-xl border border-card-edge bg-ground-2 px-3 py-2 text-sm text-ink outline-none focus:border-gold"
+                      />
+                      <select
+                        aria-label={`Add-on ${i + 1} unit`}
+                        value={a.price_unit}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            add_ons: form.add_ons.map((x, j) =>
+                              j === i ? { ...x, price_unit: e.target.value as AddOn["price_unit"] } : x,
+                            ),
+                          })
+                        }
+                        className="rounded-xl border border-card-edge bg-ground-2 px-2.5 py-2 text-sm text-ink outline-none focus:border-gold"
+                      >
+                        {ADD_ON_UNITS.map((u) => (
+                          <option key={u.value} value={u.value}>
+                            {u.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm({ ...form, add_ons: form.add_ons.filter((_, j) => j !== i) })
+                        }
+                        className="px-1 text-sm text-ink-faint hover:text-ink"
+                        aria-label={`Remove add-on ${i + 1}`}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <Button
+                type="button"
+                variant="ghost"
+                size="md"
+                className="mt-2"
+                onClick={() =>
+                  setForm({
+                    ...form,
+                    add_ons: [...form.add_ons, { name: "", price: "", price_unit: "event" }],
+                  })
+                }
+              >
+                + Add an add-on
+              </Button>
+            </div>
 
             {isVenue ? (
               <div className="rounded-xl bg-panel p-4">
@@ -641,7 +909,16 @@ export function ServicesManager({
                     value={form.location ?? ""}
                     onChange={(e) => setForm({ ...form, location: e.target.value })}
                   />
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {/* The pin comes from the address lookup below; the raw
+                      numbers are only for fixing a pin that landed on the
+                      wrong door. */}
+                  <details className="rounded-lg border border-line-soft px-3 py-2">
+                    <summary className="cursor-pointer text-xs text-ink-soft">
+                      {form.venue_latitude != null && form.venue_longitude != null
+                        ? `Pin set (${form.venue_latitude.toFixed(4)}, ${form.venue_longitude.toFixed(4)}) — adjust by hand`
+                        : "Enter the pin by hand"}
+                    </summary>
+                  <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Field
                       label="Latitude"
                       type="number"
@@ -669,6 +946,7 @@ export function ServicesManager({
                       }
                     />
                   </div>
+                  </details>
                   {matched ? (
                     <p className="rounded-lg bg-green/10 px-3 py-2 text-xs text-ink-soft">
                       Pinned to <strong className="font-semibold text-ink">{matched}</strong>. If
@@ -743,7 +1021,7 @@ export function ServicesManager({
                     <span aria-hidden="true" className="text-2xl leading-none text-ink-faint">
                       +
                     </span>
-                    <span>{newPhotos.length ? "Choose again to replace" : "Choose or drop photos"}</span>
+                    <span>{newPhotos.length ? "Add more photos" : "Choose or drop photos"}</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -800,7 +1078,7 @@ export function ServicesManager({
                     <span aria-hidden="true" className="text-2xl leading-none text-ink-faint">
                       +
                     </span>
-                    <span>{newVideos.length ? "Choose again to replace" : "Choose or drop videos"}</span>
+                    <span>{newVideos.length ? "Add more videos" : "Choose or drop videos"}</span>
                     <input
                       type="file"
                       accept="video/mp4,video/quicktime,video/webm"
@@ -867,6 +1145,89 @@ export function ServicesManager({
               </span>
             </label>
 
+            {/* Per-package contract terms. Blank = the vendor's defaults from
+                Profile → Contract defaults, shown as placeholders so it's
+                clear what "blank" means. */}
+            <div className="rounded-xl bg-panel p-4">
+              <button
+                type="button"
+                onClick={() => setShowTerms((v) => !v)}
+                aria-expanded={showTerms}
+                className="text-sm font-medium text-ink"
+              >
+                {showTerms ? "▾" : "▸"} Custom contract terms for this package
+              </button>
+              {showTerms ? (
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <Field
+                    label="Deposit (%)"
+                    inputMode="numeric"
+                    placeholder={vendor.default_deposit_percent?.toString() ?? "—"}
+                    value={form.deposit_percent}
+                    onChange={(e) => setForm({ ...form, deposit_percent: e.target.value })}
+                  />
+                  <Field
+                    label="Cancellation window (days)"
+                    inputMode="numeric"
+                    placeholder={
+                      vendor.default_cancellation_window_hours != null
+                        ? String(Math.round(vendor.default_cancellation_window_hours / 24))
+                        : "—"
+                    }
+                    value={form.cancellation_days}
+                    onChange={(e) => setForm({ ...form, cancellation_days: e.target.value })}
+                  />
+                  <Field
+                    label="Overtime rate ($/hr)"
+                    inputMode="decimal"
+                    placeholder={
+                      vendor.default_overtime_rate_cents != null
+                        ? String(vendor.default_overtime_rate_cents / 100)
+                        : "—"
+                    }
+                    value={form.overtime_rate}
+                    onChange={(e) => setForm({ ...form, overtime_rate: e.target.value })}
+                  />
+                  <p className="text-xs text-ink-faint sm:col-span-3">
+                    Leave blank to use your defaults. New contracts for this package start
+                    from these.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            <div>
+              <p className="mb-1.5 text-sm font-medium text-ink-soft">Who can see it</p>
+              <div role="radiogroup" aria-label="Who can see it" className="flex flex-wrap gap-2">
+                <Chip
+                  active={form.status !== "hidden"}
+                  onClick={() => setForm({ ...form, status: "active" })}
+                >
+                  Listed publicly
+                </Chip>
+                <Chip
+                  active={form.status === "hidden"}
+                  onClick={() => setForm({ ...form, status: "hidden" })}
+                >
+                  Private
+                </Chip>
+              </div>
+              <p className="mt-1 text-xs text-ink-faint">
+                {form.status === "hidden"
+                  ? "Not on your listing or in search — you can still send it in a contract."
+                  : "On your listing, in search, and bookable by clients."}
+              </p>
+            </div>
+
+            {error ? (
+              <p
+                role="alert"
+                className="rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold"
+              >
+                {error}
+              </p>
+            ) : null}
+
             <div className="flex gap-2">
               <Button type="submit" disabled={busy}>
                 {busy ? "Saving…" : editing === "new" ? "Add package" : "Save changes"}
@@ -886,31 +1247,89 @@ export function ServicesManager({
         </Card>
       ) : null}
 
-      {services.length === 0 && editing === null ? (
+      {ordered.length === 0 && editing === null ? (
         <p className="mt-8 text-center text-ink-soft">
           No packages yet. Clients can&apos;t book you until you list at least one.
         </p>
       ) : (
         <div className="mt-5 grid gap-3">
-          {services.map((s) => {
+          {ordered.map((s, index) => {
             const unit = priceUnitLabel(s.price_unit);
+            const details = [
+              `${money(s.price)} ${unit}`.trim(),
+              s.included_hours ? `${s.included_hours} hrs included` : null,
+              s.add_ons?.length
+                ? `${s.add_ons.length} add-on${s.add_ons.length === 1 ? "" : "s"}`
+                : null,
+              s.negotiable ? "open to offers" : null,
+            ].filter(Boolean);
             return (
               <Card key={s.service_id} className="p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h3 className="serif text-lg text-ink">{s.name}</h3>
-                    <p className="mt-0.5 text-sm text-ink-soft">
-                      {money(s.price)} {unit}
-                      {s.negotiable ? " · open to offers" : ""}
-                    </p>
-                    {s.description ? (
+                    <h3 className="serif flex items-center gap-2 text-lg text-ink">
+                      {s.name}
+                      {s.status === "hidden" ? (
+                        <span className="rounded-full bg-panel px-2 py-0.5 font-sans text-xs text-ink-soft">
+                          Private
+                        </span>
+                      ) : null}
+                    </h3>
+                    <p className="mt-0.5 text-sm text-ink-soft">{details.join(" · ")}</p>
+                    {s.inclusions?.length ? (
+                      <p className="mt-1 text-sm text-ink-faint">
+                        Includes {s.inclusions.slice(0, 3).join(", ")}
+                        {s.inclusions.length > 3 ? ` and ${s.inclusions.length - 3} more` : ""}
+                      </p>
+                    ) : s.description ? (
                       <p className="mt-1 text-sm text-ink-faint">{s.description}</p>
                     ) : null}
                   </div>
-                  <div className="flex shrink-0 gap-2">
+                  <div className="flex shrink-0 flex-wrap items-center gap-1">
+                    {/* Order: the list clients see follows this. */}
+                    <button
+                      type="button"
+                      aria-label={`Move ${s.name} up`}
+                      disabled={busy || index === 0}
+                      onClick={() => move(s, -1)}
+                      className="px-2 py-1 text-ink-faint hover:text-ink disabled:opacity-30"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Move ${s.name} down`}
+                      disabled={busy || index === ordered.length - 1}
+                      onClick={() => move(s, 1)}
+                      className="px-2 py-1 text-ink-faint hover:text-ink disabled:opacity-30"
+                    >
+                      ↓
+                    </button>
                     <Button variant="ghost" size="md" onClick={() => startEdit(s)}>
                       Edit
                     </Button>
+                    <Button variant="quiet" size="md" onClick={() => duplicate(s)}>
+                      Duplicate
+                    </Button>
+                    <Button
+                      variant="quiet"
+                      size="md"
+                      disabled={busy}
+                      onClick={() => setStatus(s, s.status === "hidden" ? "active" : "hidden")}
+                    >
+                      {s.status === "hidden" ? "List publicly" : "Make private"}
+                    </Button>
+                    {/* The public page a client lands on — a private package's
+                        still opens there by id, which is how the vendor can
+                        check it. */}
+                    <a
+                      href={`/app/service/?id=${s.service_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2 py-1 text-sm font-semibold text-ink-soft hover:text-ink"
+                    >
+                      Preview
+                    </a>
                     <Button
                       variant="quiet"
                       size="md"
@@ -1036,7 +1455,8 @@ export function ServicesManager({
                 {confirmDelete === s.service_id ? (
                   <div className="mt-3 rounded-lg bg-panel p-3">
                     <p className="text-xs text-ink-soft">
-                      Delete {s.name}? Clients won&apos;t be able to book it.
+                      Delete {s.name}? Clients won&apos;t be able to book it. If it&apos;s
+                      already been booked, it&apos;s archived instead so those bookings keep it.
                     </p>
                     <div className="mt-2 flex gap-2">
                       <Button
@@ -1061,6 +1481,37 @@ export function ServicesManager({
           })}
         </div>
       )}
+
+      {/* Retired packages: off every list and out of new contracts, kept
+          because a booking still points at them. Restoring makes one private
+          first, so bringing it back never lists it publicly by surprise. */}
+      {archived.length ? (
+        <details className="mt-6">
+          <summary className="cursor-pointer text-sm text-ink-soft">
+            Archived ({archived.length})
+          </summary>
+          <div className="mt-3 grid gap-2">
+            {archived.map((s) => (
+              <Card key={s.service_id} className="flex flex-wrap items-center justify-between gap-3 p-3">
+                <div className="min-w-0">
+                  <p className="text-sm text-ink">{s.name}</p>
+                  <p className="text-xs text-ink-faint">
+                    {money(s.price)} {priceUnitLabel(s.price_unit)} · kept for existing bookings
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="md"
+                  disabled={busy}
+                  onClick={() => setStatus(s, "hidden")}
+                >
+                  Restore as private
+                </Button>
+              </Card>
+            ))}
+          </div>
+        </details>
+      ) : null}
     </section>
   );
 }

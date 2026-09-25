@@ -24,14 +24,19 @@ export function VendorIdentityFields({
   categories,
   specializations,
   bio,
+  yearsExperience,
   onSpecializationsChange,
   onBioChange,
+  onYearsExperienceChange,
 }: {
   categories: TaxonomyCategory[];
   specializations: VendorSpecialization[];
   bio: string;
+  /** Asked once, here, rather than on every package (backend 0063). */
+  yearsExperience: string;
   onSpecializationsChange: (next: VendorSpecialization[]) => void;
   onBioChange: (value: string) => void;
+  onYearsExperienceChange: (value: string) => void;
 }) {
   // Which category's options are on screen — a picker, not part of the
   // selection itself. Starts on the first thing already picked so reopening
@@ -154,6 +159,18 @@ export function VendorIdentityFields({
           className="w-full rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5 text-ink outline-none focus:border-gold"
         />
       </label>
+
+      <Field
+        label="Years in business (optional)"
+        type="number"
+        inputMode="numeric"
+        min={0}
+        max={99}
+        step={1}
+        placeholder="9"
+        value={yearsExperience}
+        onChange={(e) => onYearsExperienceChange(e.target.value)}
+      />
     </>
   );
 }

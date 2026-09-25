@@ -11,7 +11,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
-import { convertLead, createContract, getMyVendor, listLeads, listServices } from "@/lib/jorna";
+import { convertLead, createContract, getMyVendor, listLeads, listMyServices } from "@/lib/jorna";
 import { priceUnitLabel, type Contract, type ServiceItem, type VendorDetail } from "@/lib/types";
 import { Button, Card, Field, LinkButton } from "@/components/ui";
 import { contractDefaultsToStrings } from "@/components/VendorProfileFields";
@@ -105,11 +105,13 @@ function NewContractInner() {
         setTravel(defaults.travel);
 
         const [svc, leads] = await Promise.all([
-          listServices({ vendor_id: mine.vendor_id, limit: 100 }).catch(() => null),
+          listMyServices(mine.vendor_id).catch(() => null),
           leadId ? listLeads().catch(() => null) : Promise.resolve(null),
         ]);
         if (cancelled) return;
-        if (svc) setServices(svc.items);
+        // Private (hidden) packages are exactly what contracts are for;
+        // archived ones are retired and the backend refuses them.
+        if (svc) setServices(svc.items.filter((x) => x.status !== "archived"));
         const lead = leads?.items.find((l) => l.lead_id === leadId);
         if (lead) {
           setClientName(lead.name);
@@ -135,7 +137,15 @@ function NewContractInner() {
     setServiceId(id);
     setQuantity("");
     const svc = services.find((s) => s.service_id === id);
-    if (!svc || amountTouched) return;
+    if (!svc) return;
+    // A package's own terms (backend 0063) beat the vendor-wide defaults the
+    // form started from. Only the ones the package sets; the rest stay put.
+    if (svc.deposit_percent != null) setDepositPercent(String(svc.deposit_percent));
+    if (svc.cancellation_window_hours != null) {
+      setCancellationWindowHours(String(svc.cancellation_window_hours));
+    }
+    if (svc.overtime_rate_cents != null) setOvertimeRate(String(svc.overtime_rate_cents / 100));
+    if (amountTouched) return;
     // Only a flat price is a total by itself.
     setAmount((svc.price_unit ?? "event") === "event" ? svc.price.toString() : "");
   }
@@ -356,6 +366,7 @@ function NewContractInner() {
               {services.map((s) => (
                 <option key={s.service_id} value={s.service_id}>
                   {s.name} — ${s.price}{s.price_unit && s.price_unit !== "event" ? ` ${priceUnitLabel(s.price_unit)}` : ""}
+                  {s.status === "hidden" ? " (private)" : ""}
                 </option>
               ))}
             </select>

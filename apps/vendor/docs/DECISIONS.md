@@ -402,3 +402,29 @@ Later phases (tentative holds on send, line items/add-ons, payment
 schedules, account-synced templates, e-sign audit trail, marketplace
 requests becoming proposals) are planned, not built — decisions for them
 were recorded with the user on 2026-09-23.
+
+---
+
+## Decision: Package details, status and add-ons (Phase 1, 2026-09-25)
+
+Backend 0063 (Desiconnect DECISIONS #14) gave packages a status
+(active / hidden "Private" / archived), hours included, a "what's included"
+list, priced add-ons, and optional per-package deposit / cancellation /
+overtime terms; years of experience moved to the vendor.
+
+- `ServicesManager` no longer defaults the price unit: the vendor picks
+  "Flat price" or "Per …" before a price field appears. The old per-hour
+  default was chosen as the safer mistake, but it let a flat price be
+  listed as hourly without the vendor noticing.
+- It reads the owner's list via `listMyServices` (hidden + archived
+  included); the public `listServices` only ever returns active packages.
+  Archived packages sit in a collapsed section with "Restore as private".
+- Deleting a booked package archives it (backend behaviour), and the UI
+  says so.
+- "Years in business" is asked once in `VendorIdentityFields` (onboarding
+  and Profile), not on every package.
+- `/contracts/new` hides archived packages, marks private ones, and applies
+  a package's own terms over the vendor defaults when it's picked.
+- `/service` shows hours included, inclusions and add-ons to clients.
+- Add-ons are shown to clients and stored, but not yet priced into a
+  contract — that's Phase 2's line items.

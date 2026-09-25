@@ -41,6 +41,8 @@ import type {
   RefundPreview,
   Review,
   ServiceItem,
+  AddOn,
+  PackageStatus,
   VendorDetail,
   VendorSearchItem,
   VendorSearchParams,
@@ -89,6 +91,14 @@ export function listServices(params: {
   return apiFetch<Paginated<ServiceItem>>(`/services${query({ ...params })}`, {
     auth: false,
   });
+}
+
+/** The signed-in vendor's own packages, hidden and archived included — the
+ *  public listServices only ever returns active ones. */
+export function listMyServices(vendorId: string): Promise<Paginated<ServiceItem>> {
+  return apiFetch<Paginated<ServiceItem>>(
+    `/services${query({ vendor_id: vendorId, limit: 100, include_unlisted: "true" })}`,
+  );
 }
 
 /** Everything a vendor has been reviewed on, across all their listings. */
@@ -404,7 +414,8 @@ export function updateMyVendor(updates: VendorUpdateInput): Promise<VendorDetail
 export interface ServiceInput {
   name: string;
   price: number;
-  experience: string;
+  /** Optional since backend 0063 — filled from the vendor's years_experience. */
+  experience?: string;
   /** hour | day | event | person — the quantity the rate multiplies by. */
   price_unit?: string | null;
   category?: string | null;
@@ -418,6 +429,14 @@ export interface ServiceInput {
   location?: string | null;
   venue_latitude?: number | null;
   venue_longitude?: number | null;
+  status?: PackageStatus;
+  included_hours?: number | null;
+  inclusions?: string[];
+  add_ons?: AddOn[];
+  deposit_percent?: number | null;
+  cancellation_window_hours?: number | null;
+  overtime_rate_cents?: number | null;
+  sort_order?: number | null;
 }
 
 export function createService(input: ServiceInput): Promise<ServiceItem> {

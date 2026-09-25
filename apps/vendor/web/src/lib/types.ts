@@ -256,6 +256,8 @@ export interface VendorDetail {
   default_addon_rate_cents?: number | null;
   default_contract_terms?: ContractTerms | null;
   default_guest_count_mode?: "required" | "optional" | "not_applicable" | null;
+  /** Years in business — on the vendor, not per package (backend 0063). */
+  years_experience?: number | null;
 }
 
 /** Free-form contract terms (equipment/power, travel, custom clauses) —
@@ -320,6 +322,30 @@ export interface ServiceItem {
   // number answering a different question from `rating` above.
   vendor_rating?: number | null;
   vendor_pfp_url?: string | null;
+  // ── Package details (backend 0063) ──
+  /** active: listed and bookable. hidden: private — off the listing, but
+   *  usable in the vendor's own contracts. archived: retired. */
+  status?: PackageStatus;
+  /** Hours the base price covers, when it's time-bound. */
+  included_hours?: number | null;
+  inclusions?: string[];
+  add_ons?: AddOn[];
+  /** Per-package contract terms; null means "use the vendor's default". */
+  deposit_percent?: number | null;
+  cancellation_window_hours?: number | null;
+  overtime_rate_cents?: number | null;
+  sort_order?: number | null;
+}
+
+export type PackageStatus = "active" | "hidden" | "archived";
+
+/** An optional extra on top of a package's base price. */
+export interface AddOn {
+  /** Stable across renames; assigned by the backend when omitted. */
+  id?: string;
+  name: string;
+  price: number;
+  price_unit: "event" | "person" | "hour";
 }
 
 export interface Review {
@@ -721,6 +747,7 @@ export interface VendorCreateInput {
    *  `VendorDetail.specializations`), so they stay in sync rather than one
    *  being derived from the other. */
   specializations?: VendorSpecialization[];
+  years_experience?: number | null;
 }
 
 export interface VendorUpdateInput {
@@ -742,6 +769,8 @@ export interface VendorUpdateInput {
   default_addon_rate_cents?: number | null;
   default_contract_terms?: ContractTerms | null;
   default_guest_count_mode?: "required" | "optional" | "not_applicable" | null;
+  /** Years in business — on the vendor, not per package (backend 0063). */
+  years_experience?: number | null;
 }
 
 // ── Moderation ───────────────────────────────────────────────────────

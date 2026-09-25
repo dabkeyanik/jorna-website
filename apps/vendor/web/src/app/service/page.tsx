@@ -555,6 +555,39 @@ function ServiceInner() {
             </section>
           ) : null}
 
+          {/* What the price covers (backend 0063) — so a client doesn't have
+              to dig it out of the description or ask. */}
+          {service.included_hours || service.inclusions?.length ? (
+            <section className="mt-10">
+              <span className="eyebrow">What&apos;s included</span>
+              <ul className="mt-3 grid gap-1.5 text-ink-soft">
+                {service.included_hours ? (
+                  <li>✓ {service.included_hours} hours of coverage</li>
+                ) : null}
+                {(service.inclusions ?? []).map((item) => (
+                  <li key={item}>✓ {item}</li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          {service.add_ons?.length ? (
+            <section className="mt-10">
+              <span className="eyebrow">Add-ons</span>
+              <ul className="mt-3 grid gap-1.5 text-ink-soft">
+                {service.add_ons.map((a) => (
+                  <li key={a.id ?? a.name} className="flex justify-between gap-4 max-w-md">
+                    <span>{a.name}</span>
+                    <span className="tabular-nums text-ink">
+                      ${a.price.toLocaleString()}
+                      {a.price_unit !== "event" ? ` ${priceUnitLabel(a.price_unit)}` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
           {vendor?.bio || vendor?.travel_radius_miles ? (
             <section className="mt-10">
               <span className="eyebrow">About {service.vendor_name || "the vendor"}</span>

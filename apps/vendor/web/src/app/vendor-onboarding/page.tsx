@@ -71,6 +71,7 @@ export default function VendorOnboardingPage() {
 
   // Step 1 — identity
   const [bio, setBio] = useState("");
+  const [yearsExperience, setYearsExperience] = useState("");
   const [specializations, setSpecializations] = useState<VendorSpecialization[]>([]);
 
   // Step 2 — reach (plus payment info, since with escrow disabled it's the
@@ -119,6 +120,7 @@ export default function VendorOnboardingPage() {
         }
         setVendor(mine);
         setBio(mine.bio ?? "");
+        setYearsExperience(mine.years_experience?.toString() ?? "");
         setSpecializations(vendorSpecializations(mine));
         setRadius(mine.travel_radius_miles?.toString() ?? "");
         setLongDistance(Boolean(mine.open_to_long_distance));
@@ -173,6 +175,7 @@ export default function VendorOnboardingPage() {
         category: primary.category,
         subcategory: primary.subcategory ?? undefined,
         specializations,
+        years_experience: yearsExperience ? Number(yearsExperience) : null,
       };
       if (vendor) {
         // Reached via Back from step 2 — the vendor record already exists, so
@@ -320,6 +323,8 @@ export default function VendorOnboardingPage() {
                 bio={bio}
                 onSpecializationsChange={updateSpecializations}
                 onBioChange={setBio}
+                yearsExperience={yearsExperience}
+                onYearsExperienceChange={setYearsExperience}
               />
               {error ? (
                 <p
