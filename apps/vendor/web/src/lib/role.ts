@@ -30,6 +30,17 @@ export function loadIsVendor(): Promise<boolean> {
   return inflight;
 }
 
+/**
+ * Where someone lands after signing in when nothing asked for a particular
+ * page: a vendor's dashboard, or the client home for everyone else. The
+ * dashboard used to be the default for every account, which dropped clients
+ * into the vendor sidebar with a "This is the vendor dashboard" screen — it
+ * looked like signing in had made them a vendor.
+ */
+export async function defaultLanding(): Promise<string> {
+  return (await loadIsVendor()) ? "/my-dashboard" : "/home";
+}
+
 /** Called when a session ends, so the next sign-in doesn't inherit this role. */
 export function clearRoleCache() {
   cache = null;

@@ -47,21 +47,23 @@ const OAUTH_NEXT_KEY = "jorna_oauth_next";
 // decides where the new account lands. Absent for a plain sign-in.
 const OAUTH_ROLE_KEY = "jorna_oauth_role";
 
-export function rememberOAuthNext(next: string) {
+/** null: nothing asked for a page — the callback picks by role (defaultLanding). */
+export function rememberOAuthNext(next: string | null) {
   try {
-    localStorage.setItem(OAUTH_NEXT_KEY, next);
+    if (next) localStorage.setItem(OAUTH_NEXT_KEY, next);
+    else localStorage.removeItem(OAUTH_NEXT_KEY);
   } catch {
     /* storage disabled — fall back to the default on return */
   }
 }
 
-export function takeOAuthNext(): string {
+export function takeOAuthNext(): string | null {
   try {
     const v = localStorage.getItem(OAUTH_NEXT_KEY);
     localStorage.removeItem(OAUTH_NEXT_KEY);
-    return v || "/my-dashboard";
+    return v || null;
   } catch {
-    return "/my-dashboard";
+    return null;
   }
 }
 
@@ -78,7 +80,7 @@ export function takeOAuthRole(): string | null {
 /** Begin the Google OAuth redirect. Rejects if Supabase won't start the flow.
  *  `role` is set when starting from the sign-up form, so a brand-new account
  *  knows whether it belongs to a host or a vendor. */
-export async function startGoogleSignIn(next: string, role?: string | null): Promise<void> {
+export async function startGoogleSignIn(next: string | null, role?: string | null): Promise<void> {
   rememberOAuthNext(next);
   try {
     if (role) localStorage.setItem(OAUTH_ROLE_KEY, role);

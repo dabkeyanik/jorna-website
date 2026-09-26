@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
+import { defaultLanding } from "@/lib/role";
 import { supabase, startGoogleSignIn } from "@/lib/supabase";
 import { Button, Card, Field } from "@/components/ui";
 import { CityCombobox, type Coords } from "@/components/CityCombobox";
@@ -41,12 +42,13 @@ const ROLES: { value: Role; label: string; hint: string }[] = [
  * for real would hand the browser off to whatever the link named, right after
  * the one moment a phishing page most wants to borrow credibility from.
  * Anything but a single leading slash (a bare path, no scheme, no host) is
- * rejected in favour of the same default an absent `next` already gets.
+ * rejected, the same as an absent `next`: null, and the landing is picked by
+ * role once signed in (defaultLanding).
  */
-function safeNext(raw: string | null): string {
-  if (!raw) return "/my-dashboard";
+function safeNext(raw: string | null): string | null {
+  if (!raw) return null;
   if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("://")) {
-    return "/my-dashboard";
+    return null;
   }
   return raw;
 }
@@ -168,7 +170,13 @@ function LoginInner() {
       // A new vendor goes straight into guided setup — the web equivalent of
       // iOS routing "I am a Vendor" into VendorInfoView, so the account and
       // the storefront are one continuous flow.
-      router.push(mode === "register" && role === "vendor" ? "/vendor-onboarding" : next);
+      // With no `next`, where to go depends on whether this account sells —
+      // see defaultLanding.
+      router.push(
+        mode === "register" && role === "vendor"
+          ? "/vendor-onboarding"
+          : (next ?? (await defaultLanding())),
+      );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {

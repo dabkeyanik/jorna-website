@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { supabase, takeOAuthNext, takeOAuthRole } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { googleRegister } from "@/lib/jorna";
+import { defaultLanding } from "@/lib/role";
 import { ApiError } from "@/lib/api";
 
 export default function AuthCallbackPage() {
@@ -67,13 +68,14 @@ export default function AuthCallbackPage() {
           // is just as much a vendor-to-be, and the wizard already knows how
           // to resume (and to refuse an account with live bookings), so it's
           // safe to send any of them there.
-          const landing = role === "vendor" ? "/vendor-onboarding" : next;
+          const landing =
+            role === "vendor" ? "/vendor-onboarding" : (next ?? (await defaultLanding()));
           router.replace(landing);
           return;
         }
 
         // No session came back, which shouldn't happen — fall back to the form.
-        router.replace(`/login?google=1&next=${encodeURIComponent(next)}`);
+        router.replace(next ? `/login?google=1&next=${encodeURIComponent(next)}` : "/login?google=1");
       } catch (e) {
         setError(e instanceof ApiError ? e.message : "Google sign-in failed. Please try again.");
       }
