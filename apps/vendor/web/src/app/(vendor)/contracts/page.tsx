@@ -17,14 +17,17 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
-import { getMyVendor, listVendorBookings, voidContract } from "@/lib/jorna";
+import { getMyVendor, listVendorBookings, sendContract, voidContract } from "@/lib/jorna";
 import type { VendorBooking, VendorDetail } from "@/lib/types";
 import { contractNeedsVendor, contractStatus, type ContractStatus } from "@/lib/vendorPlan";
-import { guestBookingLink } from "@/lib/contractLink";
+import { guestBookingLink, guestBookingPreviewLink } from "@/lib/contractLink";
 import { Button, Card, LinkButton } from "@/components/ui";
 
 const STATUS: Record<ContractStatus, { label: string; tone: string }> = {
+  draft: { label: "Draft — not sent", tone: "bg-panel text-ink-soft" },
   awaiting_signature: { label: "Awaiting signature", tone: "bg-[#8b7bd8]/15 text-[#6a5bc0] dark:text-[#b3a8ee]" },
+  expired: { label: "Expired — date released", tone: "bg-maroon/10 text-maroon dark:text-gold" },
+  declined: { label: "Declined", tone: "bg-panel text-ink-faint" },
   deposit_due: { label: "Signed — deposit due", tone: "bg-gold/15 text-ink" },
   confirm_deposit: { label: "Confirm deposit", tone: "bg-maroon/10 text-maroon dark:text-gold" },
   balance_due: { label: "Signed — balance due", tone: "bg-gold/15 text-ink" },
@@ -33,18 +36,21 @@ const STATUS: Record<ContractStatus, { label: string; tone: string }> = {
   cancelled: { label: "Cancelled", tone: "bg-panel text-ink-faint" },
 };
 
-type Filter = "all" | "needs_you" | "waiting" | "paid" | "cancelled";
+type Filter = "all" | "needs_you" | "waiting" | "paid" | "closed";
+
+// Over and done without a booking: the vendor voided it or the client said no.
+const closed = (s: ContractStatus) => s === "cancelled" || s === "declined";
 
 const FILTERS: { value: Filter; label: string; test: (s: ContractStatus) => boolean }[] = [
-  { value: "all", label: "All", test: (s) => s !== "cancelled" },
+  { value: "all", label: "All", test: (s) => !closed(s) },
   { value: "needs_you", label: "Needs you", test: contractNeedsVendor },
   {
     value: "waiting",
     label: "Waiting on client",
-    test: (s) => s !== "paid" && s !== "cancelled" && !contractNeedsVendor(s),
+    test: (s) => s !== "paid" && !closed(s) && !contractNeedsVendor(s),
   },
   { value: "paid", label: "Paid", test: (s) => s === "paid" },
-  { value: "cancelled", label: "Cancelled", test: (s) => s === "cancelled" },
+  { value: "closed", label: "Declined & voided", test: closed },
 ];
 
 function money(cents: number): string {
@@ -57,6 +63,26 @@ function prettyDate(iso?: string | null): string | null {
   return Number.isNaN(d.getTime())
     ? iso
     : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+function prettyDay(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+}
+
+// Where an unsigned offer stands, for the row's footer.
+function offerLine(b: VendorBooking, status: ContractStatus): string {
+  if (status === "draft") return "Not sent — the date isn't held";
+  if (status === "declined") {
+    return `Declined${b.declined_at ? ` ${prettyDate(b.declined_at)}` : ""}${
+      b.decline_reason ? ` — “${b.decline_reason}”` : ""
+    }`;
+  }
+  if (status === "cancelled") return "Not signed";
+  const seen = b.viewed_at ? `Opened ${prettyDate(b.viewed_at)}` : "Not opened yet";
+  if (!b.hold_expires_at) return seen;
+  return status === "expired"
+    ? `${seen} · hold ended ${prettyDay(b.hold_expires_at)}`
+    : `${seen} · date held until ${prettyDay(b.hold_expires_at)}`;
 }
 
 // Needs-you first — it's the reason most visits happen — then soonest event.
@@ -79,6 +105,7 @@ export default function ContractsPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [confirmVoidId, setConfirmVoidId] = useState<string | null>(null);
   const [voidingId, setVoidingId] = useState<string | null>(null);
+  const [sendingId, setSendingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login?next=/contracts&role=vendor");
@@ -134,6 +161,27 @@ export default function ContractsPage() {
     }
   }
 
+  // Sends a draft or resends a lapsed offer: the date is held again from now.
+  // The backend refuses (409) if the date went to someone else meanwhile.
+  async function sendOne(b: VendorBooking) {
+    setSendingId(b.booking_id);
+    setError(null);
+    try {
+      const res = await sendContract(b.booking_id);
+      setContracts((prev) =>
+        prev.map((c) =>
+          c.booking_id === b.booking_id
+            ? { ...c, contract_status: res.contract_status, hold_expires_at: res.hold_expires_at }
+            : c,
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't send that contract.");
+    } finally {
+      setSendingId(null);
+    }
+  }
+
   if (authLoading || !user || loading) {
     return <p className="py-20 text-center text-ink-soft">Loading…</p>;
   }
@@ -151,8 +199,8 @@ export default function ContractsPage() {
     );
   }
 
-  const live = contracts.filter((b) => contractStatus(b) !== "cancelled");
-  const awaitingSignature = live.filter((b) => !b.signed_at).length;
+  const live = contracts.filter((b) => !closed(contractStatus(b)));
+  const awaitingSignature = live.filter((b) => contractStatus(b) === "awaiting_signature").length;
   const needsYou = live.filter((b) => contractNeedsVendor(contractStatus(b))).length;
   const signedValueCents = live
     .filter((b) => b.signed_at)
@@ -189,7 +237,7 @@ export default function ContractsPage() {
         <Card className="p-4">
           <p className="text-xs uppercase tracking-wide text-ink-faint">Needs you</p>
           <p className="serif mt-1 text-2xl text-ink">{needsYou}</p>
-          <p className="mt-1 text-xs text-ink-faint">Payments to confirm</p>
+          <p className="mt-1 text-xs text-ink-faint">Payments to confirm, offers to send</p>
         </Card>
         <Card className="p-4">
           <p className="text-xs uppercase tracking-wide text-ink-faint">Signed value</p>
@@ -264,7 +312,7 @@ export default function ContractsPage() {
                   <p className="text-xs text-ink-faint">
                     {b.signed_at
                       ? `Signed ${prettyDate(b.signed_at)}${b.signer_name ? ` by ${b.signer_name}` : ""}`
-                      : "Not signed yet"}
+                      : offerLine(b, status)}
                     {b.deposit_amount_cents != null
                       ? ` · ${money(b.deposit_amount_cents)} deposit${
                           b.deposit_confirmed_received_at ? " received" : ""
@@ -272,12 +320,21 @@ export default function ContractsPage() {
                       : ""}
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {contractNeedsVendor(status) ? (
+                    {status === "draft" || status === "expired" ? (
+                      <Button disabled={sendingId === b.booking_id} onClick={() => sendOne(b)}>
+                        {sendingId === b.booking_id
+                          ? "Sending…"
+                          : status === "draft"
+                            ? "Send & hold date"
+                            : "Resend & hold date"}
+                      </Button>
+                    ) : null}
+                    {status === "confirm_deposit" || status === "confirm_payment" ? (
                       <LinkButton href="/my-bookings">
                         {status === "confirm_deposit" ? "Confirm deposit" : "Confirm payment"}
                       </LinkButton>
                     ) : null}
-                    {status !== "cancelled" && b.contract_token ? (
+                    {!closed(status) && b.contract_token ? (
                       <>
                         <Button variant="ghost" onClick={() => copyLink(b)}>
                           {copiedId === b.booking_id ? "Copied!" : "Copy link"}
@@ -285,7 +342,7 @@ export default function ContractsPage() {
                         {/* A plain anchor: the link is the client's page, opened
                             the way they'd open it, not an in-app navigation. */}
                         <a
-                          href={guestBookingLink(b.contract_token)}
+                          href={guestBookingPreviewLink(b.contract_token)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center rounded-full px-3 py-2.5 text-[0.95rem] font-semibold text-ink-soft transition hover:text-ink"
@@ -294,7 +351,7 @@ export default function ContractsPage() {
                         </a>
                       </>
                     ) : null}
-                    {status === "awaiting_signature" ? (
+                    {!b.signed_at && !closed(status) ? (
                       <Button variant="quiet" onClick={() => setConfirmVoidId(b.booking_id)}>
                         Void
                       </Button>

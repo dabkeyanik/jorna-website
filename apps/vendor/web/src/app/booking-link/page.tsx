@@ -14,6 +14,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ApiError } from "@/lib/api";
 import {
+  declineGuestBooking,
   fillGuestBookingDetails,
   getGuestBooking,
   guestMarkDepositPaid,
@@ -48,6 +49,9 @@ function Shell({ children }: { children: React.ReactNode }) {
 function BookingLinkInner() {
   const params = useSearchParams();
   const token = params.get("t") ?? "";
+  // The vendor's own "View as client" (guestBookingPreviewLink): same page,
+  // but it mustn't count as the client opening it, or act on their behalf.
+  const preview = params.get("preview") === "1";
 
   const [booking, setBooking] = useState<GuestBooking | null>(null);
   const [loading, setLoading] = useState(Boolean(token));
@@ -64,11 +68,13 @@ function BookingLinkInner() {
   const [error, setError] = useState<string | null>(null);
   const [paymentBusy, setPaymentBusy] = useState<"deposit" | "full" | null>(null);
   const [paymentNotice, setPaymentNotice] = useState<string | null>(null);
+  const [declining, setDeclining] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
 
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
-    getGuestBooking(token)
+    getGuestBooking(token, preview)
       .then((b) => {
         if (cancelled) return;
         setBooking(b);
@@ -91,7 +97,7 @@ function BookingLinkInner() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, preview]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -111,6 +117,18 @@ function BookingLinkInner() {
       setError(
         err instanceof ApiError ? err.message : "Couldn't send your reply. Check your connection and try again.",
       );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function decline() {
+    setBusy(true);
+    setError(null);
+    try {
+      setBooking(await declineGuestBooking(token, declineReason.trim() || null));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't send that. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
@@ -157,6 +175,26 @@ function BookingLinkInner() {
   }
 
   const vendorName = booking.vendor_display_name ?? "your vendor";
+  const holdUntil = booking.hold_expires_at
+    ? new Date(booking.hold_expires_at).toLocaleDateString(undefined, {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      })
+    : null;
+
+  if (booking.contract_status === "declined") {
+    return (
+      <Shell>
+        <p className="eyebrow">Declined</p>
+        <h1 className="serif mt-2 text-2xl text-maroon dark:text-gold">You turned this offer down</h1>
+        <p className="mt-3 text-ink-soft">
+          We let {vendorName} know. Nothing was signed and nothing is owed. If you change your
+          mind, ask them for a new link.
+        </p>
+      </Shell>
+    );
+  }
 
   // Voided by the vendor. The backend still serves the link so this can say
   // so, instead of the generic "not valid" a dead token gets.
@@ -174,6 +212,23 @@ function BookingLinkInner() {
       </Shell>
     );
   }
+
+  // The vendor held the date for a while; once that ran out it may have gone
+  // to someone else, so the backend won't take a signature until they resend.
+  if (booking.contract_status === "expired" && !booking.signed_at) {
+    return (
+      <Shell>
+        <p className="eyebrow">Expired</p>
+        <h1 className="serif mt-2 text-2xl text-maroon dark:text-gold">This offer has expired</h1>
+        <p className="mt-3 text-ink-soft">
+          {vendorName} was holding {prettyDate(booking.date_iso)} for you
+          {holdUntil ? ` until ${holdUntil}` : ""}. If you&apos;d still like to book, ask them to
+          resend it — they&apos;ll check the date is still free.
+        </p>
+      </Shell>
+    );
+  }
+
   const depositDue =
     booking.deposit_percent != null && booking.deposit_amount_cents != null
       ? money(booking.deposit_amount_cents)
@@ -244,9 +299,20 @@ function BookingLinkInner() {
 
   return (
     <div className="mx-auto w-[min(560px,100%-2rem)] py-12">
+      {preview ? (
+        <p className="mb-6 rounded-lg bg-panel px-3 py-2 text-center text-sm text-ink-soft">
+          Preview — this is what your client sees. Opening it here doesn&apos;t count as them
+          opening it.
+        </p>
+      ) : null}
       <div className="text-center">
         <p className="eyebrow">You&apos;ve been sent a booking by</p>
         <h1 className="serif mt-2 text-3xl text-maroon dark:text-gold">{vendorName}</h1>
+        {holdUntil ? (
+          <p className="mt-2 text-sm text-ink-soft">
+            {vendorName} is holding this date for you until {holdUntil}.
+          </p>
+        ) : null}
       </div>
 
       <Card className="mt-8 p-5">
@@ -350,7 +416,7 @@ function BookingLinkInner() {
         ) : null}
 
         <div>
-          <Button type="submit" size="lg" className="w-full" disabled={busy || !signerName.trim()}>
+          <Button type="submit" size="lg" className="w-full" disabled={busy || preview || !signerName.trim()}>
             {busy ? "Confirming…" : "Confirm booking →"}
           </Button>
           <p className="mt-2 text-center text-xs text-ink-faint">
@@ -358,6 +424,35 @@ function BookingLinkInner() {
           </p>
         </div>
       </form>
+
+      <div className="mt-8 border-t border-line-soft pt-6 text-center">
+        {declining ? (
+          <div className="grid gap-3 text-left">
+            <Field
+              label={`Anything you'd like ${vendorName} to know? (optional)`}
+              value={declineReason}
+              maxLength={500}
+              onChange={(e) => setDeclineReason(e.target.value)}
+            />
+            <div className="flex justify-center gap-2">
+              <Button variant="ghost" disabled={busy || preview} onClick={decline}>
+                {busy ? "Sending…" : "Decline this offer"}
+              </Button>
+              <Button variant="quiet" onClick={() => setDeclining(false)}>
+                Never mind
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setDeclining(true)}
+            className="text-sm text-ink-faint underline-offset-4 hover:text-ink hover:underline"
+          >
+            Not going ahead? Let {vendorName} know
+          </button>
+        )}
+      </div>
     </div>
   );
 }

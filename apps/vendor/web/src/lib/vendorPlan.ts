@@ -340,7 +340,10 @@ export function pipelineStats(bookings: VendorBooking[]): PipelineStats {
  * read Paid here while sitting in a different column on the board.
  */
 export type ContractStatus =
+  | "draft"
   | "awaiting_signature"
+  | "expired"
+  | "declined"
   | "deposit_due"
   | "confirm_deposit"
   | "balance_due"
@@ -349,13 +352,17 @@ export type ContractStatus =
   | "cancelled";
 
 export function contractStatus(b: VendorBooking): ContractStatus {
+  if (b.contract_status === "declined") return "declined";
   if (isDeadVendorBooking(b)) return "cancelled";
   if (pipelineStage(b) === "done") return "paid";
 
-  // No "hasn't opened it yet" state: that used to be read off a missing
-  // guest_name, but a vendor can fill the name in themselves now, and
-  // nothing records whether the link was ever opened.
-  if (!b.signed_at) return "awaiting_signature";
+  // Whether the client has opened it is b.viewed_at — a detail on the row,
+  // not a status of its own: either way it's waiting on them.
+  if (!b.signed_at) {
+    if (b.contract_status === "draft") return "draft";
+    if (b.contract_status === "expired") return "expired";
+    return "awaiting_signature";
+  }
 
   if (b.deposit_percent != null && !b.deposit_confirmed_received_at) {
     return b.deposit_marked_paid_at ? "confirm_deposit" : "deposit_due";
@@ -363,9 +370,15 @@ export function contractStatus(b: VendorBooking): ContractStatus {
   return b.payment_status === "marked_paid" ? "confirm_payment" : "balance_due";
 }
 
-/** The statuses where the vendor, not the client, owes the next move. */
+/** The statuses where the vendor, not the client, owes the next move — a
+ *  payment to confirm, or an offer to send or resend (or let go). */
 export function contractNeedsVendor(status: ContractStatus): boolean {
-  return status === "confirm_deposit" || status === "confirm_payment";
+  return (
+    status === "confirm_deposit" ||
+    status === "confirm_payment" ||
+    status === "expired" ||
+    status === "draft"
+  );
 }
 
 /**

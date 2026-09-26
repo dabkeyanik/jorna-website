@@ -844,6 +844,15 @@ export function updateContract(bookingId: string, updates: ContractUpdateInput):
   return apiFetch<Contract>(`/contracts/${bookingId}`, { method: "PATCH", body: updates });
 }
 
+/** Send a draft, or resend an expired offer — restarts the date hold. 409s
+ *  if the date has been taken meanwhile. */
+export function sendContract(bookingId: string, holdDays?: number): Promise<Contract> {
+  return apiFetch<Contract>(`/contracts/${bookingId}/send`, {
+    method: "POST",
+    body: holdDays ? { hold_days: holdDays } : {},
+  });
+}
+
 /** Withdraw an unsigned contract, freeing its date. Signed ones 400. */
 export function voidContract(bookingId: string): Promise<Contract> {
   return apiFetch<Contract>(`/contracts/${bookingId}/void`, { method: "POST" });
@@ -883,8 +892,17 @@ export function convertLead(leadId: string, input: ContractCreateInput): Promise
 // session to attach. The contract_token in the URL is the entire credential,
 // same trust model as the RSVP system's invitation token.
 
-export function getGuestBooking(token: string): Promise<GuestBooking> {
-  return apiFetch<GuestBooking>(`/guest-bookings/${token}`);
+/** preview: the vendor's own "View as client" — doesn't mark it viewed. */
+export function getGuestBooking(token: string, preview = false): Promise<GuestBooking> {
+  return apiFetch<GuestBooking>(`/guest-bookings/${token}${preview ? "?preview=true" : ""}`);
+}
+
+/** The client turns the offer down; frees the vendor's date. */
+export function declineGuestBooking(token: string, reason: string | null): Promise<GuestBooking> {
+  return apiFetch<GuestBooking>(`/guest-bookings/${token}/decline`, {
+    method: "POST",
+    body: { reason },
+  });
 }
 
 export function fillGuestBookingDetails(

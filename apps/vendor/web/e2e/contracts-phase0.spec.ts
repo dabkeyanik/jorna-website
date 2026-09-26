@@ -118,7 +118,7 @@ test.describe("contracts — Phase 0", () => {
     await expect(page.getByText("The link stops working")).toBeVisible();
     await page.getByRole("button", { name: "Void contract" }).click();
 
-    await page.getByRole("tab", { name: "Cancelled" }).click();
+    await page.getByRole("tab", { name: "Declined & voided" }).click();
     await expect(page.getByText("Anita Shah")).toBeVisible();
     expect(api.requestsTo("POST", "/contracts/c-void/void")).toHaveLength(1);
   });

@@ -269,6 +269,19 @@ function NewContractInner() {
             Your client opens it, fills in their own details, and signs — no account needed on
             their end.
           </p>
+          {/* Older backends don't send hold_expires_at — then say nothing. */}
+          {created.hold_expires_at ? (
+            <p className="mt-2 text-sm text-ink-faint">
+              Your date is held for them until{" "}
+              {new Date(created.hold_expires_at).toLocaleDateString(undefined, {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+              })}
+              . If they haven&apos;t signed by then, it opens up again — you can resend from
+              Contracts.
+            </p>
+          ) : null}
         </div>
         <Card className="mt-8 p-5">
           <p className="break-all rounded-lg bg-ground-2 px-3 py-2.5 font-mono text-sm text-ink">

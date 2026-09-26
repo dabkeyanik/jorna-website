@@ -1,142 +1,73 @@
 # Current Task
 
-> Temporary working memory for the task in progress. This file describes
-> *current* work, not permanent architecture — that belongs in `docs/`. It's
-> expected to be overwritten/reset when a task finishes; don't treat it as a
-> log.
+> Temporary working memory for the task in progress. Overwrite when a new
+> task starts.
 
 ## Goal
 
-Rebuild this repo as a vendor-only dashboard product (kanban pipeline,
-"Contracts" with vendor-set deposit %/cancellation window/overtime rate and
-a no-login client e-signature, a "Clients" CRM), inspired by a Figma mockup.
-Full plan: `/Users/yd/.claude/plans/delightful-leaping-starlight.md` (also
-readable from this repo's working tree if that path doesn't resolve from a
-future session — ask the user for it if missing).
+Package → contract → booking overhaul, from an audit done 2026-09-23.
+Phases: 0 fixes · 1 packages · 2 contracts as proposals · 3 client page ·
+4 marketplace requests become proposals. Work spans this repo and the
+backend (`../Desiconnect`, GitHub `jornaevents/jorna-backend`).
 
-## Current Status
+## Status (paused 2026-09-25 at the user's request)
 
-**All 9 steps (0–8) of Section 6 are done.** Backend (`Desiconnect`,
-Sections 1/3/4) and frontend (this repo, Sections 0/2/5) are both complete
-and manually verified end-to-end in a browser, including the full pipeline/
-Clients/Leads/Settings surface added in this session. Nothing in the plan
-is left unbuilt. Remaining items are all "check with the user before doing
-X" (pushing branches, opening PRs, committing this session's uncommitted
-work) — see "Remaining Work" below.
+- **Phase 0 — shipped.** jorna-vendor #19, jorna-backend #68. Dead client
+  links → book.jornaevents.com (`lib/clientApp.ts`); contract price bug;
+  client details/venue/end date on contracts; Void; lead → contract;
+  vendor notified on sign/mark-paid; emails branded Jorna.
+- **Phase 1 — shipped.** jorna-vendor #20, jorna-backend #69 (migration
+  0063). Package status (active/hidden "Private"/archived), included
+  hours, inclusions, add-ons, per-package terms, sort order; years
+  experience on the vendor. See docs/DECISIONS.md (both repos, backend #14).
+- **Phase 2a — PRs open, not merged (2026-09-26).** jorna-backend #70
+  (migration 0064), jorna-vendor PR on branch contracts-phase2a-lifecycle.
+  Contract status draft/sent/viewed/signed/declined/voided ("expired"
+  derived), 7-day tentative hold (Vendor.contract_hold_days), hard block on
+  sign, resend, client decline, preview link. `booking_service.
+  commits_vendor_date()` is the one "takes the date" rule. Backend DECISIONS
+  #15. Merge backend first (vendor UI tolerates old backend, but decline/
+  send 404 until it's live).
+- **Phase 2b — next.** Line items, payment schedule, clause-versioned terms,
+  step builder, per-contract timeline, emailing the link on send.
 
-## What Was Done
+## Decisions already made by the user (don't re-ask)
 
-**Steps 0–6** (fork, backend data model/endpoints/guard-audit, Contracts
-builder, public signing page, deposit-attestation UI) — see `git log` for
-detail; summarized in this file's previous version if needed.
+1. Customers booking from jornaevents.com go to book.jornaevents.com.
+2. A sent-but-unsigned contract gets a **tentative hold** on the date,
+   expiring (~7 days suggested, vendor-configurable); hard block on signing.
+3. Accepting a marketplace request should **create a proposal/contract**.
+4. **Add-ons and multi-package proposals are in v1** (Phase 2).
 
-**Step 7 — Pipeline kanban + stat tiles + Clients CRM + Leads CRUD** (this
-session):
-- `lib/vendorPlan.ts`: added `pipelineStage(b): PipelineStage` (5 stages:
-  inquiry/awaiting_client/confirmed/deposit_received/done, derived from
-  already-fetched booking fields — no new stored field) and
-  `pipelineStats(bookings): PipelineStats` (4 stat-tile reducers). 13 new
-  Vitest cases in `vendorPlan.test.ts` covering every branch, including
-  ordinary (non-contract) marketplace-style bookings alongside guest/
-  contract ones, and the "no date-based auto-advance to Done" decision.
-- `app/my-pipeline/page.tsx` (new): kanban with the 5 stages, leads shown
-  read-only in the Inquiry column, 4 stat tiles.
-- `app/my-clients/page.tsx` (new): CRM list backed by `GET /vendors/me/clients`.
-- `app/my-leads/page.tsx` (new): Lead CRUD (create/status-change/delete/
-  convert-to-contract link).
+Open: legal review of e-sign consent/terms before Phase 3 (unanswered);
+For vendors page still says "you only pay when you get booked"; chatbot
+persona still says "DesiConnect".
 
-**Step 8 — Contract-defaults Settings**:
-- `components/VendorProfileFields.tsx`: added `VendorContractDefaultsFields`
-  + `contractDefaultsToStrings()` helper.
-- `app/vendor-profile/page.tsx`: new "Contract defaults" card, wired to
-  `updateMyVendor()`.
+## Phase 2 plan (contracts as proposals) — 2a items done
 
-**Nav wiring** (this session, last piece of the plan):
-- `components/nav.tsx`: added Pipeline/Clients/Leads to
-  `VENDOR_DESKTOP_TABS` (new icons: `I.pipeline`/`I.clients`/`I.leads`), and
-  to `VENDOR_TABS`'s Dashboard-tab `match` array (mobile hamburger keeps one
-  compact Dashboard entry, not one per page).
-- `components/VendorNav.tsx`: added Pipeline/Clients/Leads to the mobile
-  pill-row `TABS` array.
-- **Also did the flagged "clean up once nav is touched anyway" item**:
-  `CLIENT_TABS` (renamed `NO_VENDOR_TABS`) was pointing a signed-in,
-  not-yet-a-vendor user at `/plan`, `/marketplace`, `/bundles` — all deleted
-  in this repo's Step 0 fork. Replaced with `/home` + a "Get started" link
-  to `/vendor-onboarding`. Updated `e2e/vendor-onboarding.spec.ts` (asserted
-  the old "Builder" label) to match.
-- **Did not** touch `app/vendor/[id]`'s (`app/vendor/page.tsx`) stale "Book
-  this"/`/plan`/`/marketplace` links — bigger than a nav-adjacent fix (touches
-  the `AskVendor` request/negotiation flow too); still flagged below.
+Backend: contract status (draft/sent/viewed/signed/declined/voided/
+expired) + sent_at/viewed_at/expires_at; line items (package(s) + add-ons
+snapshotted, qty, discount); payment_schedule[] replacing single deposit,
+each with marked-sent/confirmed timestamps; clause-versioned terms;
+tentative hold on send with expiry, hard block on sign (today contracts are
+created APPROVED and block immediately); account-synced templates;
+resend. Frontend: step builder (Client → Event → Items → Schedule → Terms →
+Preview → Send), edit/void from /contracts, per-contract timeline. Needs a
+migration — backfill existing contracts' status.
 
-**Bug found + fixed via manual browser testing this session**: the new
-Contract-defaults settings UI reported "Saved" but values never came back on
-reload. Root cause was in `Desiconnect` (backend), not here — see that
-repo's `current-task.md` for detail (three independent layers all missing
-`Vendor.default_*`: request schema, service-layer write allowlist, response
-dict). Fixed there; re-verified here that `/vendor-profile` → save → reload
-→ `/contracts/new` pre-fill all round-trip correctly now.
+## Ops notes
 
-**Verification** (after all of the above): typecheck/lint (0 errors, same
-pre-existing `set-state-in-effect` warnings)/unit (68 passed)/e2e (21
-passed)/production build all green. Full manual browser walkthrough of the
-new surface: created a contract, signed it as a guest (isolated logged-out
-context), marked+confirmed the deposit, watched it move
-Awaiting-client → Deposit-received on `/my-pipeline`, appeared correctly on
-`/my-clients` (grouped as "Direct"/guest), created and viewed a Lead on
-`/my-leads` and in the Pipeline's Inquiry column, and set+confirmed Contract
-defaults on `/vendor-profile`.
-
-## Remaining Work
-
-Nothing left in the plan's scope. Only user-gated follow-ups:
-- This repo has **no remote yet** — user creates it and links Cloudflare
-  Pages themselves (per their own explicit instruction earlier in the
-  project).
-- `Desiconnect`'s `feature/vendor-contracts-data-model` branch is
-  **uncommitted** (the `default_*` bug fix) on top of **not pushed, no PR**
-  — check with the user before either.
-- This repo's own nav-wiring + `NO_VENDOR_TABS` cleanup commit(s) from this
-  session are also **not yet committed** — check with the user first.
-
-## Known follow-ups, not blocking, flagged so they aren't forgotten
-
-- `app/vendor/[id]`'s (`app/vendor/page.tsx`) public listing page still has
-  a stale "Book this" CTA → `/book?service=`, plus "Back to marketplace" /
-  "Build my bundle" links → `/marketplace` / `/plan`, all deleted in Step 0.
-  Bigger than a nav fix: also touches the `AskVendor` inbound-request/
-  negotiation flow, which may or may not still make sense to keep in a
-  vendor-only, contract-first app. Needs a real decision, not a quick patch.
-- Pre-existing, unrelated bug noticed while testing: `GET /bookings/vendor`
-  (no vendor_id) in `Desiconnect`'s `app/routers/bookings.py` is shadowed by
-  the earlier-registered `GET /bookings/{booking_id}` route (Starlette
-  matches route-registration order) — "vendor" gets treated as a
-  `booking_id` and 404s. Dead code in practice: `listVendorBookings()` in
-  this repo always calls the vendor_id-qualified form
-  (`/bookings/vendor/{id}`), never the bare one. Not fixed — out of scope,
-  pre-existing, harmless since nothing calls the broken path.
-
-## Notes for the Next Agent
-
-- `cd server && venv/bin/python -m X` (not `venv/bin/X` directly) in
-  `Desiconnect` — the venv's script shebangs are stale from before that
-  repo moved into `~/Documents/GitHub/jorna/`.
-- `cd web && npm install` (not `npm --prefix web install`) in this repo —
-  an environment-specific `EALLOWSCRIPTS` quirk, unrelated to the product.
-- For a manual end-to-end browser check: run the backend with
-  `ESCROW_ENABLED=false`, a throwaway `DATABASE_URL=sqlite:////tmp/....db`
-  (sqlite triggers `Base.metadata.create_all` in `main.py` on boot — no
-  Alembic needed for a throwaway DB; Alembic itself doesn't support SQLite's
-  ALTER-constraint migrations anyway), and
-  `ALLOWED_ORIGINS=http://localhost:<port>` (CORS blocks the browser
-  otherwise — the default is empty). Run the frontend with matching
-  `NEXT_PUBLIC_API_BASE_URL` and `NEXT_PUBLIC_ESCROW_ENABLED=false`. **Use
-  the same hostname (`localhost` or `127.0.0.1`, not a mix)** for the
-  frontend dev server, the browser URL, and `ALLOWED_ORIGINS` — Next dev's
-  `allowedDevOrigins` cross-origin guard silently blocks JS chunk requests
-  otherwise, which hangs every page on "Loading…" with no useful error
-  (this cost real time this session — mismatched `127.0.0.1` vs `localhost`
-  across the three). To get a session without going through the real
-  registration form (which needs a resolved city autocomplete pick), `curl
-  POST /auth/register` + `/auth/login` directly, then
-  `localStorage.setItem("jorna_access"/"jorna_refresh", ...)` in the browser
-  — mirrors `e2e/support/fixtures.ts`'s `loginAs()`.
+- Railway's "wait for CI" gate is inconsistent: 2026-09-23 a deploy sat
+  ~3h unstarted until triggered by hand; 2026-09-25 one deployed before CI
+  finished. After merging backend, watch `railway deployment list
+  --service Desiconnect` and probe a new endpoint on
+  https://desiconnect-production.up.railway.app. User hasn't yet checked
+  the dashboard setting.
+- Railway CLI is logged in locally. Test migrations against a throwaway
+  local Postgres 16 (`initdb` + `pg_ctl -o "-p 55432 -c
+  unix_socket_directories=''"`) — scratchpad socket paths are too long.
+- `npm run build` and the Playwright dev server share `.next`; `rm -rf
+  web/.next` if e2e starts timing out after a build.
+- Backend commit trailer per its CLAUDE.md: `Co-Authored-By: Claude Opus
+  4.8 <noreply@anthropic.com>`.
+- Production ALLOWED_ORIGINS no longer includes localhost (2026-09-23).

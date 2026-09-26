@@ -6,3 +6,9 @@ export function guestBookingLink(token: string): string {
   // literal "/app" prefix.
   return `${window.location.origin}/app/booking-link?t=${token}`;
 }
+
+/** The vendor's own "View as client" — the same page, but opening it
+ *  doesn't mark the contract as seen by the client. */
+export function guestBookingPreviewLink(token: string): string {
+  return `${guestBookingLink(token)}&preview=1`;
+}

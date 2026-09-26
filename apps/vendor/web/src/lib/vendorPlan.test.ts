@@ -283,6 +283,22 @@ describe("contractStatus", () => {
     expect(contractStatus(b)).toBe("paid");
   });
 
+  it("hands a draft or a lapsed offer back to the vendor", () => {
+    const draft = contractStatus(contract({ contract_status: "draft" }));
+    const expired = contractStatus(contract({ contract_status: "expired" }));
+    expect([draft, expired]).toEqual(["draft", "expired"]);
+    expect(contractNeedsVendor(draft)).toBe(true);
+    expect(contractNeedsVendor(expired)).toBe(true);
+    // Opened or not, a live offer is waiting on the client.
+    expect(contractStatus(contract({ contract_status: "viewed" }))).toBe("awaiting_signature");
+  });
+
+  it("says declined rather than cancelled when the client turned it down", () => {
+    expect(
+      contractStatus(contract({ status: "rejected", contract_status: "declined" })),
+    ).toBe("declined");
+  });
+
   it("is cancelled when the booking is dead, whatever else is set", () => {
     expect(
       contractStatus(contract({ status: "cancelled", signed_at: "2026-05-01T00:00:00Z" })),

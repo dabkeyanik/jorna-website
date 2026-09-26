@@ -1067,9 +1067,27 @@ export interface VendorBooking {
   signed_at?: string | null;
   deposit_marked_paid_at?: string | null;
   deposit_confirmed_received_at?: string | null;
+  /** Where a contract stands as an offer — null on a non-contract booking. */
+  contract_status?: ContractLifecycle | null;
+  /** A sent/viewed contract holds its date until this; then it's "expired". */
+  hold_expires_at?: string | null;
+  viewed_at?: string | null;
+  declined_at?: string | null;
+  decline_reason?: string | null;
 }
 
 // ── Contracts (vendor-authored, no-login guest bookings) ──────────────
+
+/** The backend's contract_status (DECISIONS.md #15 there). "expired" is a
+ *  sent/viewed offer whose date hold has lapsed — derived there, never stored. */
+export type ContractLifecycle =
+  | "draft"
+  | "sent"
+  | "viewed"
+  | "signed"
+  | "declined"
+  | "voided"
+  | "expired";
 
 /** The vendor's own view of a contract — GET/PATCH /contracts/{id},
  *  POST /contracts. Shares most fields with GuestBooking below; kept as a
@@ -1099,8 +1117,15 @@ export interface Contract {
   guest_phone: string | null;
   signer_name: string | null;
   signed_at: string | null;
-  /** "approved" while live; "rejected" once the vendor voids it. */
+  /** "approved" while live; "rejected" once voided or declined. */
   status: string;
+  contract_status: ContractLifecycle | null;
+  sent_at: string | null;
+  viewed_at: string | null;
+  hold_expires_at: string | null;
+  declined_at: string | null;
+  decline_reason: string | null;
+  voided_at: string | null;
   contract_token: string;
   vendor_display_name: string | null;
 }
@@ -1155,9 +1180,12 @@ export interface GuestBooking {
   signer_name: string | null;
   signed_at: string | null;
   payment_status: string;
-  /** "rejected" once the vendor has voided it — the link still opens, but
+  /** "rejected" once voided or declined — the link still opens, but
    *  nothing on it can be acted on. */
   status?: string;
+  contract_status?: ContractLifecycle | null;
+  /** Until when the vendor is holding this date for the client. */
+  hold_expires_at?: string | null;
   deposit_marked_paid_at: string | null;
   deposit_confirmed_received_at: string | null;
 }
