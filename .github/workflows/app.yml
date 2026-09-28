@@ -21,14 +21,13 @@ on:
         required: true
         type: string
 
-defaults:
-  run:
-    working-directory: apps/${{ inputs.app }}
-
 jobs:
   build:
     name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/${{ inputs.app }}
     steps:
       - uses: actions/checkout@v7
 
@@ -55,6 +54,9 @@ jobs:
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/${{ inputs.app }}
     steps:
       - uses: actions/checkout@v7
 
@@ -89,6 +91,9 @@ jobs:
     name: Deploy PR preview
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/${{ inputs.app }}
     # A preview is a convenience, not a check: a failed one shouldn't block
     # merging a change whose tests passed.
     continue-on-error: true
@@ -150,6 +155,9 @@ jobs:
     needs: [build, e2e]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/${{ inputs.app }}
     # Two merges in quick succession must not race each other to production.
     concurrency:
       group: deploy-${{ inputs.app }}
