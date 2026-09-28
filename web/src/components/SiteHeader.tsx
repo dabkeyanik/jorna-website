@@ -17,14 +17,14 @@ import { Button, LinkButton } from "./ui";
 // clutter. MobileNavMenu's sheet has the room to show them.
 export function SiteHeader() {
   const { user, loading, logout } = useAuth();
-  const { desktopItems: items, attention, messagesUnread, home, isActive } = useAppNav();
+  const { items, attention, messagesUnread, home, isActive } = useAppNav();
 
   return (
     <header className="sticky top-0 z-20 border-b border-line-soft bg-ground/85 backdrop-blur">
       <div className="mx-auto flex w-[min(var(--container-wide),100%-2rem)] items-center justify-between gap-3 py-3 md:gap-6">
         {/* The wordmark goes Home — the ordinary thing a logo does. It points at
             /home rather than "/", which is the app entry that only redirects
-            here anyway; for a vendor, home is their dashboard. */}
+            here anyway. */}
         <Link href={home} className="serif shrink-0 text-2xl text-maroon dark:text-gold">
           Jorna
         </Link>

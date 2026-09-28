@@ -40,6 +40,7 @@ import { searchVendors } from "@/lib/jorna";
 import { CELEBRATIONS } from "@/lib/celebrations";
 import type { VendorSearchItem } from "@/lib/types";
 import { LinkButton } from "@/components/ui";
+import { vendorSiteUrl } from "@/lib/vendorSite";
 import { VendorCard, VendorCardSkeleton } from "@/components/VendorCard";
 import {
   CELEBRATION_ICONS,
@@ -530,12 +531,13 @@ export default function HomePage() {
                 ))}
               </ul>
               <div className="mt-8">
-                <Link
-                  href={user ? "/vendor-onboarding" : "/login?mode=register&role=vendor"}
+                {/* Selling is the vendor app on jornaevents.com. */}
+                <a
+                  href={vendorSiteUrl("/login?mode=register&role=vendor")}
                   className="inline-flex items-center justify-center rounded-full bg-ground px-7 py-3.5 font-semibold text-maroon transition hover:brightness-95"
                 >
                   Become a vendor
-                </Link>
+                </a>
               </div>
             </div>
           </div>

@@ -107,7 +107,7 @@ apply to WS handshakes). See `web/src/lib/chat.ts` for the consumer.
 - `client_note` on `BookingCreateInput` (`jorna.ts`) / `BundleBooking` /
   `VendorBooking` (`types.ts`) is the same kind of optimistic field: `/book`
   sends whatever the client typed in "Anything the vendor should know?", and
-  `/my-bookings` and `/my-dashboard` render it back on the vendor's side —
+  the vendor app (jornaevents.com) renders it back on the vendor's side —
   but until the backend accepts and stores this field on `POST /bookings`
   and returns it on both booking shapes, a vendor won't actually see
   anything a client writes there. No fallback exists for this one the way

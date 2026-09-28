@@ -45,7 +45,6 @@ import {
 import { Button, Card, Chip, Field, LinkButton } from "@/components/ui";
 import { PlanProgress } from "@/components/PlanProgress";
 import { CityCombobox } from "@/components/CityCombobox";
-import { ClientOnlyRoute } from "@/components/ClientOnlyRoute";
 
 function money(n?: number | null) {
   return n == null ? null : `$${Math.round(n).toLocaleString()}`;
@@ -399,11 +398,7 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
 }
 
 export default function DashboardPage() {
-  return (
-    <ClientOnlyRoute>
-      <DashboardInner />
-    </ClientOnlyRoute>
-  );
+  return <DashboardInner />;
 }
 
 function DashboardInner() {

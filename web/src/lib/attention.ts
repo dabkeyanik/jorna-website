@@ -10,10 +10,9 @@
 // Every rule mirrors a backend guard, so an item never points at an action the
 // server must reject.
 
-import { getMyVendor, getStripeStatus, listBundles, listVendorBookings } from "@/lib/jorna";
-import type { BundleDetail, StripeStatus, VendorBooking } from "@/lib/types";
+import { listBundles } from "@/lib/jorna";
+import type { BundleDetail } from "@/lib/types";
 import { ATTENTION_KINDS, planForBundle, taskDetail } from "@/lib/planning";
-import { vendorTasks } from "@/lib/vendorPlan";
 import { centsMoney } from "@/lib/contract";
 
 function money(n: number) {
@@ -72,51 +71,11 @@ function clientItems(bundles: BundleDetail[]): AttentionItem[] {
   return items;
 }
 
-/**
- * What the vendor still has to do.
- *
- * The rules live in lib/vendorPlan, which the vendor dashboard also reads, so
- * the badge and the dashboard's action list can't disagree. Stripe is derived
- * there too, which is why it no longer needs adding separately below.
- */
-function vendorItems(bookings: VendorBooking[], stripe: StripeStatus | null): AttentionItem[] {
-  return vendorTasks(bookings, stripe).map((task) => ({
-    id: task.id,
-    title: task.title,
-    detail: task.detail,
-    // Stripe is the account's problem, not a booking's, so it points at the
-    // page that fixes it; everything else at the bookings list.
-    href: task.kind === "stripe" ? "/my-earnings" : "/my-bookings",
-    cta: task.cta,
-    // The feed has two tones, and an alarm is an urgent one.
-    tone: task.tone === "normal" ? "normal" : "urgent",
-  }));
-}
-
 async function derive(): Promise<AttentionItem[]> {
-  const found: AttentionItem[] = [];
-
-  // A vendor's own money comes first: without Stripe onboarding a client
-  // literally cannot pay them, and checkout refuses.
-  const vendor = await getMyVendor().catch(() => null);
-  if (vendor) {
-    const [stripe, bookings] = await Promise.all([
-      getStripeStatus(vendor.vendor_id).catch(() => null),
-      listVendorBookings(vendor.vendor_id, { limit: 100 })
-        .then((r) => r.items)
-        .catch(() => [] as VendorBooking[]),
-    ]);
-    found.push(...vendorItems(bookings, stripe));
-  }
-
-  // Only for a client. A vendor's own plans — if the account made any back when
-  // the builder was reachable from any URL — now live behind a guard that sends
-  // them to their dashboard, so listing a task here would be an item that can't
-  // be opened. One account is one side of the marketplace.
-  if (!vendor) {
-    const bundles = await listBundles().catch(() => [] as BundleDetail[]);
-    found.push(...clientItems(bundles));
-  }
+  // Clients only — a vendor account sees VendorAccountGate, not this list.
+  // Their own is on jornaevents.com.
+  const bundles = await listBundles().catch(() => [] as BundleDetail[]);
+  const found = clientItems(bundles);
 
   // Unread messages are their own badge on the Messages tab (see nav.tsx's
   // useAppNav), not a Needs-You item — a new message isn't a task with a
@@ -127,10 +86,9 @@ async function derive(): Promise<AttentionItem[]> {
   return found;
 }
 
-// Deriving costs 2 requests for a client and 4 for a vendor, so a badge that
-// recomputed on every navigation would be wasteful. Cache briefly and dedupe
-// concurrent callers, so the tab bar and /activity mounting together still cost
-// one pass.
+// Deriving costs a request, so a badge that recomputed on every navigation
+// would be wasteful. Cache briefly and dedupe concurrent callers, so the tab
+// bar and /activity mounting together still cost one pass.
 const TTL_MS = 60_000;
 let cache: { at: number; items: AttentionItem[] } | null = null;
 let inflight: Promise<AttentionItem[]> | null = null;

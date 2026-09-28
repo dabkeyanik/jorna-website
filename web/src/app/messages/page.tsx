@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { listConversations } from "@/lib/jorna";
-import { loadIsVendor } from "@/lib/role";
 import type { ConversationSummary } from "@/lib/types";
 import { Card, Chip, LinkButton } from "@/components/ui";
 
@@ -84,16 +83,10 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
-  const [isVendor, setIsVendor] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login?next=/messages");
   }, [authLoading, user, router]);
-
-  useEffect(() => {
-    if (!user) return;
-    loadIsVendor().then(setIsVendor);
-  }, [user]);
 
   // Initial load, then a slow poll so a message that arrived elsewhere moves
   // its row up and bumps its unread count without a manual revisit — the
@@ -172,38 +165,18 @@ export default function MessagesPage() {
         <p className="mt-10 text-center text-ink-soft">Loading…</p>
       ) : conversations.length === 0 ? (
         <div className="mt-10 text-center">
-          {isVendor ? (
-            <>
-              <p className="mx-auto max-w-[46ch] text-ink-soft">
-                No messages yet. This fills in once a client asks about one of
-                your packages or books you — a vendor can&apos;t start a chat,
-                only a client can.
-              </p>
-              <div className="mt-5 flex flex-wrap justify-center gap-2">
-                <LinkButton href="/vendor-profile" variant="ghost">
-                  Edit your packages
-                </LinkButton>
-                <LinkButton href="/my-dashboard" variant="ghost">
-                  Dashboard
-                </LinkButton>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="mx-auto max-w-[46ch] text-ink-soft">
-                No chats yet. Ask a vendor a question from their page, or send a
-                plan — either one starts a conversation.
-              </p>
-              <div className="mt-5 flex flex-wrap justify-center gap-2">
-                <LinkButton href="/marketplace" variant="ghost">
-                  Browse vendors
-                </LinkButton>
-                <LinkButton href="/bundles" variant="ghost">
-                  Dashboard
-                </LinkButton>
-              </div>
-            </>
-          )}
+          <p className="mx-auto max-w-[46ch] text-ink-soft">
+            No chats yet. Ask a vendor a question from their page, or send a
+            plan — either one starts a conversation.
+          </p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <LinkButton href="/marketplace" variant="ghost">
+              Browse vendors
+            </LinkButton>
+            <LinkButton href="/bundles" variant="ghost">
+              Dashboard
+            </LinkButton>
+          </div>
         </div>
       ) : (
         <div className="mt-6 grid gap-2">

@@ -228,3 +228,24 @@ A vendor row saved while the flag was off always has `payment_method:
 a vendor who already had `payment_method: "stripe"` on file, since the
 backend's booking-time override is what actually keeps new bookings off
 Stripe regardless of what a vendor's profile still says.
+
+## Decision: vendors are served by jornaevents.com only
+
+- **Date:** 2026-09-28
+- **What:** The seller pages that were still here from before the vendor side
+  moved to its own app — `/my-dashboard`, `/my-bookings`, `/my-calendar`,
+  `/my-availability`, `/my-earnings`, `/vendor-profile`,
+  `/vendor-onboarding`, `/calendar-connected`, `/vendor/stripe-onboard` —
+  are deleted, with `lib/vendorPlan.ts`, the vendor tabs and the vendor-only
+  components. Old URLs 301 to the same page on jornaevents.com
+  (`public/_redirects`). Sign-up here is for hosts; "Become a vendor" and old
+  `?role=vendor` links go to the vendor site's sign-up.
+- **Why:** Two copies of the seller app had already drifted — contracts,
+  templates and payment schedules exist only on jornaevents.com, so a vendor
+  working here was missing most of their job. And the backend's links for
+  vendors (`WEB_APP_URL`, the Google Calendar return) already point there.
+- **A vendor account signing in here** sees `VendorAccountGate`: a notice
+  with a link to jornaevents.com and a sign-out, on every page but the
+  sign-in ones. It replaces `ClientOnlyRoute`, which guarded only five pages
+  and sent vendors to the dashboard that no longer exists here. Sessions
+  don't carry across (different origins), so the notice says to sign in there.

@@ -19,3 +19,24 @@
 # lead there. Deep links, emailed check-in and RSVP links, Stripe return URLs
 # and the Supabase auth callback all keep working untouched.
 /    /app/    200
+
+# The seller pages moved to the vendor app on jornaevents.com (the jorna-vendor
+# repo) and are gone from here. Old bookmarks and links go to the same page
+# there. 301: they aren't coming back.
+/app/my-dashboard       https://jornaevents.com/app/my-dashboard/        301
+/app/my-dashboard/*     https://jornaevents.com/app/my-dashboard/        301
+/app/my-bookings        https://jornaevents.com/app/my-bookings/         301
+/app/my-bookings/*      https://jornaevents.com/app/my-bookings/         301
+/app/my-calendar        https://jornaevents.com/app/my-calendar/         301
+/app/my-calendar/*      https://jornaevents.com/app/my-calendar/         301
+/app/my-availability    https://jornaevents.com/app/my-calendar/         301
+/app/my-availability/*  https://jornaevents.com/app/my-calendar/         301
+/app/my-earnings        https://jornaevents.com/app/my-earnings/         301
+/app/my-earnings/*      https://jornaevents.com/app/my-earnings/         301
+/app/vendor-profile     https://jornaevents.com/app/vendor-profile/      301
+/app/vendor-profile/*   https://jornaevents.com/app/vendor-profile/      301
+/app/vendor-onboarding  https://jornaevents.com/app/vendor-onboarding/   301
+/app/vendor-onboarding/* https://jornaevents.com/app/vendor-onboarding/  301
+/app/calendar-connected   https://jornaevents.com/app/calendar-connected/ 301
+/app/calendar-connected/* https://jornaevents.com/app/calendar-connected/ 301
+/app/vendor/stripe-onboard/*  https://jornaevents.com/app/vendor/stripe-onboard/:splat 301

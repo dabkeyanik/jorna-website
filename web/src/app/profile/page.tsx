@@ -5,12 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
-import { deleteMe, getEarnings, getMyVendor, listBundles } from "@/lib/jorna";
+import { deleteMe, listBundles } from "@/lib/jorna";
 import { moneyForBundle } from "@/lib/planning";
 import { disableWebPushForThisDevice } from "@/lib/push";
-import { vendorMoney } from "@/lib/vendorPlan";
-import type { VendorDetail } from "@/lib/types";
-import { Button, Card, LinkButton } from "@/components/ui";
+import { vendorSiteUrl } from "@/lib/vendorSite";
+import { Button, Card } from "@/components/ui";
 
 // Dollars, like everything in MoneyBreakdown — those sums are booking.price,
 // not the cents the Stripe fields carry.
@@ -36,8 +35,6 @@ function Row({ href, title, sub }: { href: string; title: string; sub: string })
 export default function ProfilePage() {
   const { user, loading: authLoading, logout } = useAuth();
   const router = useRouter();
-  const [vendor, setVendor] = useState<VendorDetail | null>(null);
-  const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,13 +48,9 @@ export default function ProfilePage() {
    * this reason; the account is the same plans and the same money, so it is
    * refused here too.
    *
-   * Two directions, not one: money this account has paid as a buyer (checked
-   * via listBundles/moneyForBundle) and money a client has paid *into* this
-   * account's vendor services and is still owed *to* it (checked via
-   * getEarnings/vendorMoney, when this account has a vendor profile at all).
-   * The second used to go unchecked — a vendor with a paid, unconfirmed
-   * booking could delete their account and take a client's escrowed payment
-   * down with it, with nothing left to release it to.
+   * Only the buyer's side: a vendor account never reaches this page (see
+   * VendorAccountGate) — its own check, for money owed *to* it, lives on
+   * jornaevents.com.
    *
    * Checked when they ask rather than on page load: it costs a request, and
    * nearly everyone opening this page is here for something else.
@@ -70,32 +63,24 @@ export default function ProfilePage() {
     setBusy(true);
     setError(null);
     try {
-      const [bundles, vendorEscrowCents] = await Promise.all([
-        listBundles(),
-        vendor
-          ? getEarnings(vendor.vendor_id).then((e) => vendorMoney(e)?.inEscrowCents ?? 0)
-          : Promise.resolve(0),
-      ]);
+      const bundles = await listBundles();
       const boughtHeld = bundles.reduce((sum, b) => {
         const cash = moneyForBundle(b);
         return sum + cash.inEscrow + cash.strandedInEscrow;
       }, 0);
-      const vendorHeld = vendorEscrowCents / 100;
 
-      if (boughtHeld > 0 || vendorHeld > 0) {
-        const clauses: string[] = [];
-        if (boughtHeld > 0) {
-          clauses.push(
-            `${money(boughtHeld)} you've paid is still held in escrow — release it to the vendor, request a refund, or report a problem on those bookings`,
-          );
-        }
-        if (vendorHeld > 0) {
-          clauses.push(
-            `${money(vendorHeld)} a client has paid you is still held in escrow — confirm those events so it can release to you`,
-          );
-        }
+      // The backend refuses these too (a signed contract is both sides'
+      // record); asked here so the answer comes before the confirmation.
+      const signed = bundles.flatMap((b) => b.bookings ?? []).filter((b) => b.contract_token && b.signed_at);
+      if (signed.length > 0) {
         setError(
-          `${clauses.join(", and ")} before deleting. Deleting your account wouldn't return this money — it would only remove the record of where it went.`,
+          `You have ${signed.length === 1 ? "a signed contract" : `${signed.length} signed contracts`}, so your account can't be deleted — ${signed.length === 1 ? "it's" : "they're"} the record of what you and your ${signed.length === 1 ? "vendor" : "vendors"} agreed.`,
+        );
+        return;
+      }
+      if (boughtHeld > 0) {
+        setError(
+          `${money(boughtHeld)} you've paid is still held in escrow — release it to the vendor, request a refund, or report a problem on those bookings before deleting. Deleting your account wouldn't return this money — it would only remove the record of where it went.`,
         );
         return;
       }
@@ -133,19 +118,7 @@ export default function ProfilePage() {
     if (!authLoading && !user) router.replace("/login?next=/profile");
   }, [authLoading, user, router]);
 
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    getMyVendor()
-      .then((v) => !cancelled && setVendor(v))
-      .catch(() => {})
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
-
-  if (authLoading || !user || loading) {
+  if (authLoading || !user) {
     return <p className="py-20 text-center text-ink-soft">Loading…</p>;
   }
 
@@ -188,24 +161,19 @@ export default function ProfilePage() {
       {/* Selling side */}
       <section className="mt-8">
         <p className="eyebrow mb-3">Selling</p>
-        {vendor ? (
-          <div className="grid gap-2">
-            <Row href="/my-bookings" title="Requests" sub="Accept or decline booking requests" />
-            <Row href="/my-availability" title="Hours" sub="Your weekly availability" />
-            <Row href="/my-earnings" title="Earnings" sub="Payouts, escrow, and payment setup" />
-            <Row href="/vendor-profile" title="Your listing" sub="Packages, prices and how clients see you" />
-          </div>
-        ) : (
-          <Card className="p-5">
-            <p className="text-sm text-ink-soft">
-              Offer your packages on Jorna — get discovered by people who are
-              actively planning, and get paid safely through escrow.
-            </p>
-            <LinkButton href="/vendor-onboarding" className="mt-4">
-              Start selling
-            </LinkButton>
-          </Card>
-        )}
+        {/* Selling is a different app — see VendorAccountGate. */}
+        <Card className="p-5">
+          <p className="text-sm text-ink-soft">
+            Offer your packages on Jorna — get discovered by people who are
+            actively planning. Vendors sign up and work on jornaevents.com.
+          </p>
+          <a
+            href={vendorSiteUrl("/login?mode=register&role=vendor")}
+            className="mt-4 inline-flex items-center rounded-full bg-maroon px-5 py-2.5 font-semibold text-ground hover:brightness-110"
+          >
+            Start selling
+          </a>
+        </Card>
       </section>
 
       <div className="mt-10">
@@ -232,7 +200,7 @@ export default function ProfilePage() {
           <>
             <p className="mt-1 max-w-[60ch] text-sm text-ink-soft">
               This removes your account, your celebrations and every booking on
-              them{vendor ? ", along with your vendor profile, packages and hours" : ""}.
+              them.
               Vendors you&apos;ve booked lose the request too. It cannot be undone
               and there is no way to get any of it back.
             </p>
