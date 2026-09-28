@@ -40,6 +40,7 @@ import {
   customLine,
   defaultClauses,
   describeDue,
+  describeWhen,
   emptyDraft,
   fromContract,
   fromRequest,
@@ -445,7 +446,7 @@ function NewContractInner() {
           ← {editing ? "Back to the contract" : request ? "Back to requests" : "All contracts"}
         </Link>
         <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold">
-          {editing ? "Edit contract" : request ? `Accept ${request.client_name || "this"} request` : "New contract"}
+          {editing ? "Edit contract" : request ? `Accept ${request.client_name ? `${request.client_name}'s` : "this"} request` : "New contract"}
         </h1>
         <p className="mt-3 text-ink-soft">
           {request
@@ -510,11 +511,7 @@ function NewContractInner() {
           <Card className="grid gap-1 p-5 text-sm text-ink-soft">
             <p className="eyebrow">From their request</p>
             <p className="mt-1 text-base text-ink">{request.client_name || "Your client"}</p>
-            <p>
-              {request.date_iso}
-              {request.date_end && request.date_end !== request.date_iso ? ` – ${request.date_end}` : ""} ·{" "}
-              {request.time_start}–{request.time_end}
-            </p>
+            <p>{describeWhen(request.date_iso, request.date_end, request.time_start, request.time_end)}</p>
             <p>{request.location}</p>
             {request.guest_count ? <p>{request.guest_count} guests</p> : null}
             {request.client_note ? <p className="mt-2 italic">“{request.client_note}”</p> : null}
@@ -929,9 +926,7 @@ function NewContractInner() {
               <p className="eyebrow">What your client will see</p>
               <h2 className="serif mt-2 text-xl text-ink">{draft.clientName || "Your client"}</h2>
               <p className="mt-1 text-sm text-ink-soft">
-                {draft.dateIso || "No date yet"}
-                {draft.multiDay && draft.dateEnd ? ` – ${draft.dateEnd}` : ""}
-                {draft.timeStart ? ` · ${draft.timeStart}–${draft.timeEnd}` : ""}
+                {describeWhen(draft.dateIso, draft.multiDay ? draft.dateEnd : null, draft.timeStart, draft.timeEnd)}
                 {draft.location ? ` · ${draft.location}` : ""}
               </p>
               <table className="mt-4 w-full text-sm">

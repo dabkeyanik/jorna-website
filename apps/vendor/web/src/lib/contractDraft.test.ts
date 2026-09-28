@@ -6,6 +6,7 @@ import {
   emptyDraft,
   fromContract,
   fromRequest,
+  describeWhen,
   presetSchedule,
   problems,
   scheduledCents,
@@ -179,6 +180,22 @@ describe("fromRequest", () => {
     expect(d.lines[0]).toMatchObject({ unit: "person", price: "45", quantity: "200" });
     const unknown = fromRequest(request({ price: 45, price_unit: "person", price_pending_quantity: true }));
     expect(unknown.lines[0].quantity).toBe("");
+  });
+});
+
+describe("describeWhen", () => {
+  it("reads like a date and a time, not the stored formats", () => {
+    const when = describeWhen("2030-10-12", null, "19:00", "23:00");
+    expect(when).toMatch(/Oct/);
+    expect(when).toMatch(/2030/);
+    expect(when).toContain("7:00 PM – 11:00 PM");
+    expect(when).not.toContain("19:00");
+  });
+
+  it("shows a range for several days, and leaves out what isn't set", () => {
+    expect(describeWhen("2030-10-12", "2030-10-13", null, null)).toMatch(/– .*13/);
+    expect(describeWhen("", null, "", "")).toBe("No date yet");
+    expect(describeWhen("2030-10-12", null, "00:30", "12:15")).toContain("12:30 AM – 12:15 PM");
   });
 });
 

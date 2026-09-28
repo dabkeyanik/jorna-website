@@ -487,7 +487,10 @@ function BookingLinkInner() {
               {depositDue && !schedule ? (
                 <li>✓ {depositDue} deposit ({booking.deposit_percent}%) due to secure your date</li>
               ) : null}
-              {booking.cancellation_window_hours != null ? (
+              {/* The vendor's own cancellation clause says it better than
+                  this generated line — show one, not both. */}
+              {booking.cancellation_window_hours != null &&
+              !(booking.terms_clauses ?? []).some((c) => /cancel/i.test(`${c.key} ${c.title}`)) ? (
                 <li>
                   ✓ Cancellations within {Math.round(booking.cancellation_window_hours / 24)} days of the
                   event may forfeit the deposit

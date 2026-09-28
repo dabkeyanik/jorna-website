@@ -13,7 +13,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { confirmInstallment, getContract, sendContract, voidContract } from "@/lib/jorna";
-import { describeDue, money } from "@/lib/contractDraft";
+import { describeDue, describeWhen, money } from "@/lib/contractDraft";
 import { guestBookingLink, guestBookingPreviewLink } from "@/lib/contractLink";
 import type { Contract, ContractEvent, Installment } from "@/lib/types";
 import { Button, Card, LinkButton } from "@/components/ui";
@@ -176,9 +176,7 @@ function ContractViewInner() {
             {c.guest_name || "Client hasn't filled in details"}
           </h1>
           <p className="mt-1 text-ink-soft">
-            {prettyDate(c.date_iso)}
-            {c.date_end && c.date_end !== c.date_iso ? ` – ${prettyDate(c.date_end)}` : ""} · {c.time_start}–
-            {c.time_end} · {c.location}
+            {describeWhen(c.date_iso, c.date_end, c.time_start, c.time_end)} · {c.location}
           </p>
         </div>
         <div className="text-right">

@@ -286,6 +286,33 @@ export function problems(draft: Draft, today: string): string[] {
   return problemsByStep(draft, today).map((p) => p.message);
 }
 
+/** "Sat, Oct 12, 2030 · 7:00 PM – 11:00 PM" — an event's when, as people
+ *  read it, from the stored YYYY-MM-DD and 24-hour HH:MM. Parts that aren't
+ *  set are left out rather than shown as blanks. */
+export function describeWhen(
+  dateIso?: string | null,
+  dateEnd?: string | null,
+  timeStart?: string | null,
+  timeEnd?: string | null,
+): string {
+  const day = (iso: string) => {
+    const d = new Date(`${iso.slice(0, 10)}T00:00:00`);
+    return Number.isNaN(d.getTime())
+      ? iso
+      : d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  };
+  const time = (hhmm: string) => {
+    const m = /^(\d{1,2}):(\d{2})/.exec(hhmm);
+    if (!m) return hhmm;
+    const h = Number(m[1]);
+    return `${((h + 11) % 12) + 1}:${m[2]} ${h >= 12 ? "PM" : "AM"}`;
+  };
+  const dates = dateIso && dateIso !== "TBD"
+    ? dateEnd && dateEnd !== dateIso ? `${day(dateIso)} – ${day(dateEnd)}` : day(dateIso)
+    : "No date yet";
+  return timeStart && timeEnd ? `${dates} · ${time(timeStart)} – ${time(timeEnd)}` : dates;
+}
+
 /** "Due when signed", "Due Jun 1, 2030", "Due 14 days before the event". */
 export function describeDue(i: {
   due_type: DueType;
