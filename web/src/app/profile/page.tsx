@@ -69,6 +69,15 @@ export default function ProfilePage() {
         return sum + cash.inEscrow + cash.strandedInEscrow;
       }, 0);
 
+      // The backend refuses these too (a signed contract is both sides'
+      // record); asked here so the answer comes before the confirmation.
+      const signed = bundles.flatMap((b) => b.bookings ?? []).filter((b) => b.contract_token && b.signed_at);
+      if (signed.length > 0) {
+        setError(
+          `You have ${signed.length === 1 ? "a signed contract" : `${signed.length} signed contracts`}, so your account can't be deleted — ${signed.length === 1 ? "it's" : "they're"} the record of what you and your ${signed.length === 1 ? "vendor" : "vendors"} agreed.`,
+        );
+        return;
+      }
       if (boughtHeld > 0) {
         setError(
           `${money(boughtHeld)} you've paid is still held in escrow — release it to the vendor, request a refund, or report a problem on those bookings before deleting. Deleting your account wouldn't return this money — it would only remove the record of where it went.`,
