@@ -27,5 +27,9 @@ The apps still duplicate what had drifted apart before the merge
 on them). Until those are reconciled into `packages/shared`, a fix to one
 usually belongs in both apps — check the other copy.
 
-`main` is protected: branch per change, open a PR, merge once CI is green.
-Merging deploys.
+`main` is protected: branch per change, open a PR, merge once CI is green
+and a reviewer approves. Merging deploys each changed app to staging
+(`staging.<project>.pages.dev`, against the staging backend), then to
+production once someone approves the `production` environment in the Actions
+tab. PR previews and local dev use the staging or a local backend, never
+production — see jorna-backend's `docs/STAGING.md`.
