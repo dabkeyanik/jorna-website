@@ -139,6 +139,17 @@ always "none, verify manually" until a test runner is added.
 - **Depends on:** `lib/checkin.ts`, `lib/geocode.ts`, `lib/cities.ts`,
   `lib/zips.ts`, `lib/address.ts`.
 
+## Contracts & payments
+
+- **Responsible for:** what an accepted request becomes — the link out to
+  sign on jornaevents.com, the read-only contract page, and each payment on
+  a signed contract (marked sent one at a time).
+- **Code:** `web/src/app/contract/`, `web/src/components/PaymentSchedule.tsx`,
+  the payment block in `web/src/app/bundle/page.tsx`.
+- **Depends on:** `lib/contract.ts` (sign link, `paymentRows`, due states),
+  `lib/jorna.ts` `getContract` / `markInstallmentSent` (the contract's token
+  endpoints — backend DECISIONS.md #17).
+
 ## Reviews & moderation
 
 - **Code:** `web/src/components/ReviewPanel.tsx`, `ModerationMenu.tsx`,
