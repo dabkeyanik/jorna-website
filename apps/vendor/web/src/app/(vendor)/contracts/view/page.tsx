@@ -76,7 +76,18 @@ function describeEvent(e: ContractEvent, c: Contract): string {
       return `Your client says ${typeof d.label === "string" ? d.label : "a payment"}${cents(d)} is sent`;
     case "payment_confirmed":
       return `You confirmed ${typeof d.label === "string" ? d.label : "a payment"}${cents(d)} arrived`;
-    case "expired":
+    case "payment_reminder": {
+      // Sent by the backend's payment reminder sweep: the client before and
+      // on the due date, this vendor once it's overdue.
+      const what = `${typeof d.label === "string" ? d.label : "a payment"}${cents(d)}`;
+      const due = typeof d.due_on === "string" ? prettyDate(d.due_on) : "its due date";
+      return d.reminder === "overdue"
+        ? `Overdue: ${what} was due ${due} — we let you know`
+        : d.reminder === "due"
+          ? `Reminded your client ${what} is due today`
+          : `Reminded your client ${what} is due ${due}`;
+    }
+        case "expired":
       return "The hold ended — the date opened up again";
     default:
       return e.kind;

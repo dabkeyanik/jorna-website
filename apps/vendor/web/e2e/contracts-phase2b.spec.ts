@@ -64,6 +64,7 @@ test.describe("contracts — Phase 2b (proposals)", () => {
       { at: "2030-05-01T12:00:01", kind: "sent", actor: "vendor", detail: { hold_expires_at: "2030-05-08T12:00:00" } },
       { at: "2030-05-01T12:00:02", kind: "emailed", actor: "vendor", detail: { to: "priya@example.com" } },
       { at: "2030-05-02T12:00:00", kind: "viewed", actor: "client", detail: null },
+      { at: "2030-05-15T12:00:00", kind: "payment_reminder", actor: "system", detail: { label: "Final balance", amount_cents: 110000, reminder: "upcoming", due_on: "2030-05-18" } },
     ],
     ...over,
   });
@@ -86,6 +87,7 @@ test.describe("contracts — Phase 2b (proposals)", () => {
     await expect(page.getByText("−$400.00")).toBeVisible();
     await expect(page.getByText("Link emailed to priya@example.com")).toBeVisible();
     await expect(page.getByText("Your client opened it")).toBeVisible();
+    await expect(page.getByText(/Reminded your client Final balance \(\$1,100\.00\) is due/)).toBeVisible();
     await expect(page.getByText(/fingerprint/)).toBeVisible();
 
     await expect(page.getByText("Client says it's sent")).toBeVisible();
