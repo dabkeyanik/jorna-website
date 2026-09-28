@@ -16,6 +16,7 @@ import {
   listBundles,
   listEvents,
   markBookingPaid,
+  markInstallmentSent,
   removeBookingFromBundle,
   renameBundle,
   selectBundle,
@@ -54,6 +55,7 @@ import {
   type EventCreateInput,
   type EventItem,
   type GuestList,
+  type Installment,
 } from "@/lib/types";
 import {
   bookingGaps,
@@ -83,7 +85,8 @@ import { DraftDetails } from "@/components/DraftDetails";
 import { PlanProgress } from "@/components/PlanProgress";
 import { ClientOnlyRoute } from "@/components/ClientOnlyRoute";
 import { addressPin } from "@/lib/geocode";
-import { contractSignUrl, contractStep } from "@/lib/contract";
+import { contractSignUrl, contractStep, contractViewPath, paymentRows } from "@/lib/contract";
+import { PaymentSchedule } from "@/components/PaymentSchedule";
 import { ESCROW_ENABLED } from "@/lib/flags";
 import { Avatar, Button, Card, Field, LinkButton } from "@/components/ui";
 
@@ -428,6 +431,7 @@ function BookingRow({
   onClosePanel,
   onRefund,
   onMarkPaid,
+  onMarkInstallment,
   onDispute,
   onSwap,
   onRemove,
@@ -448,6 +452,8 @@ function BookingRow({
   onRefund: (b: BundleBooking) => void;
   /** Manual-track only: the client attesting they've paid the vendor directly. */
   onMarkPaid: (b: BundleBooking) => void;
+  /** One payment on a signed contract's schedule — see PaymentSchedule. */
+  onMarkInstallment: (b: BundleBooking, installment: Installment) => void;
   onDispute: (b: BundleBooking, reason: string) => void;
   onSwap: (b: BundleBooking) => void;
   onRemove: (b: BundleBooking) => void;
@@ -518,8 +524,12 @@ function BookingRow({
   // An accepted request is a contract to sign first; until then nothing is
   // owed, so the payment block waits (the backend refuses it too).
   const signStep = booking.status === "approved" ? contractStep(booking) : null;
+  // The price and terms are the signed contract's now — see the composition row.
+  const signed = Boolean(booking.contract_token && booking.signed_at);
   const manualActive = isManual && booking.status === "approved" && !signStep;
   const manualCancellable = manualActive && !eventHasStarted(booking);
+  const schedule = paymentRows(booking);
+  const [markingId, setMarkingId] = useState<string | null>(null);
 
   return (
     <Card id={`booking-${booking.booking_id}`} className="p-4">
@@ -603,6 +613,7 @@ function BookingRow({
           made a vendor's counter-offer invisible here while /my-bookings
           showed it immediately. */}
       {booking.open_to_price_negotiation &&
+      !signed &&
       !isBeyondActionable(booking) &&
       !isDeadBooking(booking) &&
       !awaitingFirstOffer &&
@@ -662,18 +673,25 @@ function BookingRow({
                 thread with that one vendor. The group chat is still a click
                 away at the top of the page, where it's about the whole plan. */}
             <MessageVendorButton bookingId={booking.booking_id} />
-            {booking.service_category && !awaiting ? (
+            {/* A signed contract is a record, not a line in a draft: removing
+                it deleted the signed copy and its timeline outright, and the
+                server now refuses. Ending one is "Cancel booking" below; once
+                it's no longer going ahead, a swap adds the replacement and
+                leaves the old contract where it is. */}
+            {booking.service_category && !awaiting && (!signed || isDeadBooking(booking)) ? (
               <Button variant="ghost" size="md" onClick={() => onSwap(booking)}>
                 Swap package
               </Button>
             ) : null}
-            <Button
-              variant="quiet"
-              size="md"
-              onClick={() => onOpenPanel(booking.booking_id, "remove")}
-            >
-              {awaiting ? "Cancel request" : "Remove"}
-            </Button>
+            {!signed ? (
+              <Button
+                variant="quiet"
+                size="md"
+                onClick={() => onOpenPanel(booking.booking_id, "remove")}
+              >
+                {awaiting ? "Cancel request" : "Remove"}
+              </Button>
+            ) : null}
           </div>
         )
       ) : null}
@@ -871,7 +889,25 @@ function BookingRow({
                   ) : null}
                 </div>
               ) : null}
+              {schedule.length > 0 ? (
+                <div className="mt-3">
+                  <PaymentSchedule
+                    rows={schedule}
+                    vendorName={booking.vendor_name || "your vendor"}
+                    busyId={busy ? markingId : null}
+                    onMark={(installment) => {
+                      setMarkingId(installment.id);
+                      onMarkInstallment(booking, installment);
+                    }}
+                  />
+                </div>
+              ) : null}
               <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+                {booking.contract_token && booking.signed_at ? (
+                  <LinkButton href={contractViewPath(booking.contract_token)} variant="quiet" size="md">
+                    View contract
+                  </LinkButton>
+                ) : null}
                 {manualCancellable ? (
                   <Button
                     variant="ghost"
@@ -881,7 +917,8 @@ function BookingRow({
                     Cancel booking
                   </Button>
                 ) : null}
-                {pay === "unpaid" ? (
+                {/* A schedule speaks for itself above, a payment at a time. */}
+                {schedule.length > 0 ? null : pay === "unpaid" ? (
                   <Button disabled={busy} onClick={() => onMarkPaid(booking)}>
                     {busy ? "Marking…" : "I sent payment"}
                   </Button>
@@ -1669,6 +1706,8 @@ function BundleInner() {
   );
   const draft = isDraftBundle(bundle);
   const heldMoney = heldOnPlan(bundle.bookings ?? []);
+  // A signed contract is a record the server won't delete either, paid or not.
+  const hasSignedContract = (bundle.bookings ?? []).some((b) => b.contract_token && b.signed_at);
   // The address forms seed themselves once, from the venue when there is one.
   // Swapping the venue changes the answer but not the state React is already
   // holding, so the old address stayed on screen — and would have been saved
@@ -1731,6 +1770,14 @@ function BundleInner() {
           () => markBookingPaid(bk.booking_id),
           `Marked as paid. We'll show it as confirmed once ${bk.vendor_name || "the vendor"} says they received it.`,
           "Couldn't mark this as paid. Please try again.",
+        )
+      }
+      onMarkInstallment={(bk, installment) =>
+        run(
+          bk,
+          () => markInstallmentSent(bk.contract_token!, installment.id),
+          `Marked “${installment.label}” as sent. It shows as received once ${bk.vendor_name || "the vendor"} confirms it arrived.`,
+          "Couldn't mark this payment as sent. Please try again.",
         )
       }
       onDispute={(bk, reason) =>
@@ -1821,8 +1868,9 @@ function BundleInner() {
                   refuses (bundle_service.MONEY_MOVED_STATUSES), so a button
                   here could only ever produce an error — and a Delete that
                   looks available right up until you press it reads as the app
-                  losing your plan, not as a rule protecting it. */}
-              {!heldMoney ? (
+                  losing your plan, not as a rule protecting it. Likewise a
+                  signed contract. */}
+              {!heldMoney && !hasSignedContract ? (
                 <Button
                   variant="quiet"
                   size="md"

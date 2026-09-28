@@ -8,6 +8,7 @@ import type {
   AvailabilitySlot,
   BlockedUser,
   CalendarStatus,
+  Contract,
   ConversationSummary,
   Earnings,
   EventCreateInput,
@@ -905,6 +906,28 @@ export function markBookingPaid(
   bookingId: string,
 ): Promise<{ message: string; payment_status: string }> {
   return apiFetch(`/payments/bookings/${bookingId}/mark-paid`, { method: "POST" });
+}
+
+/**
+ * A booking's contract, as its link shows it. Account clients sign on the
+ * same no-login link as guests (backend DECISIONS.md #17), so the token on
+ * their booking is what opens it — there's no account-scoped twin.
+ */
+export function getContract(contractToken: string): Promise<Contract> {
+  return apiFetch(`/guest-bookings/${encodeURIComponent(contractToken)}`);
+}
+
+/**
+ * Client: mark one payment on a signed contract as sent. Self-reported, like
+ * markBookingPaid; the vendor confirms it arrived. markBookingPaid on a
+ * scheduled contract marks every payment at once, which is only right when
+ * they really did pay the lot.
+ */
+export function markInstallmentSent(contractToken: string, installmentId: string): Promise<Contract> {
+  return apiFetch(
+    `/guest-bookings/${encodeURIComponent(contractToken)}/payments/${encodeURIComponent(installmentId)}/mark-paid`,
+    { method: "POST" },
+  );
 }
 
 /**

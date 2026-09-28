@@ -352,6 +352,10 @@ export interface BundleBooking {
   contract_status?: "draft" | "sent" | "viewed" | "signed" | "declined" | "voided" | "expired" | null;
   signed_at?: string | null;
   hold_expires_at?: string | null;
+  /** The contract's payments, in order. Null for a booking paid in one go,
+   *  which payment_status describes on its own. See lib/contract's
+   *  paymentRows. */
+  payment_schedule?: Installment[] | null;
   /** Whether anything further can happen to this booking — see
    *  `isDeadBooking`. Computed server-side from the same rule for both
    *  status and payment_status; optional only so older cached bundle
@@ -446,6 +450,78 @@ export interface BundleBooking {
    * out short of a headcount ever becomes payable.
    */
   locked_fields?: string[];
+}
+
+// ── Contracts (backend DECISIONS.md #16–#18) ─────────────────────────
+
+export type DueType = "on_signing" | "date" | "before_event";
+
+/** One payment on a contract's schedule — backend contract_document.schedule_view. */
+export interface Installment {
+  id: string;
+  label: string;
+  amount_cents: number;
+  due_type: DueType;
+  due_date?: string | null;
+  due_days?: number | null;
+  /** The schedule's own date; can fall before signing on a late-signed contract. */
+  due_on?: string | null;
+  /** The date to show: due_on, but never before the signing day. It's what the
+   *  reminder emails count from, so the plan and the emails agree. Null
+   *  until signed — nothing is owed before that. */
+  effective_due?: string | null;
+  marked_paid_at?: string | null;
+  confirmed_at?: string | null;
+}
+
+/** A line as quoted — names and prices frozen, not joined back to the package. */
+export interface LineItem {
+  id: string;
+  kind: "package" | "addon" | "custom";
+  name: string;
+  description?: string | null;
+  unit_price_cents: number;
+  quantity: number;
+  total_cents: number;
+}
+
+export interface Clause {
+  key: string;
+  title: string;
+  body: string;
+}
+
+/** A contract as its link shows it — GET /guest-bookings/{token}. The same
+ *  read the signing page on jornaevents.com uses. */
+export interface Contract {
+  booking_id: string;
+  vendor_display_name?: string | null;
+  vendor_venmo_handle?: string | null;
+  vendor_zelle_contact?: string | null;
+  service_name?: string | null;
+  date_iso: string;
+  date_end?: string | null;
+  time_start?: string | null;
+  time_end?: string | null;
+  location?: string | null;
+  guest_count?: number | null;
+  amount_cents: number;
+  line_items?: LineItem[] | null;
+  subtotal_cents?: number | null;
+  discount_cents?: number | null;
+  payment_schedule?: Installment[] | null;
+  terms_clauses?: Clause[] | null;
+  /** Older contracts' terms, before clauses: a flat map of heading → text. */
+  contract_terms?: Record<string, string> | null;
+  guest_name?: string | null;
+  guest_email?: string | null;
+  signer_name?: string | null;
+  signed_at?: string | null;
+  signed_snapshot_sha256?: string | null;
+  status?: string;
+  contract_status?: BundleBooking["contract_status"];
+  hold_expires_at?: string | null;
+  payment_status?: string | null;
 }
 
 /**

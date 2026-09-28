@@ -30,8 +30,11 @@ wrangler.jsonc       Cloudflare Pages config (serves ./public)
 - **Booking** — messages, price negotiation and date-change requests with
   each vendor. When a vendor accepts, the booking becomes a contract: the
   plan shows **Review & sign**, which opens the signing page on
-  jornaevents.com (see `web/src/lib/contract.ts`), and "I sent payment"
-  appears only once it's signed. Day-of check-in and reviews.
+  jornaevents.com (see `web/src/lib/contract.ts`). Once it's signed, the
+  plan lists each payment on the contract with its due date and its own
+  "I sent this", and **View contract** opens `/contract` — the items,
+  payments, terms and signature, printable. A signed booking can be
+  cancelled but not removed from the plan. Day-of check-in and reviews.
 - It still contains the **older vendor pages** (dashboard, bookings,
   earnings, onboarding) from before the vendor side moved to
   jornaevents.com. New vendor work goes in `jorna-vendor`.

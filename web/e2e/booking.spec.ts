@@ -229,6 +229,104 @@ test.describe("bundle detail (/bundle)", () => {
     await expect(page.getByRole("button", { name: "I sent payment" })).toHaveCount(0);
   });
 
+  const schedule = [
+    {
+      id: "dep",
+      label: "Deposit",
+      amount_cents: 30_000,
+      due_type: "on_signing",
+      effective_due: "2030-03-01",
+      marked_paid_at: "2030-03-01T10:00:00+00:00",
+      confirmed_at: "2030-03-02T10:00:00+00:00",
+    },
+    {
+      id: "bal",
+      label: "Final balance",
+      amount_cents: 70_050,
+      due_type: "before_event",
+      due_days: 14,
+      effective_due: "2099-04-17",
+      marked_paid_at: null,
+      confirmed_at: null,
+    },
+  ];
+
+  test("a signed contract's payments are marked one at a time", async ({ page, api }) => {
+    await loginAs(page, api);
+    api.get(
+      "/bundles/:id",
+      mockBundleDetail({
+        bookings: [
+          mockBundleBooking({
+            payment_method: "manual",
+            payment_status: "unpaid",
+            contract_token: "tok-1",
+            contract_status: "signed",
+            signed_at: "2030-03-01T09:00:00+00:00",
+            payment_schedule: schedule,
+          }),
+        ],
+      }),
+    );
+    api.get("/bundles", []);
+    api.get("/events", []);
+    api.get("/conversations", []);
+    api.get("/payments/card", null);
+    api.post("/guest-bookings/:token/payments/:id/mark-paid", {});
+
+    await page.goto("bundle/?id=bundle-1");
+    await expect(page.getByText(/^Received by /)).toBeVisible();
+    await expect(page.getByText("$700.50")).toBeVisible();
+    // One button per payment still owed — not one that marks the lot.
+    await expect(page.getByRole("button", { name: "I sent payment" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "I sent this" })).toHaveCount(1);
+    // A signed contract is a record: nothing here deletes it.
+    await expect(page.getByRole("button", { name: "Remove" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Swap package" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "View contract" })).toHaveAttribute("href", /contract\/?\?t=tok-1/);
+
+    await page.getByRole("button", { name: "I sent this" }).click();
+
+    await expect(page.getByText(/Marked “Final balance” as sent/)).toBeVisible();
+    expect(api.requestsTo("POST", "/guest-bookings/tok-1/payments/bal/mark-paid")).toHaveLength(1);
+    expect(api.requestsTo("POST", "/payments/bookings/booking-1/mark-paid")).toHaveLength(0);
+  });
+
+  test("the contract page shows what was signed", async ({ page, api }) => {
+    await loginAs(page, api);
+    api.get("/guest-bookings/:token", {
+      booking_id: "booking-1",
+      vendor_display_name: "Anjali Studio",
+      vendor_venmo_handle: "@studio-anjali",
+      service_name: "Wedding photography",
+      date_iso: "2099-05-01",
+      time_start: "16:00",
+      time_end: "23:00",
+      location: "Pines Manor, Edison NJ",
+      amount_cents: 100_050,
+      line_items: [
+        { id: "l1", kind: "package", name: "Full day", unit_price_cents: 90_050, quantity: 1, total_cents: 90_050 },
+        { id: "l2", kind: "addon", name: "Second shooter", unit_price_cents: 5_000, quantity: 2, total_cents: 10_000 },
+      ],
+      payment_schedule: schedule,
+      terms_clauses: [{ key: "travel", title: "Travel", body: "30 miles included." }],
+      signer_name: "Priya Mehta",
+      signed_at: "2030-03-01T09:00:00+00:00",
+      signed_snapshot_sha256: "ab12cd34",
+      contract_status: "signed",
+      status: "approved",
+    });
+
+    await page.goto("contract/?t=tok-1");
+    await expect(page.getByRole("heading", { name: "Wedding photography" })).toBeVisible();
+    await expect(page.getByText("Second shooter")).toBeVisible();
+    await expect(page.getByText("$1,000.50")).toBeVisible();
+    await expect(page.getByText("30 miles included.")).toBeVisible();
+    await expect(page.getByText("Priya Mehta")).toBeVisible();
+    await expect(page.getByText("ab12cd34")).toBeVisible();
+    await expect(page.getByRole("button", { name: "I sent this" })).toHaveCount(1);
+  });
+
   test("cancelling a manual-track booking shows no refund math", async ({ page, api }) => {
     await loginAs(page, api);
     api.get(
