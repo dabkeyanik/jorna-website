@@ -9,6 +9,7 @@ import { deleteMe, listBundles } from "@/lib/jorna";
 import { moneyForBundle } from "@/lib/planning";
 import { disableWebPushForThisDevice } from "@/lib/push";
 import { vendorSiteUrl } from "@/lib/vendorSite";
+import { eventIsOver } from "@/lib/types";
 import { Button, Card } from "@/components/ui";
 
 // Dollars, like everything in MoneyBreakdown — those sums are booking.price,
@@ -69,12 +70,17 @@ export default function ProfilePage() {
         return sum + cash.inEscrow + cash.strandedInEscrow;
       }, 0);
 
-      // The backend refuses these too (a signed contract is both sides'
-      // record); asked here so the answer comes before the confirmation.
-      const signed = bundles.flatMap((b) => b.bookings ?? []).filter((b) => b.contract_token && b.signed_at);
-      if (signed.length > 0) {
+      // The backend refuses these too: until its event is over, a signed
+      // contract is both sides' record. Asked here so the answer comes
+      // before the confirmation. Same "over" as escrow — the last day, at the
+      // venue; no date yet counts as ahead.
+      const ahead = bundles
+        .flatMap((b) => b.bookings ?? [])
+        .filter((b) => b.contract_token && b.signed_at && !eventIsOver(b));
+      if (ahead.length > 0) {
+        const one = ahead.length === 1;
         setError(
-          `You have ${signed.length === 1 ? "a signed contract" : `${signed.length} signed contracts`}, so your account can't be deleted — ${signed.length === 1 ? "it's" : "they're"} the record of what you and your ${signed.length === 1 ? "vendor" : "vendors"} agreed.`,
+          `You have ${one ? "a signed contract" : `${ahead.length} signed contracts`} for ${one ? "an event that hasn't" : "events that haven't"} happened yet, so your account can't be deleted until ${one ? "it's" : "they're"} over — ${one ? "it's" : "they're"} the record of what you and your ${one ? "vendor" : "vendors"} agreed.`,
         );
         return;
       }
