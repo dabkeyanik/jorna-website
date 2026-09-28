@@ -36,6 +36,8 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          NEXT_PUBLIC_ESCROW_ENABLED: "false"
 
   e2e:
     name: E2E (Playwright)
@@ -110,6 +112,8 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          NEXT_PUBLIC_ESCROW_ENABLED: "false"
 
       # A non-production --branch value makes this a Cloudflare Pages
       # *preview* deployment — left alone by the `deploy` job below, which
@@ -190,9 +194,17 @@ jobs:
       # the same Cloudflare Pages deployment without that zone's WAF rules,
       # so it verifies the deploy actually went live without depending on
       # runner IPs being allowed through jornaevents.com's bot protection.
+      # Production has no escrow: clients pay vendors directly and the
+      # backend forces every booking to the manual track
+      # (docs/DECISIONS.md). The flag defaults to true and is baked in at
+      # build time, so every job that ships a build must say so — it was
+      # missing here, and the live site kept showing escrow wording. The e2e
+      # job leaves it unset on purpose: its Stripe-gating specs run the
+      # escrow-on path. Same as jorna-vendor's workflow.
       - name: Deploy
         run: npm run deploy
         env:
+          NEXT_PUBLIC_ESCROW_ENABLED: "false"
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DEPLOY_DOMAIN: https://jorna-events.pages.dev
