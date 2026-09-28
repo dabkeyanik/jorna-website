@@ -1,77 +1,102 @@
 # book.jornaevents.com
 
-The Jorna consumer site: the **Jorna web app**, served at both `/` and
-`/app`, plus a small hand-written **help page** at `/help`. Everything is a
-static export from one Cloudflare Pages project (`jorna-events`) out of one
-repo. (Previously a Cloudflare Worker; migrated off Workers Static Assets —
-see `docs/DECISIONS.md` for why.)
+The client side of **Jorna** — where hosts plan a South Asian wedding or
+celebration, put together a team of vendors, and book them. A Next.js app
+exported to static files and served by Cloudflare Pages (project
+`jorna-events`), with a small hand-written help page at `/help`.
 
-Lives at `book.jornaevents.com` — the `jornaevents.com` apex itself now
-belongs to the vendor-facing app (`jorna-vendor` repo).
+Vendors work on [jornaevents.com](https://jornaevents.com) (`jorna-vendor`
+repo), which also hosts the no-login page where contracts are signed. Both
+apps talk to the same FastAPI backend (`Desiconnect` repo, on Railway),
+which is the source of truth for how anything behaves.
 
 ```
-public/app/          the web app's static export — GENERATED, gitignored
+web/                 the app (Next.js, output: "export", basePath "/app")
+public/app/          the app's static export — GENERATED, gitignored
 public/help/         static help page (hand-written, no build step)
-public/_redirects    rewrites "/" to "/app/" — see "Root routing" below
-web/                 the web app source (Next.js)
+public/_redirects    rewrites "/" to "/app/"
+scripts/             build + deploy tooling
+docs/                architecture, module map, booking flow, decisions
 wrangler.jsonc       Cloudflare Pages config (serves ./public)
 ```
 
-## Root routing
+## What's in it
 
-`/` rewrites (HTTP 200, not a redirect) to `/app/`, which renders
-`web/src/app/page.tsx` → the app's own Home screen (`web/src/app/home/`).
-There is no separate marketing page anymore — the standalone
-`public/index.html` that used to serve `/` was deleted (commit `58ce333`,
-2026-07-31) once the app's own Home page took over the site root
-permanently. See "Root routing" in `docs/ARCHITECTURE.md` for the mechanics
-of the rewrite.
+- **Home and browsing** — the site root (`/` renders the app's Home),
+  vendor search and the marketplace, vendor and package pages.
+- **Planning** — plans ("bundles") built by hand or with the AI bundle
+  builder, event details, guest lists and RSVPs, then sending requests to
+  every vendor in the plan at once.
+- **Booking** — messages, price negotiation and date-change requests with
+  each vendor. When a vendor accepts, the booking becomes a contract: the
+  plan shows **Review & sign**, which opens the signing page on
+  jornaevents.com (see `web/src/lib/contract.ts`), and "I sent payment"
+  appears only once it's signed. Day-of check-in and reviews.
+- It still contains the **older vendor pages** (dashboard, bookings,
+  earnings, onboarding) from before the vendor side moved to
+  jornaevents.com. New vendor work goes in `jorna-vendor`.
 
-## The web app (`/app`)
+Jorna doesn't handle money for now: clients pay vendors directly
+(Venmo/Zelle). Stripe checkout and escrow are still in the code behind
+`NEXT_PUBLIC_ESCROW_ENABLED` (see `docs/DECISIONS.md`).
 
-A Next.js client for the same FastAPI backend the iOS app uses. It's fully
-client-rendered, so it's exported to static files (`output: "export"`,
-`basePath: "/app"`) and Cloudflare Pages serves them — no SSR runtime.
+`docs/MODULE_MAP.md` says which files own what; `docs/BOOKING_FLOW.md` walks
+the booking lifecycle; `docs/DECISIONS.md` explains the why.
+
+## Developing
 
 ```bash
-npm run install:app        # first time: install the app's dependencies
-npm --prefix web run dev   # http://localhost:3000/app — live reload while developing
+npm run install:app         # first time: install the app's dependencies
+npm --prefix web run dev    # http://localhost:3000/app
 ```
 
-The backend already allows `http://localhost:3000` via CORS, so dev talks to
-production out of the box. Create an account at `/app/login`, then `/app/plan`.
+Settings come from `web/.env.local` (see `web/.env.example`; nothing in it is
+secret). **The production API doesn't accept requests from localhost**, so
+run the backend locally (see the `Desiconnect` README) and point the app at
+it:
 
-Auth, the AI Bundle Builder, browse/search, booking + Stripe checkout/escrow,
-messaging + negotiation, reschedule requests, and the full vendor side
-(onboarding, availability, bookings, check-in, earnings via Stripe Connect)
-are all built. See `docs/BOOKING_FLOW.md` for the full booking lifecycle on
-both the client and vendor sides.
+```bash
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_ESCROW_ENABLED=false                 # escrow is off in production
+NEXT_PUBLIC_VENDOR_APP_URL=http://localhost:3100 # if you run jorna-vendor too (signing page)
+```
 
-See `web/src/lib/` for the API client (`api.ts`), auth (`auth.tsx`), and calls
-(`jorna.ts`). Email/password authenticates directly against the backend, which
-issues Jorna's own JWT; Google OAuth goes through Supabase as an identity
+and add `http://localhost:3000` to the backend's `ALLOWED_ORIGINS`.
+
+API calls all go through `web/src/lib/jorna.ts` (typed) → `web/src/lib/api.ts`
+(transport, including the shared token refresh); auth is
+`web/src/lib/auth.tsx`. Email/password signs in against the backend, which
+issues Jorna's own tokens; Google sign-in uses Supabase as an identity
 provider only.
 
-## Deploying (both, together)
+## Tests
 
 ```bash
-npm run deploy       # builds, deploys to Cloudflare Pages, verifies every
-                      # route serves 200 (see DEPLOY.md)
-npm run deploy:once  # build + single-shot deploy, unverified
+npm --prefix web run lint
+npm --prefix web run typecheck
+npm --prefix web run test       # Vitest — pure logic in web/src/lib
+npm run test:e2e                # Playwright — every backend call mocked
 ```
 
-First run needs `npx wrangler login`.
+The end-to-end tests run against `next dev` with the backend replaced by
+per-test mocks, so they never reach production. A pre-commit hook runs lint
+and typecheck on staged files.
 
-Because `public/app/` is generated and gitignored, **always deploy via
-`npm run deploy`** (or `deploy:once`) — a bare `wrangler pages deploy` would
-ship whatever stale build happens to be on disk.
+## Deploying
+
+**Merging to `main` is deploying.** `main` is protected: open a PR, and CI
+builds it, runs the unit and end-to-end tests, and publishes a preview.
+When it merges, CI deploys to Cloudflare Pages.
+
+`npm run deploy` builds and deploys from your machine and then checks every
+route serves (see `DEPLOY.md`) — for emergencies, not the normal path.
+Because `public/app/` is generated, never run a bare `wrangler pages deploy`:
+it ships whatever old build happens to be on disk.
 
 ## Design notes
 
-- Brand tokens (maroon/gold/cream, light + dark) are Tailwind v4 `@theme`
-  variables in `web/src/app/globals.css` — the single source now that there's
-  no separate marketing page to keep in sync by hand.
-- Fonts are system stacks (Didot/Palatino serif for headings, Avenir Next/Segoe UI
+- Brand tokens (maroon/gold/cream, light and dark) are Tailwind v4 `@theme`
+  variables in `web/src/app/globals.css`.
+- Fonts are system stacks (Didot/Palatino for headings, Avenir Next/Segoe UI
   for body) — nothing is fetched over the network.
-- `public/help/index.html` is still a hand-written, no-build-step static file —
-  open and edit it directly, same as the old marketing page used to be.
+- `public/help/index.html` is hand-written; edit it directly.
