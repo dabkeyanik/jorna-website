@@ -5,6 +5,7 @@ import {
   customLine,
   emptyDraft,
   fromContract,
+  fromRequest,
   presetSchedule,
   problems,
   scheduledCents,
@@ -15,7 +16,7 @@ import {
   type Draft,
   type LineDraft,
 } from "./contractDraft";
-import type { Contract, ServiceItem } from "./types";
+import type { Contract, ServiceItem, VendorBooking } from "./types";
 
 const pkg = (over: Partial<LineDraft> = {}): LineDraft => ({
   key: "p",
@@ -146,3 +147,38 @@ describe("fromContract", () => {
     expect(d.clauses[0]).toMatchObject({ title: "Travel", body: "30 miles included" });
   });
 });
+
+describe("fromRequest", () => {
+  const request = (over: Partial<VendorBooking> = {}) =>
+    ({
+      booking_id: "b",
+      user_id: "u",
+      client_name: "Priya Mehta",
+      service_id: "svc-1",
+      service_name: "Reception set",
+      price: 1400,
+      price_unit: "event",
+      price_pending_quantity: false,
+      date_iso: "2030-06-01",
+      time_start: "18:00",
+      time_end: "22:00",
+      location: "Pines Manor",
+      status: "pending",
+      ...over,
+    }) as VendorBooking;
+
+  it("starts from the request's total when it's known", () => {
+    const d = fromRequest(request());
+    expect(d.lines[0]).toMatchObject({ kind: "package", serviceId: "svc-1", price: "1400", quantity: "1" });
+    expect(totalCents(d)).toBe(140_000);
+    expect(d.clientName).toBe("Priya Mehta");
+  });
+
+  it("starts a per-guest request at the rate, counted by its guests if it has them", () => {
+    const d = fromRequest(request({ price: 45, price_unit: "person", price_pending_quantity: true, guest_count: 200 }));
+    expect(d.lines[0]).toMatchObject({ unit: "person", price: "45", quantity: "200" });
+    const unknown = fromRequest(request({ price: 45, price_unit: "person", price_pending_quantity: true }));
+    expect(unknown.lines[0].quantity).toBe("");
+  });
+});
+

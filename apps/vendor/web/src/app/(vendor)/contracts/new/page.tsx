@@ -13,6 +13,9 @@
 // ?lead=<id> starts from a lead and converts it on send. ?edit=<booking_id>
 // reopens an unsigned contract; saving bumps its revision, so a client who
 // had the old one open has to review the new one before signing.
+// ?request=<booking_id> accepts a signed-in client's marketplace request
+// with this proposal (backend DECISIONS #17): when and where are the
+// client's, so those steps only show them.
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -26,6 +29,8 @@ import {
   getMyVendor,
   listLeads,
   listMyServices,
+  listVendorBookings,
+  proposeFromRequest,
   updateContract,
 } from "@/lib/jorna";
 import {
@@ -37,6 +42,7 @@ import {
   describeDue,
   emptyDraft,
   fromContract,
+  fromRequest,
   lineTotalCents,
   money,
   newKey,
@@ -64,6 +70,7 @@ import {
   type DueType,
   type SavedContractTemplate,
   type ServiceItem,
+  type VendorBooking,
   type VendorDetail,
 } from "@/lib/types";
 import { Button, Card, Field, LinkButton } from "@/components/ui";
@@ -113,11 +120,13 @@ function NewContractInner() {
   const params = useSearchParams();
   const leadId = params.get("lead");
   const editId = params.get("edit");
+  const requestId = params.get("request");
 
   const [vendor, setVendor] = useState<VendorDetail | null>(null);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [templates, setTemplates] = useState<SavedContractTemplate[]>([]);
   const [editing, setEditing] = useState<Contract | null>(null);
+  const [request, setRequest] = useState<VendorBooking | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -149,11 +158,12 @@ function NewContractInner() {
           return;
         }
         setVendor(mine);
-        const [svc, leads, tpl, existing] = await Promise.all([
+        const [svc, leads, tpl, existing, requests] = await Promise.all([
           listMyServices(mine.vendor_id).catch(() => null),
           leadId ? listLeads().catch(() => null) : Promise.resolve(null),
           loadTemplates().catch(() => [] as SavedContractTemplate[]),
           editId ? getContract(editId) : Promise.resolve(null),
+          requestId ? listVendorBookings(mine.vendor_id, { limit: 100 }) : Promise.resolve(null),
         ]);
         if (cancelled) return;
         // Private (hidden) packages are exactly what contracts are for;
@@ -167,7 +177,16 @@ function NewContractInner() {
           setStep("items");
           return;
         }
-        const start = emptyDraft();
+        const asked = requests?.items.find((b) => b.booking_id === requestId) ?? null;
+        if (requestId) {
+          if (!asked || !["pending", "negotiation_ongoing"].includes(asked.status) || asked.contract_token) {
+            setLoadError("This request can't be accepted from here any more — it may already be answered.");
+            return;
+          }
+          setRequest(asked);
+          setStep("items");
+        }
+        const start = asked ? fromRequest(asked) : emptyDraft();
         start.clauses = defaultClauses(mine).map((c) => ({ ...c, key: newKey() }));
         if (mine.default_cancellation_window_hours != null) {
           start.cancellationDays = String(Math.round(mine.default_cancellation_window_hours / 24));
@@ -192,7 +211,7 @@ function NewContractInner() {
     return () => {
       cancelled = true;
     };
-  }, [user, router, leadId, editId]);
+  }, [user, router, leadId, editId, requestId]);
 
   const issues = useMemo(() => problemsByStep(draft, todayIso()), [draft]);
   const issuesFor = (s: Step) => issues.filter((i) => i.step === s).map((i) => i.message);
@@ -288,6 +307,21 @@ function NewContractInner() {
       if (mode === "save" && editing) {
         await updateContract(editing.booking_id, doc);
         router.push(`/contracts/view?id=${editing.booking_id}`);
+        return;
+      }
+      if (request) {
+        setCreated(
+          await proposeFromRequest(request.booking_id, {
+            line_items: doc.line_items,
+            discount_cents: doc.discount_cents,
+            payment_schedule: doc.payment_schedule,
+            terms_clauses: doc.terms_clauses,
+            cancellation_window_hours: doc.cancellation_window_hours,
+            overtime_rate_cents: doc.overtime_rate_cents,
+            hold_days: Number(draft.holdDays) > 0 ? Number(draft.holdDays) : null,
+            email_client: emailClient,
+          }),
+        );
         return;
       }
       const input = {
@@ -405,16 +439,18 @@ function NewContractInner() {
     <div className="mx-auto w-[min(720px,100%-2rem)]">
       <header>
         <Link
-          href={editing ? `/contracts/view?id=${editing.booking_id}` : "/contracts"}
+          href={editing ? `/contracts/view?id=${editing.booking_id}` : request ? "/my-bookings" : "/contracts"}
           className="eyebrow hover:text-gold"
         >
-          ← {editing ? "Back to the contract" : "All contracts"}
+          ← {editing ? "Back to the contract" : request ? "Back to requests" : "All contracts"}
         </Link>
         <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold">
-          {editing ? "Edit contract" : "New contract"}
+          {editing ? "Edit contract" : request ? `Accept ${request.client_name || "this"} request` : "New contract"}
         </h1>
         <p className="mt-3 text-ink-soft">
-          {editing
+          {request
+            ? "Set what's included, the payment plan and your terms. They sign on a link we email them — the date is held for them until then."
+            : editing
             ? editing.contract_status === "draft"
               ? "It's still a draft — nothing has gone to your client."
               : "Your client will see the new version. If they had it open, they'll need to review it again before signing."
@@ -470,7 +506,25 @@ function NewContractInner() {
       </nav>
 
       <div className="mt-6 grid gap-5">
-        {step === "client" ? (
+        {request && (step === "client" || step === "event") ? (
+          <Card className="grid gap-1 p-5 text-sm text-ink-soft">
+            <p className="eyebrow">From their request</p>
+            <p className="mt-1 text-base text-ink">{request.client_name || "Your client"}</p>
+            <p>
+              {request.date_iso}
+              {request.date_end && request.date_end !== request.date_iso ? ` – ${request.date_end}` : ""} ·{" "}
+              {request.time_start}–{request.time_end}
+            </p>
+            <p>{request.location}</p>
+            {request.guest_count ? <p>{request.guest_count} guests</p> : null}
+            {request.client_note ? <p className="mt-2 italic">“{request.client_note}”</p> : null}
+            <p className="mt-3 text-xs text-ink-faint">
+              These are theirs to change — they can ask for a new date from their plan.
+            </p>
+          </Card>
+        ) : null}
+
+        {step === "client" && !request ? (
           <Card className="grid gap-3 p-5 sm:grid-cols-2">
             <p className="text-sm text-ink-soft sm:col-span-2">
               Optional — your client can fill these in or correct them on the link. A name is what
@@ -500,7 +554,7 @@ function NewContractInner() {
           </Card>
         ) : null}
 
-        {step === "event" ? (
+        {step === "event" && !request ? (
           <Card className="grid gap-3 p-5 sm:grid-cols-2">
             <Field
               label={draft.multiDay ? "Start date" : "Date"}
@@ -953,7 +1007,12 @@ function NewContractInner() {
                   onChange={(e) => set({ holdDays: e.target.value })}
                   hint="If they haven't signed by then, the date opens up again. You can resend."
                 />
-                {draft.clientEmail.trim() ? (
+                {request ? (
+                  <label className="flex items-center gap-2 text-sm text-ink-soft">
+                    <input type="checkbox" checked={emailClient} onChange={(e) => setEmailClient(e.target.checked)} />
+                    Email the link to {request.client_name || "your client"}
+                  </label>
+                ) : draft.clientEmail.trim() ? (
                   <label className="flex items-center gap-2 text-sm text-ink-soft">
                     <input type="checkbox" checked={emailClient} onChange={(e) => setEmailClient(e.target.checked)} />
                     Email the link to {draft.clientEmail.trim()}
@@ -1013,11 +1072,13 @@ function NewContractInner() {
             </Button>
           ) : (
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="ghost" disabled={busy !== null} onClick={() => submit("draft")}>
-                {busy === "draft" ? "Saving…" : "Save as draft"}
-              </Button>
+              {request ? null : (
+                <Button type="button" variant="ghost" disabled={busy !== null} onClick={() => submit("draft")}>
+                  {busy === "draft" ? "Saving…" : "Save as draft"}
+                </Button>
+              )}
               <Button type="button" size="lg" disabled={busy !== null || issues.length > 0} onClick={() => submit("send")}>
-                {busy === "send" ? "Sending…" : "Send & hold date"}
+                {busy === "send" ? "Sending…" : request ? "Accept & send contract" : "Send & hold date"}
               </Button>
             </div>
           )}

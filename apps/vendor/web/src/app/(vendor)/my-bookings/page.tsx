@@ -156,7 +156,9 @@ export default function MyBookingsPage() {
       setConfirmCancel(null);
       setNotice(
         status === "approved"
-          ? "Accepted. The client can pay now — the money is held until after the event."
+          ? // A signed-in client's request becomes a contract they sign
+            // (backend DECISIONS #17); it's final once they do.
+            "Accepted — we've emailed them a contract to sign, built from your usual terms. The date is held for them until they sign."
           // Declining a request and pulling out of a booking are the same
           // call and very different acts; the confirmation should say which.
           : wasApproved
@@ -503,16 +505,40 @@ export default function MyBookingsPage() {
                         >
                           Decline
                         </Button>
+                        <LinkButton
+                          href={`/contracts/new?request=${b.booking_id}`}
+                          variant="ghost"
+                          size="md"
+                        >
+                          Customize contract
+                        </LinkButton>
                         <Button
                           size="md"
                           disabled={busyId === b.booking_id}
                           onClick={() => decide(b, "approved")}
                         >
-                          {busyId === b.booking_id ? "Accepting…" : "Accept"}
+                          {busyId === b.booking_id ? "Accepting…" : "Accept & send contract"}
                         </Button>
                       </div>
                     </div>
                   )
+                ) : null}
+
+                {/* Accepted, but it's a proposal until they sign it. */}
+                {b.status === "approved" && b.contract_token && !b.signed_at ? (
+                  <p className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-panel px-3 py-2 text-sm text-ink-soft">
+                    <span>
+                      {b.contract_status === "expired"
+                        ? "Their contract expired unsigned — the date is open again."
+                        : "Waiting for them to sign the contract."}
+                    </span>
+                    <Link
+                      href={`/contracts/view?id=${b.booking_id}`}
+                      className="font-semibold text-ink hover:text-maroon dark:hover:text-gold"
+                    >
+                      View contract
+                    </Link>
+                  </p>
                 ) : null}
 
                 {/* Pulling out of a booking already accepted. A vendor whose

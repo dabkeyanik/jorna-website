@@ -17,6 +17,7 @@ import type {
   LineItemKind,
   LineUnit,
   ServiceItem,
+  VendorBooking,
   VendorDetail,
 } from "./types";
 
@@ -391,6 +392,42 @@ export function fromContract(c: Contract): Draft {
     cancellationDays: c.cancellation_window_hours != null ? String(Math.round(c.cancellation_window_hours / 24)) : "",
     overtimeRate: c.overtime_rate_cents != null ? toDollars(c.overtime_rate_cents) : "",
     holdDays: "",
+  };
+}
+
+/**
+ * A signed-in client's request, as the start of the proposal that accepts
+ * it. When and where are the client's — the builder shows them but doesn't
+ * send them. The package line carries the request's total when it's known;
+ * a per-guest or per-hour one whose count isn't known yet starts at the
+ * rate with the quantity blank, for the vendor to fill in.
+ */
+export function fromRequest(b: VendorBooking): Draft {
+  const pending = Boolean(b.price_pending_quantity);
+  return {
+    ...emptyDraft(),
+    clientName: b.client_name ?? "",
+    dateIso: b.date_iso ?? "",
+    dateEnd: b.date_end ?? "",
+    multiDay: Boolean(b.date_end && b.date_end !== b.date_iso),
+    timeStart: b.time_start ?? "",
+    timeEnd: b.time_end ?? "",
+    location: b.location === "TBD" ? "" : (b.location ?? ""),
+    guestCount: b.guest_count ? String(b.guest_count) : "",
+    lines: b.service_id
+      ? [
+          {
+            key: newKey(),
+            kind: "package",
+            serviceId: b.service_id,
+            addonId: null,
+            name: b.service_name ?? "Package",
+            unit: pending ? lineUnit(b.price_unit) : "event",
+            price: String(b.price),
+            quantity: pending ? (b.guest_count ? String(b.guest_count) : "") : "1",
+          },
+        ]
+      : [],
   };
 }
 

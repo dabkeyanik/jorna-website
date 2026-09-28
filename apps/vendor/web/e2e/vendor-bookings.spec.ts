@@ -3,7 +3,7 @@ import { loginAs } from "./support/fixtures";
 import { mockStripeStatus, mockVendorBooking, mockVendorDetail } from "./support/mock-data";
 
 test.describe("vendor bookings (/my-bookings)", () => {
-  test("accepting a pending request notifies the client can now pay", async ({ page, api }) => {
+  test("accepting a pending request sends the client a contract to sign", async ({ page, api }) => {
     await loginAs(page, api);
     const vendor = mockVendorDetail();
     api.get("/vendors/me", vendor);
@@ -22,11 +22,14 @@ test.describe("vendor bookings (/my-bookings)", () => {
     await page.goto("my-bookings/");
     await expect(page.getByText("Priya Shah")).toBeVisible();
 
-    await page.getByRole("button", { name: "Accept", exact: true }).click();
+    // Or tailor it first in the builder.
+    await expect(page.getByRole("link", { name: "Customize contract" })).toHaveAttribute(
+      "href",
+      "/app/contracts/new/?request=vbooking-1",
+    );
+    await page.getByRole("button", { name: "Accept & send contract" }).click();
 
-    await expect(
-      page.getByText("Accepted. The client can pay now — the money is held until after the event."),
-    ).toBeVisible();
+    await expect(page.getByText(/we've emailed them a contract to sign/)).toBeVisible();
     const putCalls = api.requestsTo("PUT", "/bookings/vbooking-1/status");
     expect(putCalls).toHaveLength(1);
     expect(putCalls[0].body).toMatchObject({ status: "approved" });

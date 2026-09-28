@@ -860,6 +860,16 @@ export function sendContract(
   });
 }
 
+/** Accept a signed-in client's request by sending them this proposal to
+ *  sign (backend DECISIONS #17). Anything left out comes from the request
+ *  and the vendor's usual terms. */
+export function proposeFromRequest(
+  bookingId: string,
+  input: Omit<ContractCreateInput, "date_iso" | "date_end" | "time_start" | "time_end">,
+): Promise<Contract> {
+  return apiFetch<Contract>(`/bookings/${bookingId}/propose`, { method: "POST", body: input });
+}
+
 /** Vendor: one scheduled payment arrived (marked by the client or not). */
 export function confirmInstallment(bookingId: string, installmentId: string): Promise<Contract> {
   return apiFetch<Contract>(`/contracts/${bookingId}/payments/${installmentId}/confirm`, {
