@@ -84,6 +84,7 @@ import { PlanProgress } from "@/components/PlanProgress";
 import { ClientOnlyRoute } from "@/components/ClientOnlyRoute";
 import { addressPin } from "@/lib/geocode";
 import { contractSignUrl, contractStep } from "@/lib/contract";
+import { ESCROW_ENABLED } from "@/lib/flags";
 import { Avatar, Button, Card, Field, LinkButton } from "@/components/ui";
 
 function money(n: number) {
@@ -396,6 +397,14 @@ function statusLine(b: BundleBooking, draft: boolean): { text: string; tone: str
   // answers that without them having to ask.
   if (b.status === "pending") {
     return { text: "Awaiting vendor approval", tone: "text-gold" };
+  }
+  // Accepted, but it's a contract to sign before it's booked (backend
+  // DECISIONS.md #17) — "Approved" read as done when it wasn't.
+  if (b.status === "approved") {
+    const step = contractStep(b);
+    if (step === "sign") return { text: "Accepted — awaiting your signature", tone: "text-gold" };
+    if (step === "expired") return { text: "Contract expired", tone: "text-maroon dark:text-gold" };
+    if (b.contract_token && b.signed_at) return { text: "Booked", tone: "text-green" };
   }
   return {
     // Rejected used to share the faintest tone with routine, already-settled
@@ -2228,8 +2237,9 @@ function BundleInner() {
       ) : null}
 
       <p className="mt-8 rounded-2xl border border-card-edge bg-panel p-5 text-center text-sm text-ink-soft">
-        Each vendor is paid separately. Your money is held in escrow and only
-        released after the event, once you and the vendor both confirm.
+        {ESCROW_ENABLED
+          ? "Each vendor is paid separately. Your money is held in escrow and only released after the event, once you and the vendor both confirm."
+          : "Each vendor is paid separately, directly — Jorna doesn't hold the money."}
       </p>
     </div>
   );
