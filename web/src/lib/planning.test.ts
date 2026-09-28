@@ -291,3 +291,80 @@ describe("bundleNeedsCard — whether the plan has anything a saved card could p
     expect(bundleNeedsCard([])).toBe(false);
   });
 });
+
+describe("planForBundle — contracts", () => {
+  /** A UTC calendar day `offset` days from today, as the backend writes due dates. */
+  const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+  const inDays = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString();
+  const installment = (id: string, due: string, over: Record<string, unknown> = {}) => ({
+    id,
+    label: id === "dep" ? "Deposit" : "Final balance",
+    amount_cents: id === "dep" ? 3_000 : 7_000,
+    due_type: "date" as const,
+    effective_due: due,
+    marked_paid_at: null,
+    confirmed_at: null,
+    ...over,
+  });
+  const signedWith = (schedule: ReturnType<typeof installment>[]) =>
+    booking({
+      status: "approved",
+      payment_method: "manual",
+      contract_token: "tok",
+      contract_status: "signed",
+      signed_at: inDays(-10),
+      payment_schedule: schedule,
+    });
+
+  it("asks for a signature, not a payment, while the contract is out", () => {
+    const plan = planForBundle(
+      bundle([
+        booking({ status: "approved", contract_token: "tok", contract_status: "sent", hold_expires_at: inDays(5) }),
+      ]),
+    );
+    expect(plan.tasks.map((t) => t.kind)).toEqual(["sign"]);
+    expect(plan.tasks[0].tone).toBe("normal");
+    expect(ATTENTION_KINDS).toContain("sign");
+  });
+
+  it("is urgent when the hold on the date is about to run out", () => {
+    const plan = planForBundle(
+      bundle([
+        booking({ status: "approved", contract_token: "tok", contract_status: "viewed", hold_expires_at: inDays(1) }),
+      ]),
+    );
+    expect(plan.tasks[0].tone).toBe("urgent");
+  });
+
+  it("says when an unsigned contract lapsed", () => {
+    const plan = planForBundle(
+      bundle([booking({ status: "approved", contract_token: "tok", contract_status: "expired" })]),
+    );
+    expect(plan.tasks.map((t) => t.kind)).toEqual(["contract-expired"]);
+  });
+
+  it("asks for the next payment on a schedule, for that payment's amount", () => {
+    const plan = planForBundle(
+      bundle([signedWith([installment("dep", day(-2), { confirmed_at: inDays(-1) }), installment("bal", day(0))])]),
+    );
+    expect(plan.tasks).toHaveLength(1);
+    expect(plan.tasks[0]).toMatchObject({ kind: "payment", amount: 70, tone: "urgent" });
+    expect(plan.tasks[0].title).toMatch(/final balance/);
+  });
+
+  it("stays quiet about a payment that isn't due for weeks, or one already sent", () => {
+    expect(planForBundle(bundle([signedWith([installment("bal", day(40))])])).tasks).toEqual([]);
+    expect(
+      planForBundle(bundle([signedWith([installment("bal", day(0), { marked_paid_at: inDays(0) })])])).tasks,
+    ).toEqual([]);
+  });
+
+  it("counts a received deposit as paid and only the rest as still to pay", () => {
+    const cash = moneyForBundle(
+      bundle([signedWith([installment("dep", day(-2), { confirmed_at: inDays(-1) }), installment("bal", day(30))])]),
+    );
+    expect(cash.released).toBe(30);
+    expect(cash.outstanding).toBe(70);
+    expect(cash.committed).toBe(100);
+  });
+});
