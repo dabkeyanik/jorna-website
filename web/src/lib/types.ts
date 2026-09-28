@@ -345,6 +345,13 @@ export interface BundleBooking {
   booking_id: string;
   status: string;
   payment_status?: string | null;
+  /** An accepted request is a contract the client signs on the vendor
+   *  site's no-login page (backend DECISIONS.md #17) — see lib/contract.ts.
+   *  Null on a request accepted before that, which has nothing to sign. */
+  contract_token?: string | null;
+  contract_status?: "draft" | "sent" | "viewed" | "signed" | "declined" | "voided" | "expired" | null;
+  signed_at?: string | null;
+  hold_expires_at?: string | null;
   /** Whether anything further can happen to this booking — see
    *  `isDeadBooking`. Computed server-side from the same rule for both
    *  status and payment_status; optional only so older cached bundle

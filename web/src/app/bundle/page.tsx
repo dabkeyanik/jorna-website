@@ -83,6 +83,7 @@ import { DraftDetails } from "@/components/DraftDetails";
 import { PlanProgress } from "@/components/PlanProgress";
 import { ClientOnlyRoute } from "@/components/ClientOnlyRoute";
 import { addressPin } from "@/lib/geocode";
+import { contractSignUrl, contractStep } from "@/lib/contract";
 import { Avatar, Button, Card, Field, LinkButton } from "@/components/ui";
 
 function money(n: number) {
@@ -505,7 +506,10 @@ function BookingRow({
   // holds this money, so none of the escrow logic above (held/canConfirm/
   // fullRefundNow) ever applies either. A separate block below covers how
   // these are actually paid.
-  const manualActive = isManual && booking.status === "approved";
+  // An accepted request is a contract to sign first; until then nothing is
+  // owed, so the payment block waits (the backend refuses it too).
+  const signStep = booking.status === "approved" ? contractStep(booking) : null;
+  const manualActive = isManual && booking.status === "approved" && !signStep;
   const manualCancellable = manualActive && !eventHasStarted(booking);
 
   return (
@@ -798,6 +802,31 @@ function BookingRow({
       {/* This vendor is paid directly — Venmo/Zelle, not through Jorna. No
           card, no charge, no escrow; just where to send it and each side
           saying what happened. */}
+      {signStep === "sign" && booking.contract_token ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line-soft pt-3">
+          <p className="text-sm text-ink-soft">
+            {booking.vendor_name || "Your vendor"} accepted — review and sign the contract to confirm.
+            {booking.hold_expires_at
+              ? ` They're holding the date until ${new Date(booking.hold_expires_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}.`
+              : ""}
+          </p>
+          {/* A plain anchor: it's a different site, opened in a new tab. */}
+          <a
+            href={contractSignUrl(booking.contract_token)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center rounded-full bg-maroon px-4 py-2 text-sm font-semibold text-ground hover:brightness-110"
+          >
+            Review &amp; sign
+          </a>
+        </div>
+      ) : signStep === "expired" ? (
+        <p className="mt-3 border-t border-line-soft pt-3 text-sm text-ink-soft">
+          The contract from {booking.vendor_name || "this vendor"} expired before it was signed. Message
+          them to send it again if you still want to book.
+        </p>
+      ) : null}
+
       {manualActive ? (
         <div className="mt-3 border-t border-line-soft pt-3">
           {openPanel === "cancel" ? (
