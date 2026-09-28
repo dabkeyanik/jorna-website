@@ -1,0 +1,190 @@
+name: App
+
+# One app's checks, preview and deploy — called by ci.yml once per app that
+# a change touches. Both apps are the same shape (web/ is the Next.js app,
+# public/ what Cloudflare Pages serves, scripts/deploy.mjs the verified
+# deploy), so they share this and differ only in the inputs.
+
+on:
+  workflow_call:
+    inputs:
+      app:
+        description: Folder under apps/
+        required: true
+        type: string
+      pages_project:
+        description: Cloudflare Pages project
+        required: true
+        type: string
+      deploy_domain:
+        description: Where the deploy is verified from CI (see below)
+        required: true
+        type: string
+
+jobs:
+  build:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/${{ inputs.app }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: apps/${{ inputs.app }}/web/package-lock.json
+
+      - run: npm run install:app
+      - run: npm --prefix web run lint
+      - run: npm --prefix web run typecheck
+      - run: npm --prefix web run test
+
+      # Production has no escrow: clients pay vendors directly and the backend
+      # forces every booking to the manual track. The flag defaults to true and
+      # is baked in at build time, so every job that ships or checks a
+      # production build says so. The e2e job leaves it unset on purpose: its
+      # Stripe-gating specs run the escrow-on path.
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_ESCROW_ENABLED: "false"
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/${{ inputs.app }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: apps/${{ inputs.app }}/web/package-lock.json
+
+      - run: npm run install:app
+
+      # Google's own apt repo for Chrome has intermittently served a
+      # Packages.gz that doesn't match its Release file's hash, which fails
+      # `apt-get update` and takes the job down before a test runs — though
+      # `--with-deps` never needs a package from it (Playwright brings its own
+      # Chromium). `-f` makes this a no-op once the repo is healthy.
+      - name: Work around Google Chrome apt repo outages
+        run: sudo rm -f /etc/apt/sources.list.d/google-chrome*.list
+
+      - run: npx --prefix web playwright install --with-deps chromium
+      - run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-${{ inputs.app }}
+          path: apps/${{ inputs.app }}/web/playwright-report/
+          retention-days: 14
+
+  preview:
+    name: Deploy PR preview
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/${{ inputs.app }}
+    # A preview is a convenience, not a check: a failed one shouldn't block
+    # merging a change whose tests passed.
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            apps/${{ inputs.app }}/package-lock.json
+            apps/${{ inputs.app }}/web/package-lock.json
+
+      # wrangler is the app's own devDependency, run with `npx --no-install`.
+      - run: npm ci
+      - run: npm run install:app
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_ESCROW_ENABLED: "false"
+
+      # A non-production --branch makes this a Pages *preview* deployment,
+      # which the deploy job leaves alone (it only promotes --branch main).
+      - name: Deploy preview
+        run: npx --no-install wrangler pages deploy public --project-name ${{ inputs.pages_project }} --branch "pr-${{ github.event.pull_request.number }}" --commit-dirty=true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Comment preview URL on PR
+        uses: actions/github-script@v9
+        env:
+          APP: ${{ inputs.app }}
+          PROJECT: ${{ inputs.pages_project }}
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const { APP, PROJECT } = process.env;
+            const url = `https://pr-${prNumber}.${PROJECT}.pages.dev`;
+            // One comment per app, updated in place on each push.
+            const marker = `<!-- pr-preview-comment:${APP} -->`;
+            const body = `${marker}\n🔗 ${APP} preview: ${url}\n\nUses the production backend/DB — see [DEPLOY.md](../blob/main/apps/${APP}/DEPLOY.md) before exercising booking/payment flows.`;
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: prNumber,
+            });
+            const existing = comments.find((c) => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: prNumber, body });
+            }
+
+  deploy:
+    name: Deploy to Cloudflare Pages
+    needs: [build, e2e]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/${{ inputs.app }}
+    # Two merges in quick succession must not race each other to production.
+    concurrency:
+      group: deploy-${{ inputs.app }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            apps/${{ inputs.app }}/package-lock.json
+            apps/${{ inputs.app }}/web/package-lock.json
+
+      - run: npm ci
+
+      # scripts/deploy.mjs builds, runs `wrangler pages deploy`, then polls
+      # every route until it's stably serving 200 (see the app's DEPLOY.md),
+      # failing the job on a bad deploy. DEPLOY_DOMAIN points that polling at
+      # the project's pages.dev URL: the jornaevents.com zone's bot/WAF rules
+      # 403 GitHub Actions runner IPs (the upload itself succeeds; only the
+      # runner's verification fetches are blocked).
+      - name: Deploy
+        run: npm run deploy
+        env:
+          NEXT_PUBLIC_ESCROW_ENABLED: "false"
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOY_DOMAIN: ${{ inputs.deploy_domain }}

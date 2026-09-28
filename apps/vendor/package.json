@@ -1,0 +1,22 @@
+{
+  "name": "jorna-vendor-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The vendor-dashboard app (pipeline, contracts, guest e-signature), served by Cloudflare Pages as jorna-vendor.",
+  "scripts": {
+    "install:app": "npm --prefix web install",
+    "build": "npm --prefix web run build",
+    "test:e2e": "npm --prefix web run test:e2e",
+    "deploy": "node scripts/deploy.mjs",
+    "deploy:once": "npm run build && wrangler pages deploy public --project-name jorna-vendor --branch main --commit-dirty=true"
+  },
+  "devDependencies": {
+    "wrangler": "^4.127.1"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "fsevents@2.3.3": true,
+    "sharp@0.34.5": true,
+    "workerd@1.20260714.1": true
+  }
+}
