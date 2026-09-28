@@ -12,8 +12,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { loadAttention, type AttentionItem } from "@/lib/attention";
-import { PushOptIn } from "@/components/PushOptIn";
-import { Button, Card, LinkButton } from "@/components/ui";
+import { PushOptIn } from "@jorna/shared/components/PushOptIn";
+import { Button, Card, LinkButton } from "@jorna/shared/components/ui";
 
 export default function ActivityPage() {
   const { user, loading: authLoading } = useAuth();

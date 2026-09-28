@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import {
   confirmBookingEvent,
   confirmDepositReceived,
@@ -28,7 +28,7 @@ import {
   type VendorBooking,
   type VendorDetail,
 } from "@/lib/types";
-import { Button, Card, LinkButton } from "@/components/ui";
+import { Button, Card, LinkButton } from "@jorna/shared/components/ui";
 import { NegotiationPanel } from "@/components/NegotiationPanel";
 import { DateChangeRequest } from "@/components/DateChangeRequest";
 import { MessageVendorButton } from "@/components/MessageVendorButton";

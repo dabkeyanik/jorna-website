@@ -6,19 +6,26 @@ has its own `CLAUDE.md`, docs and README — read the one for the app you're
 changing, and run its commands from that app's folder (paths in its docs,
 like `web/src/...`, are relative to it).
 
+Code both apps use lives once in `packages/shared` (`@jorna/shared`,
+imported as `@jorna/shared/lib/api`, `@jorna/shared/components/ui`,
+`@jorna/shared/styles/globals.css`). A change there ships to both apps.
+
 What lives at the root instead of in each app:
 
 - **CI** — `.github/workflows/ci.yml` picks the apps a change touches and
   runs `.github/workflows/app.yml` for each (checks, PR preview, deploy on
   `main`). Where an app's own docs describe "the CI workflow", this is it.
+- **Dependencies** — one npm workspace (`apps/*/web`, `packages/*`) with one
+  lockfile. `npm install` at the root; never inside an app, which would make
+  a second lockfile.
 - **The pre-commit hook** — `.husky/pre-commit` + `lint-staged.config.mjs`,
-  lint and typecheck per app. Run `npm install` at the root once.
+  lint and typecheck for whichever app (or the shared package) is staged.
 - **Dependabot and issue templates** — `.github/`.
 
-The apps still duplicate shared code (`web/src/lib/api.ts`, `auth.tsx`,
-`types.ts`, `jorna.ts`, `components/ui.tsx`, `globals.css`, …). Until that's
-moved into a shared package, a fix to one of those usually belongs in both
-apps — check the other copy.
+The apps still duplicate what had drifted apart before the merge
+(`web/src/lib/jorna.ts`, most of `types.ts`, `auth.tsx`, and components built
+on them). Until those are reconciled into `packages/shared`, a fix to one
+usually belongs in both apps — check the other copy.
 
 `main` is protected: branch per change, open a PR, merge once CI is green.
 Merging deploys.

@@ -27,13 +27,13 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { searchVendors } from "@/lib/jorna";
 import { freeVendorIds } from "@/lib/availability";
 import { categoryLabel, type VendorSearchItem } from "@/lib/types";
-import { TILES } from "@/lib/categoryTiles";
-import { Button, Chip, Field, TimeField } from "@/components/ui";
-import { CityCombobox } from "@/components/CityCombobox";
+import { TILES } from "@jorna/shared/lib/categoryTiles";
+import { Button, Chip, Field, TimeField } from "@jorna/shared/components/ui";
+import { CityCombobox } from "@jorna/shared/components/CityCombobox";
 import { VendorCard, VendorCardSkeleton } from "@/components/VendorCard";
 
 const PAGE_SIZE = 12;

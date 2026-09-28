@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { openBookingThread } from "@/lib/jorna";
-import { Button } from "./ui";
+import { Button } from "@jorna/shared/components/ui";
 
 /**
  * Open a booking's private thread and go to it. Either party may open it —

@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import "./globals.css";
+import "@jorna/shared/styles/globals.css";
 import { AuthProvider } from "@/lib/auth";
 import { SiteHeader } from "@/components/SiteHeader";
-import { SiteFooter } from "@/components/SiteFooter";
+import { SiteFooter } from "@jorna/shared/components/SiteFooter";
 import { PushRuntime } from "@/components/PushRuntime";
-import { SentryRuntime } from "@/components/SentryRuntime";
+import { SentryRuntime } from "@jorna/shared/components/SentryRuntime";
 import { VendorAccountGate } from "@/components/VendorAccountGate";
 
 export const metadata: Metadata = {

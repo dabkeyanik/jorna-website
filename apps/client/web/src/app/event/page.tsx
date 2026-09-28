@@ -13,7 +13,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { listBundles } from "@/lib/jorna";
-import { LinkButton } from "@/components/ui";
+import { LinkButton } from "@jorna/shared/components/ui";
 
 function EventRedirect() {
   const { user, loading } = useAuth();

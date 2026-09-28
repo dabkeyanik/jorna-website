@@ -9,7 +9,7 @@
 // the stat tiles and search filter from the same fetch.
 
 import type { VendorClient } from "@/lib/types";
-import { Card } from "@/components/ui";
+import { Card } from "@jorna/shared/components/ui";
 
 function money(cents: number): string {
   return `$${Math.round(cents / 100).toLocaleString()}`;

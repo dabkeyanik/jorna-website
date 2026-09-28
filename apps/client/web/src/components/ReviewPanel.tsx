@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { createReview, getBookingReview } from "@/lib/jorna";
 import type { Review } from "@/lib/types";
-import { Button } from "./ui";
+import { Button } from "@jorna/shared/components/ui";
 
 function Stars({
   value,

@@ -26,12 +26,12 @@
 // and says so.
 
 import { useId, useState } from "react";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { resendCheckInEmail } from "@/lib/jorna";
 import { categoryLabel, formatCheckInTime, type BundleBooking } from "@/lib/types";
 import { daysUntil, runSheetIsDue, scheduleFor, type ScheduleDay } from "@/lib/planning";
 import type { BundleDetail } from "@/lib/types";
-import { Avatar } from "@/components/ui";
+import { Avatar } from "@jorna/shared/components/ui";
 
 function dayLabel(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);

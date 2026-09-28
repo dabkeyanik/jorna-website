@@ -35,9 +35,12 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: apps/${{ inputs.app }}/web/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - run: npm run install:app
+      # One npm workspace: both apps and packages/shared install together
+      # from the root lockfile.
+      - run: npm ci
+        working-directory: .
       - run: npm --prefix web run lint
       - run: npm --prefix web run typecheck
       - run: npm --prefix web run test
@@ -64,9 +67,10 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: apps/${{ inputs.app }}/web/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - run: npm run install:app
+      - run: npm ci
+        working-directory: .
 
       # Google's own apt repo for Chrome has intermittently served a
       # Packages.gz that doesn't match its Release file's hash, which fails
@@ -76,7 +80,7 @@ jobs:
       - name: Work around Google Chrome apt repo outages
         run: sudo rm -f /etc/apt/sources.list.d/google-chrome*.list
 
-      - run: npx --prefix web playwright install --with-deps chromium
+      - run: npx --no-install playwright install --with-deps chromium
       - run: npm run test:e2e
 
       - name: Upload Playwright report
@@ -107,13 +111,11 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: |
-            apps/${{ inputs.app }}/package-lock.json
-            apps/${{ inputs.app }}/web/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      # wrangler is the app's own devDependency, run with `npx --no-install`.
+      # Everything, wrangler included, installs once at the workspace root.
       - run: npm ci
-      - run: npm run install:app
+        working-directory: .
       - run: npm run build
         env:
           NEXT_PUBLIC_ESCROW_ENABLED: "false"
@@ -169,15 +171,12 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: |
-            apps/${{ inputs.app }}/package-lock.json
-            apps/${{ inputs.app }}/web/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - run: npm ci
-
-      # scripts/deploy.mjs builds, runs `wrangler pages deploy`, then polls
-      # every route until it's stably serving 200 (see the app's DEPLOY.md),
-      # failing the job on a bad deploy. DEPLOY_DOMAIN points that polling at
+      # scripts/deploy.mjs installs (`npm ci` at the workspace root), builds,
+      # runs `wrangler pages deploy`, then polls every route until it's stably
+      # serving 200 (see the app's DEPLOY.md), failing the job on a bad
+      # deploy. DEPLOY_DOMAIN points that polling at
       # the project's pages.dev URL: the jornaevents.com zone's bot/WAF rules
       # 403 GitHub Actions runner IPs (the upload itself succeeds; only the
       # runner's verification fetches are blocked).

@@ -2,7 +2,11 @@
 // refresh on a 401, and JSON (de)serialization. Token storage is pluggable so
 // the auth layer owns persistence (localStorage) — this module stays UI-free.
 
-import type { TokenPair } from "./types";
+export interface TokenPair {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+}
 
 export const API_BASE = (
   process.env.NEXT_PUBLIC_API_BASE_URL ??

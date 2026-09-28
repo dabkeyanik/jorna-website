@@ -18,7 +18,7 @@
 // vendor's own profile — it was asked again on every package.
 
 import { useEffect, useState } from "react";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import {
   createService,
   deleteService,
@@ -40,9 +40,9 @@ import {
   type TaxonomyCategory,
   type VendorDetail,
 } from "@/lib/types";
-import { geocodeUsAddress } from "@/lib/geocode";
-import { checkImageFiles, checkVideoFiles, describeRejections } from "@/lib/uploads";
-import { Button, Card, Chip, Field } from "./ui";
+import { geocodeUsAddress } from "@jorna/shared/lib/geocode";
+import { checkImageFiles, checkVideoFiles, describeRejections } from "@jorna/shared/lib/uploads";
+import { Button, Card, Chip, Field } from "@jorna/shared/components/ui";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;

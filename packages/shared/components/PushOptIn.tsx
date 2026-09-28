@@ -12,8 +12,8 @@ import {
   pushAvailability,
   type PermissionState,
   type PushAvailability,
-} from "@/lib/push";
-import { Button, Card } from "@/components/ui";
+} from "../lib/push";
+import { Button, Card } from "./ui";
 
 export function PushOptIn() {
   const [avail, setAvail] = useState<PushAvailability | null>(null);

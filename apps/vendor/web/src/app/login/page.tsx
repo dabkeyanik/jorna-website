@@ -4,11 +4,11 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { defaultLanding } from "@/lib/role";
 import { supabase, startGoogleSignIn } from "@/lib/supabase";
-import { Button, Card, Field } from "@/components/ui";
-import { CityCombobox, type Coords } from "@/components/CityCombobox";
+import { Button, Card, Field } from "@jorna/shared/components/ui";
+import { CityCombobox, type Coords } from "@jorna/shared/components/CityCombobox";
 
 function GoogleMark() {
   // Google "G", inline so nothing is fetched over the network (the site's ethos).

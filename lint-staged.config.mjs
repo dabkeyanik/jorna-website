@@ -10,4 +10,8 @@ const app = (dir) => ({
 export default {
   ...app("apps/client"),
   ...app("apps/vendor"),
+  "packages/shared/**/*.{js,jsx,ts,tsx}": (files) => [
+    `npm --workspace @jorna/shared run lint -- ${files.join(" ")}`,
+    "npm --workspace @jorna/shared run typecheck",
+  ],
 };

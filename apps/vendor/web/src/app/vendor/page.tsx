@@ -4,8 +4,8 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
-import { ESCROW_ENABLED } from "@/lib/flags";
+import { ApiError } from "@jorna/shared/lib/api";
+import { ESCROW_ENABLED } from "@jorna/shared/lib/flags";
 import { getVendor, getVendorReviews, listServices } from "@/lib/jorna";
 import {
   categoryLabel,
@@ -17,7 +17,7 @@ import {
   type VendorDetail,
 } from "@/lib/types";
 import { loadIsVendor } from "@/lib/role";
-import { Card, LinkButton, Stars } from "@/components/ui";
+import { Card, LinkButton, Stars } from "@jorna/shared/components/ui";
 import { ModerationMenu } from "@/components/ModerationMenu";
 import { AskVendor } from "@/components/AskVendor";
 import { clientAppUrl } from "@/lib/clientApp";

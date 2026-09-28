@@ -11,12 +11,12 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { getContract, markInstallmentSent } from "@/lib/jorna";
 import { centsMoney, contractSignUrl, paymentRows } from "@/lib/contract";
 import { parseServerTime, type Contract, type Installment } from "@/lib/types";
 import { PaymentSchedule } from "@/components/PaymentSchedule";
-import { Button, Card } from "@/components/ui";
+import { Button, Card } from "@jorna/shared/components/ui";
 
 function longDate(iso?: string | null): string | null {
   if (!iso || iso === "TBD") return null;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { createBooking, listServices, removeBookingFromBundle } from "@/lib/jorna";
 import {
   categoryLabel,
@@ -10,8 +10,8 @@ import {
   type BundleBooking,
   type ServiceItem,
 } from "@/lib/types";
-import { Button, Card } from "./ui";
-import { useOverlay } from "./useOverlay";
+import { Button, Card } from "@jorna/shared/components/ui";
+import { useOverlay } from "@jorna/shared/components/useOverlay";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;

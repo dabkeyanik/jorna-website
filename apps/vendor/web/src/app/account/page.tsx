@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { changePassword, updateMe, uploadAvatar } from "@/lib/jorna";
-import { checkImageFiles, describeRejections } from "@/lib/uploads";
-import { Button, Card, Field } from "@/components/ui";
-import { CityCombobox } from "@/components/CityCombobox";
+import { checkImageFiles, describeRejections } from "@jorna/shared/lib/uploads";
+import { Button, Card, Field } from "@jorna/shared/components/ui";
+import { CityCombobox } from "@jorna/shared/components/CityCombobox";
 
 export default function AccountPage() {
   const { user, loading: authLoading, setUser, logout } = useAuth();

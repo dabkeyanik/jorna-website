@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { getService, getServiceReviews, getVendor } from "@/lib/jorna";
 import {
   categoryLabel,
@@ -23,9 +23,9 @@ import {
   quantityPhrase,
   settledBy,
   type Quantity,
-} from "@/lib/pricing";
+} from "@jorna/shared/lib/pricing";
 import { GAP_LABELS, describeGaps, requiredFields } from "@/lib/planning";
-import { Avatar, Card, LinkButton, Stars } from "@/components/ui";
+import { Avatar, Card, LinkButton, Stars } from "@jorna/shared/components/ui";
 import { AskVendor } from "@/components/AskVendor";
 
 function money(n: number) {

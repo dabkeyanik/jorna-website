@@ -3,8 +3,8 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
-import { ESCROW_ENABLED } from "@/lib/flags";
+import { ApiError } from "@jorna/shared/lib/api";
+import { ESCROW_ENABLED } from "@jorna/shared/lib/flags";
 import {
   getEarnings,
   getMyVendor,
@@ -19,7 +19,7 @@ import {
   type VendorDetail,
 } from "@/lib/types";
 import { paymentsSetup, vendorMoney } from "@/lib/vendorPlan";
-import { Button, Card, Field, LinkButton } from "@/components/ui";
+import { Button, Card, Field, LinkButton } from "@jorna/shared/components/ui";
 
 function money(cents: number) {
   return `$${Math.round(cents / 100).toLocaleString()}`;

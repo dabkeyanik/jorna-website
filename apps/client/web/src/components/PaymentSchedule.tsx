@@ -2,7 +2,7 @@
 
 import { centsMoney, describePayment, type PaymentRow } from "@/lib/contract";
 import type { Installment } from "@/lib/types";
-import { Button } from "@/components/ui";
+import { Button } from "@jorna/shared/components/ui";
 
 const TONE: Record<PaymentRow["state"], string> = {
   received: "text-green",

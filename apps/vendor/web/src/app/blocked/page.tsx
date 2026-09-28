@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { listBlockedUsers, unblockUser } from "@/lib/jorna";
 import type { BlockedUser } from "@/lib/types";
-import { Button, Card } from "@/components/ui";
+import { Button, Card } from "@jorna/shared/components/ui";
 
 export default function BlockedPage() {
   const { user, loading: authLoading } = useAuth();

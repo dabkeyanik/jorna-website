@@ -1,9 +1,10 @@
 name: CI
 
-# Two apps, one repo. Each is checked, previewed and deployed by app.yml —
-# but only when a change touches it, so a vendor-only change doesn't rebuild
-# and redeploy the client site. Anything outside apps/ (this workflow, the
-# root tooling) counts as touching both.
+# Two apps and the package they share, one repo. Each app is checked,
+# previewed and deployed by app.yml — but only when a change touches it, so a
+# vendor-only change doesn't rebuild and redeploy the client site. Anything
+# outside apps/ (packages/shared, this workflow, the root tooling) counts as
+# touching both, and also runs the shared package's own checks.
 
 on:
   push:
@@ -18,6 +19,7 @@ jobs:
     outputs:
       client: ${{ steps.diff.outputs.client }}
       vendor: ${{ steps.diff.outputs.vendor }}
+      shared: ${{ steps.diff.outputs.shared }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -29,14 +31,32 @@ jobs:
         run: |
           # No usable base (a first push, a force-push): check everything.
           if ! files=$(git diff --name-only "$BASE" "$GITHUB_SHA" 2>/dev/null); then
-            echo "client=true" >> "$GITHUB_OUTPUT"; echo "vendor=true" >> "$GITHUB_OUTPUT"; exit 0
+            printf 'client=true\nvendor=true\nshared=true\n' >> "$GITHUB_OUTPUT"; exit 0
           fi
           echo "$files"
           shared=$(echo "$files" | grep -v '^apps/' | grep -c . || true)
+          if [ "$shared" -gt 0 ]; then echo "shared=true"; else echo "shared=false"; fi >> "$GITHUB_OUTPUT"
           for app in client vendor; do
             own=$(echo "$files" | grep -c "^apps/$app/" || true)
             if [ "$own" -gt 0 ] || [ "$shared" -gt 0 ]; then echo "$app=true"; else echo "$app=false"; fi >> "$GITHUB_OUTPUT"
           done
+
+  shared:
+    name: Shared package
+    needs: changes
+    if: needs.changes.outputs.shared == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm --workspace @jorna/shared run lint
+      - run: npm --workspace @jorna/shared run typecheck
+      - run: npm --workspace @jorna/shared run test
 
   client:
     name: Client
@@ -71,22 +91,22 @@ jobs:
   # change didn't touch is skipped, which counts as fine.
   build-gate:
     name: Lint, typecheck, test, build
-    needs: [changes, client, vendor]
+    needs: [changes, shared, client, vendor]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - run: |
-          for r in "${{ needs.changes.result }}" "${{ needs.client.result }}" "${{ needs.vendor.result }}"; do
+          for r in "${{ needs.changes.result }}" "${{ needs.shared.result }}" "${{ needs.client.result }}" "${{ needs.vendor.result }}"; do
             case "$r" in success|skipped) ;; *) echo "a required job ended: $r"; exit 1 ;; esac
           done
 
   e2e-gate:
     name: E2E (Playwright)
-    needs: [changes, client, vendor]
+    needs: [changes, shared, client, vendor]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - run: |
-          for r in "${{ needs.changes.result }}" "${{ needs.client.result }}" "${{ needs.vendor.result }}"; do
+          for r in "${{ needs.changes.result }}" "${{ needs.shared.result }}" "${{ needs.client.result }}" "${{ needs.vendor.result }}"; do
             case "$r" in success|skipped) ;; *) echo "a required job ended: $r"; exit 1 ;; esac
           done

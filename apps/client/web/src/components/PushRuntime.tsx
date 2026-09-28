@@ -7,7 +7,7 @@
 
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth";
-import { listenForeground } from "@/lib/push";
+import { listenForeground } from "@jorna/shared/lib/push";
 
 export function PushRuntime() {
   const { user } = useAuth();

@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
-import { ESCROW_ENABLED } from "@/lib/flags";
+import { ApiError } from "@jorna/shared/lib/api";
+import { ESCROW_ENABLED } from "@jorna/shared/lib/flags";
 import {
   getMyVendor,
   getVendorReviews,
@@ -21,7 +21,7 @@ import {
   type VendorSpecialization,
 } from "@/lib/types";
 type GuestCountMode = NonNullable<VendorDetail["default_guest_count_mode"]>;
-import { Button, Card, LinkButton, Stars } from "@/components/ui";
+import { Button, Card, LinkButton, Stars } from "@jorna/shared/components/ui";
 import { ServicesManager } from "@/components/ServicesManager";
 import { AvailabilityFields } from "@/components/AvailabilityFields";
 import {

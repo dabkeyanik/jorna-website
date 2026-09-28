@@ -27,7 +27,7 @@ import { getMyVendor, getUnreadCount } from "@/lib/jorna";
 import { loadAttention } from "@/lib/attention";
 import { getEffectiveTheme, toggleTheme, type Theme } from "@/lib/theme";
 import { categoryLabel, type VendorDetail } from "@/lib/types";
-import { Avatar } from "@/components/ui";
+import { Avatar } from "@jorna/shared/components/ui";
 import { icon, I } from "@/components/nav";
 
 const RAIL_BG = "#2a0c19";

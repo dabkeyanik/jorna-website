@@ -13,8 +13,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { loadAttention, type AttentionItem } from "@/lib/attention";
 import { loadIsVendor } from "@/lib/role";
-import { PushOptIn } from "@/components/PushOptIn";
-import { Button, Card, LinkButton } from "@/components/ui";
+import { PushOptIn } from "@jorna/shared/components/PushOptIn";
+import { Button, Card, LinkButton } from "@jorna/shared/components/ui";
 import { clientAppUrl } from "@/lib/clientApp";
 
 export default function ActivityPage() {

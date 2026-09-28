@@ -1,0 +1,15 @@
+{
+  "name": "@jorna/shared",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Code both web apps use: the API client, UI kit, styles and the helpers that are the same on both sides. Imported as source (@jorna/shared/lib/…, /components/…, /styles/…); each app compiles it via transpilePackages.",
+  "scripts": {
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "next": "*",
+    "react": "*"
+  }
+}

@@ -21,7 +21,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import {
   convertLead,
   createContract,
@@ -74,7 +74,7 @@ import {
   type VendorBooking,
   type VendorDetail,
 } from "@/lib/types";
-import { Button, Card, Field, LinkButton } from "@/components/ui";
+import { Button, Card, Field, LinkButton } from "@jorna/shared/components/ui";
 
 // Today as YYYY-MM-DD in the vendor's own timezone — the backend allows a
 // day of slack for UTC, but the form shouldn't offer yesterday at all.

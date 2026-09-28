@@ -31,7 +31,7 @@
 // actually saved.
 
 import { useEffect, useRef, useState } from "react";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { updateBooking, updateEvent } from "@/lib/jorna";
 import {
   formatAddress,
@@ -40,9 +40,9 @@ import {
   addressFromVenue,
   zipFromVenue,
   type Address,
-} from "@/lib/address";
-import { addressPin } from "@/lib/geocode";
-import { createSaver, type Saver } from "@/lib/autosave";
+} from "@jorna/shared/lib/address";
+import { addressPin } from "@jorna/shared/lib/geocode";
+import { createSaver, type Saver } from "@jorna/shared/lib/autosave";
 import {
   isDeadBooking,
   isUnset,
@@ -50,9 +50,9 @@ import {
   type BookingGapField,
 } from "@/lib/planning";
 import { priceUnitKind, type BundleDetail, type BundleBooking } from "@/lib/types";
-import { crossesMidnight, hoursBetween } from "@/lib/pricing";
-import { AddressFields } from "@/components/AddressFields";
-import { Button, Card, Field, roundTimeLabel, TimeField } from "@/components/ui";
+import { crossesMidnight, hoursBetween } from "@jorna/shared/lib/pricing";
+import { AddressFields } from "@jorna/shared/components/AddressFields";
+import { Button, Card, Field, roundTimeLabel, TimeField } from "@jorna/shared/components/ui";
 
 /**
  * This card autosaves with no submit step to gate (see the header comment),

@@ -10,7 +10,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LinkButton } from "@/components/ui";
+import { LinkButton } from "@jorna/shared/components/ui";
 
 export default function EventsPage() {
   const router = useRouter();

@@ -14,8 +14,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { MESSAGES, NavBadge, NEEDS_YOU, useAppNav } from "./nav";
-import { Card } from "./ui";
-import { useOverlay } from "./useOverlay";
+import { Card } from "@jorna/shared/components/ui";
+import { useOverlay } from "@jorna/shared/components/useOverlay";
 
 export function MobileNavMenu() {
   const { items, attention, messagesUnread, isActive } = useAppNav();

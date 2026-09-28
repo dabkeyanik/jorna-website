@@ -13,9 +13,9 @@
 // claims nothing about Jorna holding money.
 
 import { useAuth } from "@/lib/auth";
-import { LinkButton } from "@/components/ui";
+import { LinkButton } from "@jorna/shared/components/ui";
 import { Eyebrow } from "@/components/marketing/Eyebrow";
-import { IconLock, IconShield, IconUsers } from "@/components/marketing/icons";
+import { IconLock, IconShield, IconUsers } from "@jorna/shared/components/marketing/icons";
 import { clientAppUrl } from "@/lib/clientApp";
 
 const PAYMENT_STAGES = [

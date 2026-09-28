@@ -37,9 +37,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { searchVendors } from "@/lib/jorna";
-import { CELEBRATIONS } from "@/lib/celebrations";
+import { CELEBRATIONS } from "@jorna/shared/lib/celebrations";
 import type { VendorSearchItem } from "@/lib/types";
-import { LinkButton } from "@/components/ui";
+import { LinkButton } from "@jorna/shared/components/ui";
 import { vendorSiteUrl } from "@/lib/vendorSite";
 import { VendorCard, VendorCardSkeleton } from "@/components/VendorCard";
 import {
@@ -51,7 +51,7 @@ import {
   IconLock,
   IconShield,
   IconUsers,
-} from "@/components/marketing/icons";
+} from "@jorna/shared/components/marketing/icons";
 
 const STEPS = [
   {

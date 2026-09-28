@@ -11,12 +11,12 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { confirmInstallment, getContract, sendContract, voidContract } from "@/lib/jorna";
 import { describeDue, describeWhen, money } from "@/lib/contractDraft";
 import { guestBookingLink, guestBookingPreviewLink } from "@/lib/contractLink";
 import type { Contract, ContractEvent, Installment } from "@/lib/types";
-import { Button, Card, LinkButton } from "@/components/ui";
+import { Button, Card, LinkButton } from "@jorna/shared/components/ui";
 
 function prettyDate(iso?: string | null): string {
   if (!iso || iso === "TBD") return "TBD";

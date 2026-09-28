@@ -1,8 +1,9 @@
 version: 2
 updates:
-  # Each app's Next.js dependencies, grouped the same way for both.
+  # One npm workspace — both apps, packages/shared, wrangler and the git
+  # hooks — with one lockfile at the root.
   - package-ecosystem: "npm"
-    directory: "/apps/client/web"
+    directory: "/"
     schedule:
       interval: "weekly"
     groups:
@@ -11,24 +12,6 @@ updates:
       dev-dependencies:
         dependency-type: "development"
     open-pull-requests-limit: 10
-
-  - package-ecosystem: "npm"
-    directory: "/apps/vendor/web"
-    schedule:
-      interval: "weekly"
-    groups:
-      next-react:
-        patterns: ["next", "react", "react-dom", "@types/react*"]
-      dev-dependencies:
-        dependency-type: "development"
-    open-pull-requests-limit: 10
-
-  # Deploy tooling (wrangler), per app, and the root's git hooks.
-  - package-ecosystem: "npm"
-    directories: ["/", "/apps/client", "/apps/vendor"]
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
 
   # GitHub Actions
   - package-ecosystem: "github-actions"

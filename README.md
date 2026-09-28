@@ -9,18 +9,18 @@ anything behaves.
 | Client | [`apps/client`](apps/client) | [book.jornaevents.com](https://book.jornaevents.com) — hosts plan and book | `jorna-events` |
 | Vendor | [`apps/vendor`](apps/vendor) | [jornaevents.com](https://jornaevents.com) — vendors, and the no-login contract signing page | `jorna-vendor` |
 
-Each app is self-contained — its own `web/` (Next.js), `public/`, deploy
-script, docs and README — and builds and deploys on its own. Run an app's
-commands from its folder:
+Code both apps use — the API client, UI kit, styles and the helpers that are
+identical on both sides — lives once in [`packages/shared`](packages/shared)
+(`@jorna/shared`). Everything else is the app's own: its `web/` (Next.js),
+`public/`, deploy script, docs and README. Each app builds and deploys on its
+own.
+
+The repo is one npm workspace, so dependencies install once, at the root:
 
 ```bash
-cd apps/client            # or apps/vendor
-npm run install:app       # first time
-npm --prefix web run dev  # http://localhost:3000/app
+npm install                            # at the root: every app, the shared package, the pre-commit hook
+cd apps/client && npm --prefix web run dev   # or apps/vendor · http://localhost:3000/app
 ```
-
-At the root: `npm install` once, to set up the pre-commit hook (lint and
-typecheck for whichever app's files are staged).
 
 ## Deploying
 
@@ -31,6 +31,7 @@ and end-to-end tests for each, publishes a PR preview per app, and on
 outside `apps/` counts as touching both. See each app's `DEPLOY.md`.
 
 The two apps grew up as separate repos (`jorna-vendor` started as a copy of
-this one), so they still carry duplicate copies of shared code — the API
-client, auth, types, UI kit, styles. Moving those into one shared package is
-the next step.
+this one). What was identical is now in `packages/shared`; what had drifted
+apart — the typed API layer (`lib/jorna.ts`), most of `lib/types.ts`, auth,
+and the components built on them — is still copied in both apps until it's
+reconciled.

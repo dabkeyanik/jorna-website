@@ -15,7 +15,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { apiFetch, configureTokens } from "./api";
+import { apiFetch, configureTokens } from "@jorna/shared/lib/api";
 import { clearAttentionCache } from "./attention";
 import { clearRoleCache } from "./role";
 import type { TokenPair, User } from "./types";

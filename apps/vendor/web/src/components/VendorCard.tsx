@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { categoryLabel, paymentMethodBadge, type VendorSearchItem } from "@/lib/types";
-import { Card, Stars } from "./ui";
+import { Card, Stars } from "@jorna/shared/components/ui";
 
 function money(n?: number | null) {
   if (n == null) return null;

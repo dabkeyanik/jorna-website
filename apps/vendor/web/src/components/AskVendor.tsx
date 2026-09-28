@@ -11,9 +11,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { askVendor } from "@/lib/jorna";
-import { Button } from "./ui";
+import { Button } from "@jorna/shared/components/ui";
 
 export function AskVendor({
   vendorId,

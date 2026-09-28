@@ -18,7 +18,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { loadIsVendor } from "@/lib/role";
 import { vendorSiteUrl } from "@/lib/vendorSite";
-import { Button, Card } from "@/components/ui";
+import { Button, Card } from "@jorna/shared/components/ui";
 
 const OPEN_TO_ANYONE = ["/login", "/auth", "/forgot-password", "/reset-password"];
 

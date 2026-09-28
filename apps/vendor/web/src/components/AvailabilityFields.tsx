@@ -7,10 +7,10 @@
 // page's single combined form.
 
 import { useEffect, useState } from "react";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { getMyAvailability, setMyAvailability } from "@/lib/jorna";
 import { WEEKDAYS, type AvailabilitySlot } from "@/lib/types";
-import { Button, Card, LinkButton, TimeField } from "@/components/ui";
+import { Button, Card, LinkButton, TimeField } from "@jorna/shared/components/ui";
 
 type Window = { start_time: string; end_time: string };
 

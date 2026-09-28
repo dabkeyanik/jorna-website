@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Tailwind finds class names by scanning the app it's building, and this
+   package is outside both apps — so its components are listed explicitly, or
+   their classes would silently go missing. Paths are relative to this file. */
+@source "../components";
+@source "../lib";
+
 /*
   Jorna design system — ported from the marketing site (jornaevents.com).
   Palette is defined once here; Tailwind v4 exposes each --color-* token as a

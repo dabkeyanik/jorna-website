@@ -11,7 +11,7 @@
 // request resolves, which is what lets this be proposed freely.
 
 import { useState } from "react";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import {
   consentToChangePrice,
   proposeChange,
@@ -26,7 +26,7 @@ import {
   type ChangeRequest,
 } from "@/lib/types";
 import { isDeadBooking } from "@/lib/planning";
-import { Button, Card, Field, TimeField } from "@/components/ui";
+import { Button, Card, Field, TimeField } from "@jorna/shared/components/ui";
 
 function money(cents: number) {
   return `$${Math.round(cents / 100).toLocaleString()}`;
