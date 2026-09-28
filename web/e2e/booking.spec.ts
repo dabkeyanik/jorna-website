@@ -195,6 +195,39 @@ test.describe("bundle detail (/bundle)", () => {
     expect(api.requestsTo("POST", "/payments/bookings/booking-1/mark-paid")).toHaveLength(1);
   });
 
+  test("an accepted request asks for a signature before any payment", async ({ page, api }) => {
+    await loginAs(page, api);
+    api.get(
+      "/bundles/:id",
+      mockBundleDetail({
+        bookings: [
+          mockBundleBooking({
+            payment_method: "manual",
+            payment_status: "unpaid",
+            vendor_venmo_handle: "@studio-anjali",
+            contract_token: "tok-1",
+            contract_status: "sent",
+            signed_at: null,
+            hold_expires_at: "2030-05-08T12:00:00",
+          }),
+        ],
+      }),
+    );
+    api.get("/bundles", []);
+    api.get("/events", []);
+    api.get("/conversations", []);
+    api.get("/payments/card", null);
+
+    await page.goto("bundle/?id=bundle-1");
+    await expect(page.getByText(/accepted — review and sign the contract/)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Review & sign" })).toHaveAttribute(
+      "href",
+      "https://jornaevents.com/app/booking-link?t=tok-1",
+    );
+    // Nothing is owed until it's signed.
+    await expect(page.getByRole("button", { name: "I sent payment" })).toHaveCount(0);
+  });
+
   test("cancelling a manual-track booking shows no refund math", async ({ page, api }) => {
     await loginAs(page, api);
     api.get(

@@ -190,10 +190,13 @@ describe("moneyForBundle — where a plan's money actually is", () => {
   });
 });
 
+// The local calendar date, not toISOString's UTC one: in a US evening the
+// UTC date is already tomorrow, which turned "yesterday" into today and
+// failed this suite after dark.
 function isoDaysFromNow(offset: number): string {
   const d = new Date();
   d.setDate(d.getDate() + offset);
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 describe("bookingGaps — a date that's set but already gone", () => {
