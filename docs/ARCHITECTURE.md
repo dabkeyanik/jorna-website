@@ -82,12 +82,11 @@ ever disagree after a future change.
 
 ## Important cross-cutting convention: single source of truth for "what's outstanding"
 
-`web/src/lib/planning.ts` (client-side) and `web/src/lib/vendorPlan.ts`
-(vendor-side) are the **only** places that decide what a user still needs to
-do (finish event details, pay, confirm, respond to a negotiation, etc). Both
-the relevant dashboard/plan page and `web/src/lib/attention.ts` (the tab-bar
-notification badge) read from these — never re-derive "is this booking
-actionable" logic elsewhere. Every rule in these two files is written to
+`web/src/lib/planning.ts` is the **only** place that decides what a client
+still needs to do (finish event details, sign, pay, confirm, respond to a
+negotiation, etc). Both the dashboard/plan pages and `web/src/lib/attention.ts`
+(the tab-bar notification badge) read from it — never re-derive "is this booking
+actionable" logic elsewhere. Every rule in this file is written to
 mirror a backend guard, so a task shown in the UI never points at an action
 the server will reject. If you're changing what counts as "needs attention,"
 this is the one place to change it.
@@ -201,7 +200,7 @@ export at build time; a runtime-only env var won't reach the client bundle.
 
 - Read `docs/MODULE_MAP.md` to find the right subsystem first.
 - If it touches pricing, booking status, or "what needs a user's attention,"
-  read `planning.ts`/`vendorPlan.ts`/`attention.ts` — don't duplicate their
+  read `planning.ts`/`attention.ts` — don't duplicate their
   rules.
 - If it touches deploy behavior, read `DEPLOY.md` — the deploy script exists
   specifically to work around a Cloudflare upload reliability issue; don't

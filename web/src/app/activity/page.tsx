@@ -12,7 +12,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { loadAttention, type AttentionItem } from "@/lib/attention";
-import { loadIsVendor } from "@/lib/role";
 import { PushOptIn } from "@/components/PushOptIn";
 import { Button, Card, LinkButton } from "@/components/ui";
 
@@ -20,21 +19,11 @@ export default function ActivityPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [items, setItems] = useState<AttentionItem[] | null>(null);
-  const [isVendor, setIsVendor] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login?next=/activity");
   }, [authLoading, user, router]);
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    loadIsVendor().then((v) => !cancelled && setIsVendor(v));
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -73,30 +62,13 @@ export default function ActivityPage() {
       ) : items && items.length === 0 ? (
         <Card className="mt-8 p-6 text-center">
           <p className="text-ink-soft">You&apos;re all caught up.</p>
-          {/* Where to go next depends on which app you're in. A vendor with
-              nothing waiting was being offered "Plan an event" — an invitation
-              to become their own customer, into a builder that now turns them
-              away. */}
           <div className="mt-5 flex flex-wrap justify-center gap-2">
-            {isVendor ? (
-              <>
-                <LinkButton href="/my-dashboard" size="md">
-                  Your dashboard
-                </LinkButton>
-                <LinkButton href="/my-calendar" variant="ghost" size="md">
-                  Your calendar
-                </LinkButton>
-              </>
-            ) : (
-              <>
-                <LinkButton href="/plan" size="md">
-                  Plan an event
-                </LinkButton>
-                <LinkButton href="/marketplace" variant="ghost" size="md">
-                  Browse vendors
-                </LinkButton>
-              </>
-            )}
+            <LinkButton href="/plan" size="md">
+              Plan an event
+            </LinkButton>
+            <LinkButton href="/marketplace" variant="ghost" size="md">
+              Browse vendors
+            </LinkButton>
           </div>
         </Card>
       ) : (

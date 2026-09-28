@@ -35,9 +35,9 @@ wrangler.jsonc       Cloudflare Pages config (serves ./public)
   "I sent this", and **View contract** opens `/contract` — the items,
   payments, terms and signature, printable. A signed booking can be
   cancelled but not removed from the plan. Day-of check-in and reviews.
-- It still contains the **older vendor pages** (dashboard, bookings,
-  earnings, onboarding) from before the vendor side moved to
-  jornaevents.com. New vendor work goes in `jorna-vendor`.
+- **Vendors aren't served here.** Their side — including sign-up — is
+  jornaevents.com. Old seller URLs redirect there, and a vendor account that
+  signs in here is pointed to it.
 
 Jorna doesn't handle money for now: clients pay vendors directly
 (Venmo/Zelle). Stripe checkout and escrow are still in the code behind

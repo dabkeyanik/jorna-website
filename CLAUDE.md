@@ -56,7 +56,7 @@ docs/               architecture docs (read before cross-cutting changes)
   the relevant subsystem, then read only the files it points to.
 - Search for existing implementations before writing new code — in
   particular, check `web/src/lib/jorna.ts` before adding a new API call, and
-  `web/src/lib/planning.ts` / `vendorPlan.ts` before adding any "does the
+  `web/src/lib/planning.ts` before adding any "does the
   user still need to do X" logic (see `docs/ARCHITECTURE.md`).
 - Read the relevant doc in `docs/` before a change that spans multiple
   subsystems (auth, pricing, task/attention rules, deploy).
@@ -71,7 +71,7 @@ docs/               architecture docs (read before cross-cutting changes)
 
 - Comments explain *why*, not *what* — match the existing style (see almost
   any file in `web/src/lib`). Don't add comments that restate the code.
-- Don't duplicate the task/attention rules in `planning.ts`/`vendorPlan.ts`;
+- Don't duplicate the task/attention rules in `planning.ts`;
   extend them instead.
 - All backend calls go through `web/src/lib/jorna.ts` (typed) →
   `web/src/lib/api.ts` (transport). No ad-hoc `fetch()` in components.
@@ -108,7 +108,7 @@ Vitest, `next build`) and `e2e` (Playwright, below) run on every push/PR to
 ships to Cloudflare Pages (see `DEPLOY.md`) — merging a PR is what puts a
 change into production, there's no separate manual deploy step in the
 normal flow. The Vitest suite stays narrow on purpose — pure-logic unit
-tests for `web/src/lib` (pricing, planning/vendorPlan rules) — component-
+tests for `web/src/lib` (pricing, planning rules) — component-
 level and user-flow coverage lives in Playwright instead, so a UI change
 should get an E2E test or a manual pass through the dev server, not a
 component test here.
@@ -129,8 +129,7 @@ path params, `api.error()` for non-2xx); `web/e2e/support/fixtures.ts`'s
 `loginAs()` seeds a signed-in session by writing `auth.tsx`'s localStorage
 keys directly, skipping the real login form for tests that don't need to
 exercise it. Add a spec next to the existing ones (`home`, `auth`,
-`marketplace`, `booking`, `vendor-onboarding`, `vendor-bookings`,
-`vendor-earnings`) when a flow is worth covering beyond a manual dev-server
+`marketplace`, `booking`) when a flow is worth covering beyond a manual dev-server
 check — favor the ones with real logic (gating, redirects, status-dependent
 rendering) over pure layout.
 

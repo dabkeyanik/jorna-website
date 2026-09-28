@@ -5,12 +5,12 @@
 // phones (MobileNavMenu). Only one is visible at a time — the split is CSS,
 // so both mount.
 //
-//   Client: Home · Builder · Market · Dashboard · Needs you · Messages · Profile
-//   Vendor: Dashboard · Needs you · Messages · Profile
+//   Home · Builder · Market · Dashboard · Needs you · Messages · Profile
 //
-// Role is "has a vendor profile" (getMyVendor != null), the same signal iOS uses
-// (vendorID != nil). Shown only to a signed-in user; the whole app lives under
-// basePath "/app", which next/link applies to these hrefs.
+// Clients only: vendors work on jornaevents.com, and a vendor account signed
+// in here sees VendorAccountGate instead of the app. Shown only to a
+// signed-in user; the whole app lives under basePath "/app", which next/link
+// applies to these hrefs.
 //
 // Two independent badges: Needs You counts exactly what /activity lists (both
 // read lib/attention, whose short TTL cache means navigating around doesn't
@@ -23,7 +23,6 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { loadAttention } from "@/lib/attention";
 import { getUnreadCount } from "@/lib/jorna";
-import { loadIsVendor } from "@/lib/role";
 
 export interface NavItem {
   href: string;
@@ -97,109 +96,12 @@ export const CLIENT_TABS: NavItem[] = [
   { href: "/profile", label: "Profile", icon: icon(I.profile), match: ["/profile"] },
 ];
 
-// No Home tab. /home is a marketing page written to sell the bundle builder to
-// someone planning an event — every button on it leads somewhere a vendor is
-// now turned away from. A seller's home is the dashboard: what's been requested
-// of them, when they're working, and what they're owed.
-export const VENDOR_TABS: NavItem[] = [
-  {
-    href: "/my-dashboard",
-    label: "Dashboard",
-    icon: icon(I.dashboard),
-    // Every seller page hangs off the dashboard now, reached through VendorNav,
-    // so they all keep this tab current. They used to light Profile, back when
-    // Profile was the only tab that owned them — two tabs matching the same
-    // path would light both.
-    // Browsing is in here too, now that Home is gone: a vendor reading the
-    // marketplace or another listing shouldn't leave the whole bar unlit.
-    // "/vendor" is safe beside "/vendor-profile" — isActive matches a whole
-    // segment, so the shorter one can't swallow the longer.
-    match: [
-      "/my-dashboard",
-      "/my-bookings",
-      "/my-calendar",
-      "/my-availability",
-      "/my-earnings",
-      "/vendor-profile",
-      "/marketplace",
-      "/vendor",
-      "/home",
-      "/browse",
-    ],
-  },
-  NEEDS_YOU,
-  MESSAGES,
-  { href: "/profile", label: "Profile", icon: icon(I.profile), match: ["/profile"] },
-];
-
-/**
- * Every seller destination, for the desktop header only.
- *
- * A vendor page used to carry two navigations: this bar with one Dashboard tab
- * in it, and a second strip of six directly underneath — the same word twice,
- * a hand's width apart. The header has room for the lot on a desktop, so it
- * takes the lot, and VendorNav drops to phones (see VendorNav, md:hidden).
- *
- * Phones keep VENDOR_TABS. Nine icons across 390px is 43px each, and the tab
- * bar's own note puts the floor at about 68 — there, the two navigations are at
- * opposite ends of the screen and don't read as a repetition anyway.
- *
- * Their work first, then the account. "Listing" rather than a second "Profile":
- * the two went to different pages under one word, and which one you got
- * depended on which bar you happened to click.
- */
-export const VENDOR_DESKTOP_TABS: NavItem[] = [
-  {
-    href: "/my-dashboard",
-    label: "Dashboard",
-    icon: icon(I.dashboard),
-    // Just itself here. The phone bar's Dashboard stands in for every seller
-    // page because it's the only seller tab there; up here each page has a tab
-    // of its own to light.
-    match: ["/my-dashboard", "/home", "/browse"],
-  },
-  {
-    href: "/my-bookings",
-    label: "Bookings",
-    icon: icon(I.dashboard),
-    match: ["/my-bookings"],
-  },
-  {
-    href: "/my-calendar",
-    label: "Calendar",
-    icon: icon(I.dashboard),
-    match: ["/my-calendar", "/my-availability"],
-  },
-  {
-    href: "/my-earnings",
-    label: "Earnings",
-    icon: icon(I.dashboard),
-    match: ["/my-earnings"],
-  },
-  {
-    href: "/vendor-profile",
-    label: "Listing",
-    icon: icon(I.profile),
-    // Services live on this page now, so there is no separate tab for them.
-    // "/vendor" is the public listing view — the same thing a client sees, so
-    // it belongs here rather than leaving the bar unlit.
-    match: ["/vendor-profile", "/vendor", "/marketplace"],
-  },
-  NEEDS_YOU,
-  MESSAGES,
-  { href: "/profile", label: "Profile", icon: icon(I.profile), match: ["/profile"] },
-];
-
 /**
  * The items to show, the badge count, and which one is current.
  * `items` is null for a signed-out visitor — browsing, "Get started", login.
- *
- * `desktopItems` differs only for a vendor, and only because the header has
- * room the phone bar doesn't.
  */
 export function useAppNav(): {
   items: NavItem[] | null;
-  desktopItems: NavItem[] | null;
   attention: number;
   messagesUnread: number;
   home: string;
@@ -207,29 +109,8 @@ export function useAppNav(): {
 } {
   const { user, loading } = useAuth();
   const pathname = usePathname() ?? "";
-  const [isVendor, setIsVendor] = useState<boolean | null>(null);
   const [attention, setAttention] = useState(0);
   const [messagesUnread, setMessagesUnread] = useState(0);
-
-  // Re-check on navigation, not just on sign-in: this bar is part of the
-  // persistent layout, mounted once per session — unlike ClientOnlyRoute,
-  // which re-derives isVendor on every protected page it wraps, this effect
-  // would otherwise never run again after the first check. A client who
-  // completes vendor-onboarding mid-session (create_vendor calls
-  // clearRoleCache()) would keep seeing the client tabs until they signed
-  // out and back in. Cheap: lib/role's own TTL cache makes most of these a
-  // no-op, same as the attention/messagesUnread effects below.
-  useEffect(() => {
-    if (!user) {
-      setIsVendor(null);
-      return;
-    }
-    let cancelled = false;
-    loadIsVendor().then((v) => !cancelled && setIsVendor(v));
-    return () => {
-      cancelled = true;
-    };
-  }, [user, pathname]);
 
   // Re-check on navigation so the badge follows you as you act on things. Cheap:
   // lib/attention's TTL cache makes most of these a no-op, so this is roughly
@@ -267,13 +148,10 @@ export function useAppNav(): {
 
   const signedOut = loading || !user;
   return {
-    items: signedOut ? null : isVendor ? VENDOR_TABS : CLIENT_TABS,
-    desktopItems: signedOut ? null : isVendor ? VENDOR_DESKTOP_TABS : CLIENT_TABS,
+    items: signedOut ? null : CLIENT_TABS,
     attention,
     messagesUnread,
-    // Where the wordmark goes. A logo goes home, and home for a seller is their
-    // dashboard — not the page selling the builder to everyone else.
-    home: isVendor ? "/my-dashboard" : "/home",
+    home: "/home",
     isActive: (item) =>
       item.match.some((m) => pathname === m || pathname.startsWith(`${m}/`)),
   };

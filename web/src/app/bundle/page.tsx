@@ -83,7 +83,6 @@ import {
 import { AddressFields } from "@/components/AddressFields";
 import { DraftDetails } from "@/components/DraftDetails";
 import { PlanProgress } from "@/components/PlanProgress";
-import { ClientOnlyRoute } from "@/components/ClientOnlyRoute";
 import { addressPin } from "@/lib/geocode";
 import { contractSignUrl, contractStep, contractViewPath, paymentRows } from "@/lib/contract";
 import { PaymentSchedule } from "@/components/PaymentSchedule";
@@ -2295,10 +2294,8 @@ function BundleInner() {
 
 export default function BundlePage() {
   return (
-    <ClientOnlyRoute>
-      <Suspense fallback={<p className="py-20 text-center text-ink-soft">Loading…</p>}>
-        <BundleInner />
-      </Suspense>
-    </ClientOnlyRoute>
+    <Suspense fallback={<p className="py-20 text-center text-ink-soft">Loading…</p>}>
+      <BundleInner />
+    </Suspense>
   );
 }

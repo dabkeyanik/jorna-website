@@ -30,7 +30,6 @@ import {
   updateFunction,
   updateGuest,
 } from "@/lib/jorna";
-import { ClientOnlyRoute } from "@/components/ClientOnlyRoute";
 import { Button, Card, Field, TimeField } from "@/components/ui";
 import {
   headcountGap,
@@ -914,10 +913,8 @@ function GuestsInner() {
 
 export default function GuestsPage() {
   return (
-    <ClientOnlyRoute>
-      <Suspense fallback={<p className="py-20 text-center text-ink-soft">Loading…</p>}>
-        <GuestsInner />
-      </Suspense>
-    </ClientOnlyRoute>
+    <Suspense fallback={<p className="py-20 text-center text-ink-soft">Loading…</p>}>
+      <GuestsInner />
+    </Suspense>
   );
 }

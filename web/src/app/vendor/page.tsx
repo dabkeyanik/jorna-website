@@ -16,7 +16,6 @@ import {
   type ServiceItem,
   type VendorDetail,
 } from "@/lib/types";
-import { loadIsVendor } from "@/lib/role";
 import { Card, LinkButton, Stars } from "@/components/ui";
 import { ModerationMenu } from "@/components/ModerationMenu";
 import { AskVendor } from "@/components/AskVendor";
@@ -71,7 +70,7 @@ function StatTile({ value, label }: { value: React.ReactNode; label: string }) {
   );
 }
 
-function ServiceRow({ service, canBook }: { service: ServiceItem; canBook: boolean }) {
+function ServiceRow({ service }: { service: ServiceItem }) {
   const [photoFailed, setPhotoFailed] = useState(false);
   const unit = priceUnitLabel(service.price_unit);
   const first = usableMedia(service.media)[0];
@@ -149,20 +148,13 @@ function ServiceRow({ service, canBook }: { service: ServiceItem; canBook: boole
                 Open to offers
               </span>
             ) : null}
-            {/* A vendor can read any listing — seeing how others present a
-                service is a fair reason to be here — but booking is the client
-                half of the app, and /book turns them away anyway. Offering a
-                button that only leads to a redirect is worse than not offering
-                it. */}
-            {canBook ? (
-              <LinkButton
-                href={`/book?service=${service.service_id}`}
-                size="md"
-                className="relative z-10 ml-auto"
-              >
-                Book this
-              </LinkButton>
-            ) : null}
+            <LinkButton
+              href={`/book?service=${service.service_id}`}
+              size="md"
+              className="relative z-10 ml-auto"
+            >
+              Book this
+            </LinkButton>
           </div>
         </div>
       </div>
@@ -180,18 +172,6 @@ function VendorInner() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Null until known, and only a confirmed vendor loses the button — a signed-out
-  // visitor keeps it, because "Book this" is how they're invited to sign up.
-  const [isVendor, setIsVendor] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadIsVendor().then((v) => !cancelled && setIsVendor(v));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   useEffect(() => {
     if (!vendorId) {
       setError("No vendor specified.");
@@ -361,7 +341,7 @@ function VendorInner() {
         ) : (
           <div className="mt-4 grid gap-3">
             {services.map((s) => (
-              <ServiceRow key={s.service_id} service={s} canBook={isVendor !== true} />
+              <ServiceRow key={s.service_id} service={s} />
             ))}
           </div>
         )}

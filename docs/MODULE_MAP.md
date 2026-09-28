@@ -38,9 +38,8 @@ always "none, verify manually" until a test runner is added.
 - **Responsible for:** header/footer chrome (including the mobile hamburger
   menu) and generic UI primitives used across pages.
 - **Code:** `web/src/components/SiteHeader.tsx`, `SiteFooter.tsx`,
-  `MobileNavMenu.tsx`, `VendorNav.tsx`, `nav.tsx`, `ui.tsx`,
-  `ClientOnlyRoute.tsx`.
-- **Depends on:** `lib/auth.tsx` (role-aware nav), `lib/role.ts`.
+  `MobileNavMenu.tsx`, `nav.tsx`, `ui.tsx`, `VendorAccountGate.tsx`.
+- **Depends on:** `lib/auth.tsx`, `lib/role.ts` (the gate's vendor check).
 - **Consumers:** every page, via the root layout.
 
 ## API client layer
@@ -76,41 +75,22 @@ always "none, verify manually" until a test runner is added.
 - **Code:** `web/src/lib/planning.ts` (task rules — single source of truth,
   see `docs/ARCHITECTURE.md`), `web/src/app/bundle/`, `bundles/`, `plan/`,
   `web/src/components/BundleResults.tsx`, `PlanProgress.tsx`,
-  `DraftDetails.tsx`. (`my-dashboard/` is the *vendor* dashboard, not this
-  flow's — see "Vendor flow" below.)
+  `DraftDetails.tsx`.
 - **Depends on:** `lib/jorna.ts`, `lib/types.ts`, `lib/address.ts`
   (`isCompleteLocation`).
 - **Consumers:** `lib/attention.ts` reads `planning.ts` for the nav badge.
 - **Full detail (booking status model, checkout/escrow, confirm/release):**
   `docs/BOOKING_FLOW.md`.
 
-## Vendor flow
+## Vendor accounts
 
-- **Responsible for:** vendor profile/services management, availability,
-  bookings, earnings, and the vendor equivalent of the task-rules module.
-- **Code:** `web/src/lib/vendorPlan.ts` (task rules), `web/src/app/vendor/`,
-  `vendor-profile/`, `my-availability/`, `my-bookings/`, `my-calendar/`,
-  `my-earnings/`, `my-dashboard/` (the vendor dashboard — ported from
-  `VENDOR_DASHBOARD_BRIEF.md`, see that doc's shipped-note), `web/src/components/ServicesManager.tsx`,
-  `VendorCard.tsx`, `VendorNav.tsx`.
-- **First-time setup:** `web/src/app/vendor-onboarding/` — a resumable
-  3-step wizard (identity+bio, reach, first service) that both the
-  register-as-vendor flow and "Start selling" route to instead of
-  `vendor-profile/` directly. It shares field UI with `vendor-profile/` via
-  `web/src/components/VendorProfileFields.tsx`, and reuses `ServicesManager`
-  itself (via its `autoStartNew`/`onServiceAdded` props) for the service
-  step rather than a second form. `vendor-profile/` assumes setup is done and
-  redirects here if a user has no vendor record yet; the wizard's own test
-  for "done" is having at least one service, not just a vendor record — see
-  the comments in `vendor-onboarding/page.tsx` for why.
-- **Depends on:** `lib/jorna.ts`, `lib/types.ts`, `lib/availability.ts`,
-  `lib/pricing.ts`.
-- **Consumers:** `lib/attention.ts` reads `vendorPlan.ts` for the nav badge.
-- **Related:** `web/src/app/vendor/stripe-onboard/` (+ `refresh/`, `return/`)
-  — Stripe Connect onboarding redirect targets; the onboarding wizard's last
-  step links to `/my-earnings` to start that flow, but doesn't build it.
-- **Full detail (approve/decline, check-in, earnings/Stripe gate):**
-  `docs/BOOKING_FLOW.md`.
+- **Responsible for:** nothing a vendor does — that's jornaevents.com (the
+  `jorna-vendor` repo). This app only sends vendors there:
+  `web/src/components/VendorAccountGate.tsx` (a vendor account signed in
+  here), `web/src/lib/vendorSite.ts` (links to the vendor site), and the
+  old seller URLs in `public/_redirects`.
+- **Still here, for clients:** `web/src/app/vendor/` (a vendor's public page)
+  and `web/src/components/VendorCard.tsx`.
 
 ## Messaging & negotiation
 

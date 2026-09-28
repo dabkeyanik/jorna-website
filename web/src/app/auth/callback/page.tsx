@@ -50,7 +50,9 @@ export default function AuthCallbackPage() {
         // carries the email, name and avatar, the username is derived, and the
         // rest of the profile is nullable and filled in later.
         const next = takeOAuthNext();
-        const role = takeOAuthRole();
+        // Cleared, not read: sign-up here is for hosts now, but a sign-in
+        // started before that may have left a role behind.
+        takeOAuthRole();
 
         const session_ = await googleRegister(session.access_token);
 
@@ -62,13 +64,7 @@ export default function AuthCallbackPage() {
           });
           // Jorna's JWT is the session now — the Supabase one isn't needed.
           await supabase.auth.signOut();
-          // Anyone who chose "Vendor" goes straight into guided setup — not
-          // just a brand-new account. An existing client picking "Vendor" here
-          // is just as much a vendor-to-be, and the wizard already knows how
-          // to resume (and to refuse an account with live bookings), so it's
-          // safe to send any of them there.
-          const landing = role === "vendor" ? "/vendor-onboarding" : next;
-          router.replace(landing);
+          router.replace(next);
           return;
         }
 

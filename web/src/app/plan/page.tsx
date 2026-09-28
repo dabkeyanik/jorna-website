@@ -10,7 +10,6 @@ import { CATEGORY_LABELS, categoryLabel, type BundleOption } from "@/lib/types";
 import { unchosenBundleIds } from "@/lib/planning";
 import { Button, Card, Chip, Field, TimeField } from "@/components/ui";
 import { BundleResults } from "@/components/BundleResults";
-import { ClientOnlyRoute } from "@/components/ClientOnlyRoute";
 import { CityCombobox, type Coords } from "@/components/CityCombobox";
 import { locateZip, type ZipPlace } from "@/lib/zips";
 
@@ -565,10 +564,8 @@ function PlanInner() {
 // useSearchParams needs a Suspense boundary to prerender in the static export.
 export default function PlanPage() {
   return (
-    <ClientOnlyRoute>
-      <Suspense fallback={<p className="py-20 text-center text-ink-soft">Loading…</p>}>
-        <PlanInner />
-      </Suspense>
-    </ClientOnlyRoute>
+    <Suspense fallback={<p className="py-20 text-center text-ink-soft">Loading…</p>}>
+      <PlanInner />
+    </Suspense>
   );
 }

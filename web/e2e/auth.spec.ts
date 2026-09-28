@@ -1,4 +1,4 @@
-import { test, expect } from "./support/fixtures";
+import { test, expect, loginAs } from "./support/fixtures";
 import { mockTokenPair, mockUser } from "./support/mock-data";
 
 test.describe("authentication", () => {
@@ -31,21 +31,45 @@ test.describe("authentication", () => {
     await expect(page).toHaveURL(/\/app\/login\/?$/);
   });
 
-  test("blocks registration until a role (host/vendor) is chosen", async ({ page }) => {
+  test("sign-up here is for hosts, and points vendors to jornaevents.com", async ({ page }) => {
     await page.goto("login/?mode=register");
 
-    const submit = page.getByRole("button", { name: "Create account" });
-    await expect(submit).toBeDisabled();
+    await expect(page.getByRole("button", { name: /^Vendor/ })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Sign up on jornaevents.com" })).toHaveAttribute(
+      "href",
+      "https://jornaevents.com/app/login?mode=register&role=vendor",
+    );
+  });
 
-    await page.getByRole("button", { name: /^Host/ }).click();
-    await expect(submit).toBeEnabled();
+  test("an old become-a-vendor link goes to the vendor site's sign-up", async ({ page }) => {
+    await page.route("https://jornaevents.com/**", (route) =>
+      route.fulfill({ status: 200, contentType: "text/html", body: "vendor site" }),
+    );
+    await page.goto("login/?mode=register&role=vendor");
+
+    await expect(page).toHaveURL("https://jornaevents.com/app/login?mode=register&role=vendor");
+  });
+
+  test("a vendor account signed in here is sent to jornaevents.com", async ({ page, api }) => {
+    await loginAs(page, api);
+    api.get("/vendors/me", { vendor_id: "vendor-1", user_id: "user-1" });
+    api.get("/bundles", []);
+    api.get("/conversations/unread-count", { unread_count: 0 });
+
+    await page.goto("bundles/");
+
+    await expect(page.getByRole("heading", { name: "This is a vendor account" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Go to jornaevents.com" })).toHaveAttribute(
+      "href",
+      "https://jornaevents.com/app/my-dashboard",
+    );
   });
 
   test("redirects a signed-out visitor away from a protected page, preserving the return path", async ({
     page,
   }) => {
-    await page.goto("my-availability/");
+    await page.goto("bundles/");
 
-    await expect(page).toHaveURL(/\/app\/login\/?\?next=\/my-availability/);
+    await expect(page).toHaveURL(/\/app\/login\/?\?next=\/bundles/);
   });
 });

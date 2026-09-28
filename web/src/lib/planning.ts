@@ -873,7 +873,7 @@ function isoOfLocalDate(d: Date): string {
  * `toISOString().slice(0, 10)` — that round-trips through UTC, so east of
  * Greenwich a local midnight lands on the previous UTC day and every date in
  * the range comes out one day early. Same bug already found and fixed in
- * `vendorPlan.ts`'s `spanDays`; this mirrors that fix so the client-side run
+ * the vendor app's `vendorPlan.ts` `spanDays`; this mirrors that fix so the client-side run
  * sheet and the vendor's calendar agree on which days a booking covers.
  */
 function daysBetween(start: string, end?: string | null): string[] {

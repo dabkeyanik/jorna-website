@@ -133,67 +133,23 @@ Two more independent status enums exist for sub-flows:
 
 ## Vendor journey
 
-1. **Onboarding** — `/vendor-onboarding`, a resumable 3-step wizard
-   (identity+bio → reach → first service). An account with active client-side
-   bookings/requests is blocked from switching to vendor
-   (`hasActiveBookings()`, `planning.ts`). "Done" means at least one service
-   exists, not just a vendor record — `/vendor-profile` redirects back here
-   until that's true.
-2. **Availability** — `/my-availability`: per-weekday time windows
-   (`getMyAvailability`/`setMyAvailability`). This is advisory, not a hard
-   gate — `listingHealth()` (`vendorPlan.ts`) flags "no weekly hours set" as a
-   warning, and the marketplace date filter and `getVendorAvailability`
-   (which also folds in Google Calendar busy times) use it for display.
-3. **Receive a request** — `/my-bookings`, filtered `pending` (needs an
-   answer — includes `negotiation_ongoing`) / `upcoming`
-   (`approved`/`payment_confirmed`) / `all`.
-4. **Approve / decline** — `setBookingStatus(id, "approved"|"rejected")`
-   (`PUT /bookings/{id}/status`). A 409 on approve means an overlapping
-   accepted booking. Cancelling an already-approved booking reuses the same
-   `rejected` status (different copy in the UI) and is only offered while
-   `payment_status` isn't `processing`/`paid`/`released`/`refunded`/`disputed`
-   — i.e. never after money has moved.
-5. **Negotiate / respond to a reschedule** — mirror of the client actions
-   above: `NegotiationPanel.tsx` (vendor can counter/accept when it's their
-   turn), `DateChangeRequest.tsx` on `/my-bookings` → `respondToChange()`.
-6. **Check in / confirm at the event** — the vendor's half of escrow release,
-   two routes depending on whether the booking has a venue anchor
-   (`checkin_latitude`/`longitude`, resolved from the plan's venue or the
-   event address):
-   - **Has a venue**: GPS "Check in at venue" on `/my-bookings`, or the
-     no-login token link from a pre-event reminder email
-     (`/check-in?t=`, `getCheckInInvite`/`checkInWithToken`) — same
-     server-side GPS verification either way.
-   - **No venue** (e.g. a mobile service): falls back to a plain "Confirm"
-     once the event is over (`vendorConfirm()` → `confirmBookingEvent()`).
-   Either path sets `vendor_confirmed_at`; release still waits on the
-   client-side confirmation too (see step 10 above).
-7. **Get paid** — `/my-earnings`. `paymentsSetup()` (`vendorPlan.ts`) is the
-   single source of truth for the Stripe Connect gate, with 5 states:
-   `not-started | unfinished | needs-more | under-review | ready` — read
-   identically by the attention badge, the dashboard, and this page.
-   `startStripeOnboarding()` redirects to Stripe's hosted Connect flow and
-   returns to `/my-earnings?stripe=return`; `getStripeStatus()` polls live
-   status. Earnings tiles (`getEarnings()`): released total, in-escrow total,
-   upcoming, plus disputed/refunded when applicable; history rows show gross
-   minus platform fee = net. An un-onboarded vendor can still accept bookings
-   but cannot be paid — the earnings page states this plainly rather than
-   hiding the booking flow.
+Not in this app. Vendors onboard, answer requests, send contracts, check in
+and get paid on jornaevents.com — the `jorna-vendor` repo, whose own
+`docs/BOOKING_FLOW.md` walks that side. This app's seller pages were removed
+once that app had all of them; old URLs redirect there (`public/_redirects`),
+and a vendor account that signs in here sees `VendorAccountGate` instead of
+the client app.
 
 ## Where the rules live (don't re-derive elsewhere)
 
-Both files below are read by `web/src/lib/attention.ts` for the tab-bar badge
-and by the respective dashboard pages — see "single source of truth" in
+`planning.ts` is read by `web/src/lib/attention.ts` for the tab-bar badge
+and by the dashboard and plan pages — see "single source of truth" in
 `docs/ARCHITECTURE.md`.
 
-- **`web/src/lib/planning.ts`** (client) — `TaskKind`:
-  `event-detail | quantity | payment | confirm`. (`event-detail` is
-  deliberately excluded from the attention badge — it's a task list item, not
-  a badge-worthy one.)
-- **`web/src/lib/vendorPlan.ts`** (vendor) — `VendorTaskKind`:
-  `stripe | request | negotiation | date-change | confirm | check-in`. Also
-  owns `PaymentsState` (the Stripe gate, above) and `DayStatus`
-  (`booked | tentative | free`, for the vendor calendar).
+- **`web/src/lib/planning.ts`** — `TaskKind`:
+  `event-detail | quantity | payment | confirm | negotiation | sign |
+  contract-expired`. (`event-detail` is deliberately excluded from the
+  attention badge — it's a task list item, not a badge-worthy one.)
 - **`planning.ts`**'s `ProgressStage` (`toBook | chosen | awaiting | accepted
   | paid | problem | done`) drives the plan-progress bar on `/bundle` — a
   display concept, not a task list.

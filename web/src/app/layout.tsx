@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { PushRuntime } from "@/components/PushRuntime";
 import { SentryRuntime } from "@/components/SentryRuntime";
+import { VendorAccountGate } from "@/components/VendorAccountGate";
 
 export const metadata: Metadata = {
   title: "Jorna — Plan your celebration",
@@ -30,7 +31,9 @@ export default function RootLayout({
         <SentryRuntime />
         <AuthProvider>
           <SiteHeader />
-          <main className="flex-1">{children}</main>
+          <main className="flex-1">
+            <VendorAccountGate>{children}</VendorAccountGate>
+          </main>
           <SiteFooter />
           {/* Foreground web-push listener; no-op unless signed in + permitted. */}
           <PushRuntime />
