@@ -12,6 +12,7 @@
 
 import {
   canConfirmBooking,
+  parseServerTime,
   priceUnitKind,
   priceUnitLabel,
   type BundleBooking,
@@ -19,6 +20,7 @@ import {
   type BundleEventInfo,
 } from "./types";
 import { isCompleteLocation } from "./address";
+import { centsMoney, contractStep, nextPayment, paymentRows, shortDate, utcToday } from "./contract";
 
 // Every kind here is something the client can go and do. There used to be one
 // that wasn't — "vendor-reply", a sent request the vendor hadn't answered — and
@@ -40,7 +42,14 @@ export type TaskKind =
    *  turn to answer it — unlike the removed "vendor-reply" kind, this is
    *  always actionable: negotiation_awaiting_role already says whose turn it
    *  is, so a booking only gets this task while it's really theirs to act on. */
-  | "negotiation";
+  | "negotiation"
+  /** An accepted request is a contract to sign before it's booked (backend
+   *  DECISIONS.md #17). Nothing is owed until then, so this comes before any
+   *  payment task, never beside one. */
+  | "sign"
+  /** The contract lapsed unsigned — the vendor has to resend it, and asking
+   *  them is the client's move. */
+  | "contract-expired";
 
 /**
  * The kinds lib/attention surfaces as "Needs you".
@@ -49,7 +58,14 @@ export type TaskKind =
  * make it count things that were never in it — this list is what the badge
  * already meant, held steady while the rules themselves moved here.
  */
-export const ATTENTION_KINDS: TaskKind[] = ["quantity", "payment", "confirm", "negotiation"];
+export const ATTENTION_KINDS: TaskKind[] = [
+  "quantity",
+  "payment",
+  "confirm",
+  "negotiation",
+  "sign",
+  "contract-expired",
+];
 
 export interface PlanTask {
   id: string;
@@ -62,6 +78,9 @@ export interface PlanTask {
   tone: "urgent" | "normal";
   cta: string;
   bookingId?: string;
+  /** What a payment task asks for, in dollars, when it's less than the whole
+   *  booking — one payment on a contract's schedule. */
+  amount?: number;
 }
 
 export interface BundlePlan {
@@ -256,6 +275,23 @@ function sharpen(task: PlanTask, days: number | null): PlanTask {
   };
 }
 
+/** Whole days left on a contract's hold, or null without one. */
+function holdDays(expires?: string | null): number | null {
+  const ms = parseServerTime(expires);
+  return ms === null ? null : Math.floor((ms - Date.now()) / 86_400_000);
+}
+
+/** How far ahead an upcoming payment becomes a task — the reminder email goes
+ *  out three days before (backend DECISIONS.md #18); this gives a little
+ *  more notice than that. */
+const PAYMENT_NOTICE_DAYS = 7;
+
+function dueSoon(due: string | null): boolean {
+  if (!due) return false;
+  const days = (Date.parse(`${due}T00:00:00Z`) - Date.parse(`${utcToday()}T00:00:00Z`)) / 86_400_000;
+  return days <= PAYMENT_NOTICE_DAYS;
+}
+
 /** What one booking still needs. At most one task each, most pressing first. */
 function bookingTask(b: BundleBooking): PlanTask | null {
   const pay = b.payment_status ?? "unpaid";
@@ -291,6 +327,66 @@ function bookingTask(b: BundleBooking): PlanTask | null {
       tone: "normal",
       cta: "Review offer",
       bookingId: b.booking_id,
+    };
+  }
+
+  // An accepted request is a contract first. Before it's signed nothing is
+  // owed — the backend refuses a payment — so "Pay for" here was an
+  // instruction the server had to turn down.
+  const step = b.status === "approved" ? contractStep(b) : null;
+  if (step === "sign") {
+    const hold = holdDays(b.hold_expires_at);
+    return {
+      id: `sign-${b.booking_id}`,
+      kind: "sign",
+      title: `Sign ${vendor}'s contract`,
+      vendor,
+      note:
+        hold == null
+          ? `for ${service}.`
+          : hold <= 0
+            ? `for ${service}. Their hold on your date ends today.`
+            : `for ${service}. They're holding your date for ${hold === 1 ? "1 more day" : `${hold} more days`}.`,
+      tone: hold != null && hold <= 2 ? "urgent" : "normal",
+      cta: "Review & sign",
+      bookingId: b.booking_id,
+    };
+  }
+  if (step === "expired") {
+    return {
+      id: `expired-${b.booking_id}`,
+      kind: "contract-expired",
+      title: `${vendor}'s contract expired`,
+      vendor,
+      note: `it lapsed before it was signed. Message them to resend it if you still want ${service}.`,
+      tone: "normal",
+      cta: "View",
+      bookingId: b.booking_id,
+    };
+  }
+
+  // A signed contract with a payment plan asks for one payment at a time, and
+  // only as its date comes up — the whole schedule on day one would be a task
+  // for money that isn't due for months.
+  if (b.signed_at && b.payment_schedule?.length) {
+    const next = nextPayment(b);
+    if (!next || (next.state === "upcoming" && !dueSoon(next.due))) return null;
+    const { label, amount_cents } = next.installment;
+    return {
+      id: `pay-${b.booking_id}-${next.installment.id}`,
+      kind: "payment",
+      title: `Send ${vendor} the ${label.toLowerCase()}`,
+      vendor,
+      note:
+        next.state === "overdue"
+          ? `${centsMoney(amount_cents)} for ${service} — it was due ${shortDate(next.due!)}.`
+          : next.state === "due"
+            ? `${centsMoney(amount_cents)} for ${service}, due today.`
+            : `${centsMoney(amount_cents)} for ${service}, due ${shortDate(next.due!)}.`,
+      tone: next.state === "upcoming" ? "normal" : "urgent",
+      cta: "Mark sent",
+      bookingId: b.booking_id,
+      amount: amount_cents / 100,
     };
   }
 
@@ -466,6 +562,18 @@ export function moneyForBundle(bundle: BundleDetail): MoneyBreakdown {
     }
 
     sum.committed += price;
+    // A payment plan is settled a payment at a time, and payment_status only
+    // moves once every one has — so a received deposit read as nothing paid,
+    // and the whole price stayed "to pay".
+    const rows = paymentRows(b);
+    if (rows.length > 0 && pay !== "confirmed_paid") {
+      for (const row of rows) {
+        const dollars = row.installment.amount_cents / 100;
+        if (row.state === "received") sum.released += dollars;
+        else if (row.state !== "sent") sum.outstanding += dollars;
+      }
+      continue;
+    }
     if (pay === "paid" || pay === "disputed") sum.inEscrow += price;
     // `confirmed_paid` is the manual (Venmo/Zelle) track's own "done" state —
     // Jorna never held this money, so it has no escrow leg to sit in first,

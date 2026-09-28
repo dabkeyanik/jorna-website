@@ -14,6 +14,7 @@ import { getMyVendor, getStripeStatus, listBundles, listVendorBookings } from "@
 import type { BundleDetail, StripeStatus, VendorBooking } from "@/lib/types";
 import { ATTENTION_KINDS, planForBundle, taskDetail } from "@/lib/planning";
 import { vendorTasks } from "@/lib/vendorPlan";
+import { centsMoney } from "@/lib/contract";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -53,10 +54,17 @@ function clientItems(bundles: BundleDetail[]): AttentionItem[] {
         id: task.id,
         title: task.title,
         detail: taskDetail(task, where),
-        href,
+        // Straight to the booking's row — the plan page scrolls to the hash.
+        href: task.bookingId ? `${href}#booking-${task.bookingId}` : href,
         // The amount belongs on the button, and only planning's caller knows
-        // it's a button rather than a checklist line.
-        cta: task.kind === "payment" && booking ? `Pay ${money(booking.price)}` : task.cta,
+        // it's a button rather than a checklist line. One payment on a
+        // schedule asks for that payment, not the whole booking.
+        cta:
+          task.kind === "payment" && task.amount != null
+            ? `Pay ${centsMoney(Math.round(task.amount * 100))}`
+            : task.kind === "payment" && booking
+              ? `Pay ${money(booking.price)}`
+              : task.cta,
         tone: task.tone,
       });
     }
