@@ -85,7 +85,8 @@ export function centsMoney(cents: number): string {
   })}`;
 }
 
-function shortDate(iso: string): string {
+/** "2030-04-17" → "17 Apr 2030", in the reader's locale. */
+export function shortDate(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
   return Number.isNaN(d.getTime())
     ? iso
