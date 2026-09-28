@@ -1,0 +1,5 @@
+# Each app has its own .gitignore for its build output; these are the root's.
+node_modules/
+.DS_Store
+*.make
+.wrangler/

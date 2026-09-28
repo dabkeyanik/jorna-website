@@ -1,0 +1,13 @@
+{
+  "name": "jorna-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Jorna's two web apps: apps/client (book.jornaevents.com) and apps/vendor (jornaevents.com). Each builds and deploys on its own; this root holds only the git hooks.",
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.4.1"
+  }
+}

@@ -1,24 +1,31 @@
 version: 2
 updates:
-  # web/ — Next.js app dependencies
+  # Each app's Next.js dependencies, grouped the same way for both.
   - package-ecosystem: "npm"
-    directory: "/web"
+    directory: "/apps/client/web"
     schedule:
       interval: "weekly"
     groups:
       next-react:
-        patterns:
-          - "next"
-          - "react"
-          - "react-dom"
-          - "@types/react*"
+        patterns: ["next", "react", "react-dom", "@types/react*"]
       dev-dependencies:
         dependency-type: "development"
     open-pull-requests-limit: 10
 
-  # root — deploy tooling (wrangler)
   - package-ecosystem: "npm"
-    directory: "/"
+    directory: "/apps/vendor/web"
+    schedule:
+      interval: "weekly"
+    groups:
+      next-react:
+        patterns: ["next", "react", "react-dom", "@types/react*"]
+      dev-dependencies:
+        dependency-type: "development"
+    open-pull-requests-limit: 10
+
+  # Deploy tooling (wrangler), per app, and the root's git hooks.
+  - package-ecosystem: "npm"
+    directories: ["/", "/apps/client", "/apps/vendor"]
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
