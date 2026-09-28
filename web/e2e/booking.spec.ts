@@ -220,6 +220,7 @@ test.describe("bundle detail (/bundle)", () => {
 
     await page.goto("bundle/?id=bundle-1");
     await expect(page.getByText(/accepted — review and sign the contract/)).toBeVisible();
+    await expect(page.getByText("Accepted — awaiting your signature")).toBeVisible();
     await expect(page.getByRole("link", { name: "Review & sign" })).toHaveAttribute(
       "href",
       "https://jornaevents.com/app/booking-link?t=tok-1",

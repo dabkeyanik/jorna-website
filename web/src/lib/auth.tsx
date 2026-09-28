@@ -23,6 +23,18 @@ import type { TokenPair, User } from "./types";
 const ACCESS_KEY = "jorna_access";
 const REFRESH_KEY = "jorna_refresh";
 
+/** A token as every tab currently sees it. Storage is the one copy all tabs
+ *  share; the fallback is only for when there's no storage to read (server
+ *  render, or storage blocked). */
+function stored(key: string, fallback: string | null): string | null {
+  if (typeof window === "undefined") return fallback;
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return fallback;
+  }
+}
+
 interface RegisterInput {
   email: string;
   password: string;
@@ -96,8 +108,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Wire the api client to our token storage (once).
   useEffect(() => {
     configureTokens({
-      getAccess: () => access.current,
-      getRefresh: () => refresh.current,
+      // Read from storage, not this tab's copy: another tab that refreshed
+      // rotated the refresh token, and replaying the old one signs the
+      // user out everywhere (the backend treats it as a stolen token).
+      getAccess: () => stored(ACCESS_KEY, access.current),
+      getRefresh: () => stored(REFRESH_KEY, refresh.current),
       onRefreshed: (pair) => persist(pair),
       onAuthLost: () => clear(),
     });

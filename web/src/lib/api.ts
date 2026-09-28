@@ -89,6 +89,7 @@ export async function apiFetch<T>(path: string, opts: RequestOpts = {}): Promise
 
   const access = auth ? tokens.getAccess() : null;
   if (access) headers.Authorization = `Bearer ${access}`;
+  const sentWith = tokens.getRefresh();
 
   const res = await fetch(`${API_BASE}${path}`, {
     method,
@@ -98,7 +99,7 @@ export async function apiFetch<T>(path: string, opts: RequestOpts = {}): Promise
 
   // One transparent refresh attempt on an expired token.
   if (res.status === 401 && auth && retry && tokens.getRefresh()) {
-    const refreshed = await tryRefresh();
+    const refreshed = await tryRefresh(sentWith);
     if (refreshed) return apiFetch<T>(path, { ...opts, retry: false });
     tokens.onAuthLost();
   }
@@ -124,11 +125,12 @@ export async function apiUpload<T>(
   const headers: Record<string, string> = {};
   const access = tokens.getAccess();
   if (access) headers.Authorization = `Bearer ${access}`;
+  const sentWith = tokens.getRefresh();
 
   const res = await fetch(`${API_BASE}${path}`, { method, headers, body: form });
 
   if (res.status === 401 && retry && tokens.getRefresh()) {
-    const refreshed = await tryRefresh();
+    const refreshed = await tryRefresh(sentWith);
     if (refreshed) return apiUpload<T>(path, form, { ...opts, retry: false });
     tokens.onAuthLost();
   }
@@ -138,14 +140,38 @@ export async function apiUpload<T>(
   return (await res.json()) as T;
 }
 
-async function tryRefresh(): Promise<boolean> {
-  const refresh_token = tokens.getRefresh();
-  if (!refresh_token) return false;
+// One refresh at a time. The backend rotates the refresh token on every
+// use and treats a second use of the old one as theft — it wipes every
+// session the user has. So parallel 401s (a page loading several things as
+// the access token expires) must share one refresh, and tabs must take turns
+// (navigator.locks) and pick up the pair another tab already got.
+let refreshing: Promise<boolean> | null = null;
+
+/** `seen`: the refresh token in storage when the failed request went out. */
+function tryRefresh(seen: string | null): Promise<boolean> {
+  refreshing ??= refreshOnce(seen).finally(() => {
+    refreshing = null;
+  });
+  return refreshing;
+}
+
+async function refreshOnce(seen: string | null): Promise<boolean> {
+  if (!seen) return false;
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  return locks ? locks.request("jorna-auth-refresh", () => refreshFrom(seen)) : refreshFrom(seen);
+}
+
+async function refreshFrom(seen: string): Promise<boolean> {
+  const current = tokens.getRefresh();
+  if (!current) return false;
+  // Another tab refreshed while this one waited: its new pair is already
+  // in storage, and using the old token now would be the replay.
+  if (current !== seen) return true;
   try {
     const res = await fetch(`${API_BASE}/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token }),
+      body: JSON.stringify({ refresh_token: current }),
     });
     if (!res.ok) return false;
     const pair = (await res.json()) as TokenPair;

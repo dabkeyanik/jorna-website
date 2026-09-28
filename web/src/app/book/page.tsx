@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import { ESCROW_ENABLED } from "@/lib/flags";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
@@ -560,7 +561,9 @@ function BookInner() {
               <p className="text-center text-xs text-ink-faint">
                 This plan is already with your vendors, so this one goes out as
                 soon as you add it. They review it first — you only pay once they
-                accept, and the money is held in escrow until after the event.
+                {ESCROW_ENABLED
+                  ? " accept, and the money is held in escrow until after the event."
+                  : " accept and you've signed their contract."}
               </p>
             </>
           ) : (
