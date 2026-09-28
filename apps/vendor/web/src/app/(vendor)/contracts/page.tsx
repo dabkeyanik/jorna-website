@@ -14,6 +14,7 @@
 // there rather than growing a second copy of them.
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
@@ -289,11 +290,14 @@ export default function ContractsPage() {
               <Card key={b.booking_id} className="p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-medium text-ink">
+                    <Link
+                      href={`/contracts/view?id=${b.booking_id}`}
+                      className="font-medium text-ink hover:text-maroon dark:hover:text-gold"
+                    >
                       {b.guest_name || b.client_name || (
                         <span className="text-ink-faint">Client hasn&apos;t filled in details</span>
                       )}
-                    </p>
+                    </Link>
                     <p className="mt-0.5 text-sm text-ink-soft">
                       {[b.service_name, date].filter(Boolean).join(" · ")}
                     </p>
@@ -330,7 +334,9 @@ export default function ContractsPage() {
                       </Button>
                     ) : null}
                     {status === "confirm_deposit" || status === "confirm_payment" ? (
-                      <LinkButton href="/my-bookings">
+                      <LinkButton
+                        href={b.payment_schedule?.length ? `/contracts/view?id=${b.booking_id}` : "/my-bookings"}
+                      >
                         {status === "confirm_deposit" ? "Confirm deposit" : "Confirm payment"}
                       </LinkButton>
                     ) : null}

@@ -258,6 +258,8 @@ export interface VendorDetail {
   default_guest_count_mode?: "required" | "optional" | "not_applicable" | null;
   /** Years in business — on the vendor, not per package (backend 0063). */
   years_experience?: number | null;
+  /** Days a sent contract holds its date; null means the backend's 7. */
+  contract_hold_days?: number | null;
 }
 
 /** Free-form contract terms (equipment/power, travel, custom clauses) —
@@ -1074,6 +1076,7 @@ export interface VendorBooking {
   viewed_at?: string | null;
   declined_at?: string | null;
   decline_reason?: string | null;
+  payment_schedule?: Installment[] | null;
 }
 
 // ── Contracts (vendor-authored, no-login guest bookings) ──────────────
@@ -1119,6 +1122,16 @@ export interface Contract {
   signed_at: string | null;
   /** "approved" while live; "rejected" once voided or declined. */
   status: string;
+  payment_status?: string;
+  line_items?: LineItem[] | null;
+  subtotal_cents?: number;
+  discount_cents?: number | null;
+  payment_schedule?: Installment[] | null;
+  terms_clauses?: Clause[] | null;
+  revision?: number | null;
+  signed_snapshot_sha256?: string | null;
+  /** GET /contracts/{id} only. */
+  timeline?: ContractEvent[];
   contract_status: ContractLifecycle | null;
   sent_at: string | null;
   viewed_at: string | null;
@@ -1130,13 +1143,100 @@ export interface Contract {
   vendor_display_name: string | null;
 }
 
+// ── What a contract says (backend 0065, its DECISIONS.md #16) ─────────
+
+export type LineItemKind = "package" | "addon" | "custom";
+export type LineUnit = "event" | "person" | "hour" | "day" | "item";
+
+/** A snapshot — names and prices as quoted, not joined back to the package. */
+export interface LineItem {
+  id: string;
+  kind: LineItemKind;
+  service_id: string | null;
+  addon_id: string | null;
+  name: string;
+  description: string | null;
+  unit: LineUnit;
+  unit_price_cents: number;
+  quantity: number;
+  total_cents: number;
+}
+
+export type DueType = "on_signing" | "date" | "before_event";
+
+export interface Installment {
+  id: string;
+  label: string;
+  amount_cents: number;
+  due_type: DueType;
+  due_date: string | null;
+  due_days: number | null;
+  /** The calendar date it's due — null for "on signing" until signed. */
+  due_on: string | null;
+  marked_paid_at: string | null;
+  confirmed_at: string | null;
+}
+
+export interface Clause {
+  key: string;
+  title: string;
+  body: string;
+}
+
+export interface ContractEvent {
+  at: string;
+  kind: string;
+  actor: "vendor" | "client" | "system";
+  detail: Record<string, unknown> | null;
+}
+
+/** What's sent for a line; the server fills ids and totals. */
+export interface LineItemInput {
+  id?: string;
+  kind: LineItemKind;
+  service_id?: string | null;
+  addon_id?: string | null;
+  name?: string;
+  description?: string | null;
+  unit?: LineUnit;
+  unit_price_cents: number;
+  quantity: number;
+}
+
+export interface InstallmentInput {
+  id?: string;
+  label: string;
+  amount_cents: number;
+  due_type: DueType;
+  due_date?: string | null;
+  due_days?: number | null;
+}
+
+export interface SavedContractTemplate {
+  template_id: string;
+  name: string;
+  /** The builder's own shape — see lib/contractDraft's TemplateBody. */
+  body: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ContractCreateInput {
-  service_id: string;
+  /** The one-package form; the builder sends line_items instead. */
+  service_id?: string;
   date_iso: string;
   date_end?: string | null;
   time_start: string;
   time_end: string;
-  amount_cents: number;
+  amount_cents?: number;
+  line_items?: LineItemInput[];
+  discount_cents?: number | null;
+  payment_schedule?: InstallmentInput[];
+  terms_clauses?: Clause[];
+  guest_count?: number | null;
+  draft?: boolean;
+  hold_days?: number | null;
+  email_client?: boolean;
   deposit_percent?: number | null;
   cancellation_window_hours?: number | null;
   overtime_rate_cents?: number | null;
@@ -1186,6 +1286,14 @@ export interface GuestBooking {
   contract_status?: ContractLifecycle | null;
   /** Until when the vendor is holding this date for the client. */
   hold_expires_at?: string | null;
+  line_items?: LineItem[] | null;
+  subtotal_cents?: number;
+  discount_cents?: number | null;
+  payment_schedule?: Installment[] | null;
+  terms_clauses?: Clause[] | null;
+  /** Sent back with the signature; a stale one is refused. */
+  revision?: number | null;
+  signed_snapshot_sha256?: string | null;
   deposit_marked_paid_at: string | null;
   deposit_confirmed_received_at: string | null;
 }

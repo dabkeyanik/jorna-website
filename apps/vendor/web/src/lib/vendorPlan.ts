@@ -364,6 +364,18 @@ export function contractStatus(b: VendorBooking): ContractStatus {
     return "awaiting_signature";
   }
 
+  // A payment schedule (backend 0065) can have a middle payment the client
+  // has sent while the rest aren't — the mirrored deposit/balance fields
+  // below can't say so, so read the installments themselves.
+  const schedule = b.payment_schedule;
+  if (schedule?.length) {
+    const waiting = schedule.find((i) => i.marked_paid_at && !i.confirmed_at);
+    if (waiting) return schedule.length > 1 && waiting === schedule[0] ? "confirm_deposit" : "confirm_payment";
+    const next = schedule.find((i) => !i.confirmed_at);
+    if (!next) return "paid";
+    return schedule.length > 1 && next === schedule[0] ? "deposit_due" : "balance_due";
+  }
+
   if (b.deposit_percent != null && !b.deposit_confirmed_received_at) {
     return b.deposit_marked_paid_at ? "confirm_deposit" : "deposit_due";
   }

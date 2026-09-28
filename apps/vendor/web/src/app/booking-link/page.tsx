@@ -19,10 +19,12 @@ import {
   getGuestBooking,
   guestMarkDepositPaid,
   guestMarkFullPaid,
+  guestMarkInstallmentPaid,
   signGuestBooking,
 } from "@/lib/jorna";
+import { describeDue } from "@/lib/contractDraft";
 import { Button, Card, Field } from "@/components/ui";
-import type { GuestBooking } from "@/lib/types";
+import type { GuestBooking, Installment } from "@/lib/types";
 
 function money(cents: number): string {
   return `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -40,6 +42,70 @@ function prettyTime(t: string): string {
   const hour = Number(m[1]);
   const suffix = hour >= 12 ? "PM" : "AM";
   return `${((hour + 11) % 12) + 1}:${m[2]} ${suffix}`;
+}
+
+/** What's being bought, line by line, and the total. A contract made before
+ *  line items has one line — then the service name above already says it. */
+function Items({ booking }: { booking: GuestBooking }) {
+  const lines = booking.line_items ?? [];
+  if (lines.length <= 1 && !booking.discount_cents) return null;
+  return (
+    <table className="mt-3 w-full border-t border-line-soft text-sm">
+      <tbody>
+        {lines.map((l) => (
+          <tr key={l.id} className="border-b border-line-soft">
+            <td className="py-1.5 text-ink-soft">
+              {l.name}
+              {l.quantity !== 1 ? ` × ${l.quantity}` : ""}
+            </td>
+            <td className="py-1.5 text-right text-ink">{money(l.total_cents)}</td>
+          </tr>
+        ))}
+        {booking.discount_cents ? (
+          <tr className="border-b border-line-soft">
+            <td className="py-1.5 text-ink-soft">Discount</td>
+            <td className="py-1.5 text-right text-ink-soft">−{money(booking.discount_cents)}</td>
+          </tr>
+        ) : null}
+      </tbody>
+    </table>
+  );
+}
+
+function Schedule({
+  schedule,
+  onMark,
+  busyId,
+}: {
+  schedule: Installment[];
+  onMark?: (id: string) => void;
+  busyId?: string | null;
+}) {
+  return (
+    <ul className="grid gap-2 text-sm">
+      {schedule.map((i) => (
+        <li key={i.id} className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-ink">
+              {i.label} · {money(i.amount_cents)}
+            </p>
+            <p className="text-xs text-ink-faint">
+              {i.confirmed_at
+                ? "Received by your vendor"
+                : i.marked_paid_at
+                  ? "Marked as sent — waiting for your vendor to confirm"
+                  : describeDue(i)}
+            </p>
+          </div>
+          {onMark && !i.marked_paid_at ? (
+            <Button size="md" variant="ghost" disabled={busyId === i.id} onClick={() => onMark(i.id)}>
+              {busyId === i.id ? "Marking…" : "I've sent this"}
+            </Button>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -66,7 +132,7 @@ function BookingLinkInner() {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [paymentBusy, setPaymentBusy] = useState<"deposit" | "full" | null>(null);
+  const [paymentBusy, setPaymentBusy] = useState<string | null>(null);
   const [paymentNotice, setPaymentNotice] = useState<string | null>(null);
   const [declining, setDeclining] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
@@ -111,9 +177,14 @@ function BookingLinkInner() {
         location: location.trim() || null,
         guest_count: guestCount ? Number(guestCount) : null,
       });
-      const signed = await signGuestBooking(token, signerName);
+      const signed = await signGuestBooking(token, signerName, booking?.revision);
       setBooking(signed);
     } catch (err) {
+      // The vendor changed it after this page loaded: show the new version,
+      // keep what the client typed, and say why they're signing again.
+      if (err instanceof ApiError && err.status === 409) {
+        getGuestBooking(token, preview).then(setBooking).catch(() => undefined);
+      }
       setError(
         err instanceof ApiError ? err.message : "Couldn't send your reply. Check your connection and try again.",
       );
@@ -131,6 +202,19 @@ function BookingLinkInner() {
       setError(err instanceof ApiError ? err.message : "Couldn't send that. Check your connection and try again.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function markInstallment(id: string) {
+    setPaymentBusy(id);
+    setPaymentNotice(null);
+    try {
+      setBooking(await guestMarkInstallmentPaid(token, id));
+      setPaymentNotice("Marked as sent — your vendor still needs to confirm receiving it.");
+    } catch (err) {
+      setPaymentNotice(err instanceof ApiError ? err.message : "Couldn't mark that as sent.");
+    } finally {
+      setPaymentBusy(null);
     }
   }
 
@@ -229,6 +313,7 @@ function BookingLinkInner() {
     );
   }
 
+  const schedule = booking.payment_schedule?.length ? booking.payment_schedule : null;
   const depositDue =
     booking.deposit_percent != null && booking.deposit_amount_cents != null
       ? money(booking.deposit_amount_cents)
@@ -257,8 +342,9 @@ function BookingLinkInner() {
             {prettyDate(booking.date_iso)} · {prettyTime(booking.time_start)}–{prettyTime(booking.time_end)}
           </p>
           <p className="text-sm text-ink-faint">{booking.location}</p>
+          <Items booking={booking} />
           <p className="mt-3 text-sm text-ink-soft">Total: {money(booking.amount_cents)}</p>
-          {depositDue ? (
+          {depositDue && !schedule ? (
             <p className="text-sm text-ink-soft">
               Deposit due: {depositDue} {depositPaid ? "— marked paid" : ""}
               {depositConfirmed ? " (confirmed)" : ""}
@@ -279,6 +365,12 @@ function BookingLinkInner() {
           </p>
         ) : null}
 
+        {schedule ? (
+          <Card className="mt-5 p-5">
+            <p className="mb-3 text-sm font-medium text-ink-soft">Your payments</p>
+            <Schedule schedule={schedule} onMark={preview ? undefined : markInstallment} busyId={paymentBusy} />
+          </Card>
+        ) : (
         <div className="mt-5 grid gap-2">
           {depositDue && !depositPaid ? (
             <Button disabled={paymentBusy === "deposit"} onClick={() => reportPaid("deposit")}>
@@ -293,6 +385,12 @@ function BookingLinkInner() {
             <p className="text-center text-sm text-green">Marked as fully paid.</p>
           )}
         </div>
+        )}
+        {booking.signed_snapshot_sha256 ? (
+          <p className="mt-6 break-all text-center text-xs text-ink-faint">
+            Your signed copy&apos;s fingerprint (SHA-256): {booking.signed_snapshot_sha256}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -320,6 +418,7 @@ function BookingLinkInner() {
         <p className="mt-1 text-sm text-ink-soft">
           {prettyDate(booking.date_iso)} · {prettyTime(booking.time_start)}–{prettyTime(booking.time_end)}
         </p>
+        <Items booking={booking} />
         <div className="mt-3 grid grid-cols-2 gap-3 border-t border-line-soft pt-3 text-sm sm:grid-cols-3">
           {booking.overtime_rate_cents != null ? (
             <div>
@@ -327,7 +426,7 @@ function BookingLinkInner() {
               <p className="font-semibold text-ink">{money(booking.overtime_rate_cents)}/hr</p>
             </div>
           ) : null}
-          {depositDue ? (
+          {depositDue && !schedule ? (
             <div>
               <p className="text-ink-faint">Deposit due</p>
               <p className="font-semibold text-maroon dark:text-gold">{depositDue}</p>
@@ -338,6 +437,12 @@ function BookingLinkInner() {
             <p className="font-semibold text-ink">{money(booking.amount_cents)}</p>
           </div>
         </div>
+        {schedule ? (
+          <div className="mt-4 border-t border-line-soft pt-3">
+            <p className="mb-2 text-sm font-medium text-ink-soft">How you&apos;ll pay</p>
+            <Schedule schedule={schedule} />
+          </div>
+        ) : null}
         <p className="mt-4 rounded-lg bg-gold/10 px-3 py-2.5 text-sm text-ink-soft">
           <strong className="text-ink">You&apos;ll pay {vendorName} directly</strong> — Jorna
           doesn&apos;t handle the money. This is your written agreement.
@@ -374,11 +479,12 @@ function BookingLinkInner() {
           booking.contract_terms?.equipment_power ||
           booking.contract_terms?.travel ||
           booking.overtime_rate_cents != null ||
+          booking.terms_clauses?.length ||
           depositDue) ? (
           <Card className="p-5">
             <p className="text-sm font-medium text-ink-soft">What you&apos;re agreeing to</p>
             <ul className="mt-3 grid gap-2 text-sm text-ink-soft">
-              {depositDue ? (
+              {depositDue && !schedule ? (
                 <li>✓ {depositDue} deposit ({booking.deposit_percent}%) due to secure your date</li>
               ) : null}
               {booking.cancellation_window_hours != null ? (
@@ -392,6 +498,11 @@ function BookingLinkInner() {
               ) : null}
               {booking.contract_terms?.equipment_power ? <li>✓ {booking.contract_terms.equipment_power}</li> : null}
               {booking.contract_terms?.travel ? <li>✓ {booking.contract_terms.travel}</li> : null}
+              {(booking.terms_clauses ?? []).map((c) => (
+                <li key={c.key}>
+                  ✓ <strong className="text-ink">{c.title}.</strong> {c.body}
+                </li>
+              ))}
             </ul>
           </Card>
         ) : null}

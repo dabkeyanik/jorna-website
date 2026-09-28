@@ -31,11 +31,8 @@ import {
   VendorContractDefaultsFields,
   contractDefaultsToStrings,
 } from "@/components/VendorProfileFields";
-import {
-  deleteTemplate,
-  listTemplates,
-  type ContractTemplate,
-} from "@/lib/contractTemplates";
+import { deleteTemplate, loadTemplates } from "@/lib/contractTemplates";
+import type { SavedContractTemplate } from "@/lib/types";
 
 function prettyDate(iso?: string | null): string | null {
   if (!iso || iso === "TBD") return null;
@@ -75,19 +72,28 @@ export default function VendorProfilePage() {
   const [equipmentPower, setEquipmentPower] = useState("");
   const [travel, setTravel] = useState("");
   const [guestCountMode, setGuestCountMode] = useState<GuestCountMode>("optional");
-  const [templates, setTemplates] = useState<ContractTemplate[]>([]);
+  const [templates, setTemplates] = useState<SavedContractTemplate[]>([]);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login?next=/vendor-profile&role=vendor");
   }, [authLoading, user, router]);
 
   useEffect(() => {
-    setTemplates(listTemplates());
-  }, []);
+    if (!user) return;
+    let cancelled = false;
+    // Not worth an error banner on the profile page: without them the
+    // section just doesn't show.
+    loadTemplates()
+      .then((items) => !cancelled && setTemplates(items))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   function removeTemplate(id: string) {
-    deleteTemplate(id);
-    setTemplates((prev) => prev.filter((t) => t.id !== id));
+    setTemplates((prev) => prev.filter((t) => t.template_id !== id));
+    deleteTemplate(id).catch(() => loadTemplates().then(setTemplates).catch(() => undefined));
   }
 
   useEffect(() => {
@@ -318,26 +324,24 @@ export default function VendorProfilePage() {
         </div>
       </form>
 
-      {/* Not part of the profile save above — these live entirely in this
-          browser's localStorage (lib/contractTemplates.ts), not on the
-          vendor's account, so there's no endpoint to include them in. See
-          HONEYBOOK_PARITY_PLAN.md §1.1 for why that's a deliberate cut. */}
+      {/* Not part of the profile save above — templates have their own
+          endpoints (lib/contractTemplates.ts) and are made from the builder. */}
       {templates.length > 0 ? (
         <>
           <h2 className="serif mt-10 text-2xl text-ink">Saved contract templates</h2>
           <Card className="mt-5 p-6">
             <p className="text-sm text-ink-soft">
-              Saved on this device — used from the template picker on{" "}
-              <span className="font-medium text-ink">Contracts → New booking</span>.
+              Saved to your account — pick one when you start a contract on{" "}
+              <span className="font-medium text-ink">Contracts → New contract</span>.
             </p>
             <div className="mt-4 grid gap-2">
               {templates.map((t) => (
                 <div
-                  key={t.id}
+                  key={t.template_id}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5"
                 >
                   <span className="text-sm font-medium text-ink">{t.name}</span>
-                  <Button variant="ghost" size="md" onClick={() => removeTemplate(t.id)}>
+                  <Button variant="ghost" size="md" onClick={() => removeTemplate(t.template_id)}>
                     Delete template
                   </Button>
                 </div>

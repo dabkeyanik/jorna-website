@@ -1,62 +1,100 @@
 "use client";
 
-// Named contract-term presets, stored per-browser (localStorage), not synced
-// to the vendor's account — see HONEYBOOK_PARITY_PLAN.md §1.1 for why this
-// is a deliberate barebones cut rather than an oversight: there's no backend
-// concept of a "template" today (only the single `default_*` fields on
-// VendorDetail), and adding one is a bigger ask than a vendor's own browser
-// remembering a few presets they quote from.
+// A vendor's contract templates, stored on their account (backend 0065) —
+// so the one they saved on a laptop is there on their phone. The body is
+// lib/contractDraft's TemplateBody; the backend keeps it as-is.
 //
-// Scoped to exactly the fields /contracts/new actually collects — deposit,
-// cancellation window, overtime rate, equipment/power, travel. Guest-count
-// mode isn't here: it's a single account-wide policy set once in Settings
-// (VendorContractDefaultsFields), not something that varies per contract.
+// Templates used to live in this browser's localStorage, holding only the
+// terms (deposit %, cancellation, overtime, equipment, travel). The first
+// load after that changed uploads any found here and then forgets them, so
+// nothing a vendor saved is lost in the move.
 
-const KEY = "jorna_contract_templates";
+import {
+  createContractTemplate,
+  deleteContractTemplate,
+  listContractTemplates,
+} from "./jorna";
+import type { TemplateBody } from "./contractDraft";
+import type { SavedContractTemplate } from "./types";
 
-export interface ContractTemplate {
-  id: string;
+const LEGACY_KEY = "jorna_contract_templates";
+
+interface LegacyTemplate {
   name: string;
-  depositPercent: string;
-  cancellationWindowHours: string;
-  overtimeRate: string;
-  equipmentPower: string;
-  travel: string;
+  depositPercent?: string;
+  cancellationWindowHours?: string;
+  overtimeRate?: string;
+  equipmentPower?: string;
+  travel?: string;
 }
 
-export type ContractTemplateInput = Omit<ContractTemplate, "id">;
+export function fromLegacy(t: LegacyTemplate): TemplateBody {
+  const deposit = Number(t.depositPercent);
+  const clauses = [
+    t.equipmentPower?.trim() ? { title: "Equipment & power", body: t.equipmentPower.trim() } : null,
+    t.travel?.trim() ? { title: "Travel", body: t.travel.trim() } : null,
+  ].filter((c): c is { title: string; body: string } => c !== null);
+  return {
+    version: 1,
+    schedule:
+      deposit > 0 && deposit < 100
+        ? [
+            { label: "Deposit", percent: deposit, dueType: "on_signing", dueDays: "" },
+            { label: "Final balance", percent: 100 - deposit, dueType: "before_event", dueDays: "14" },
+          ]
+        : undefined,
+    clauses: clauses.length ? clauses : undefined,
+    cancellationDays: t.cancellationWindowHours
+      ? String(Math.round(Number(t.cancellationWindowHours) / 24))
+      : undefined,
+    overtimeRate: t.overtimeRate || undefined,
+  };
+}
 
-function read(): ContractTemplate[] {
-  if (typeof window === "undefined") return [];
+function readLegacy(): LegacyTemplate[] {
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed = JSON.parse(localStorage.getItem(LEGACY_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((t) => t && typeof t.name === "string") : [];
   } catch {
-    // Corrupt or hand-edited storage — treat as empty rather than throw.
     return [];
   }
 }
 
-function write(templates: ContractTemplate[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(KEY, JSON.stringify(templates));
+let migrating: Promise<void> | null = null;
+
+/** Move this browser's old templates onto the account, once. Only forgets
+ *  them after every upload succeeded, so a failure retries next time. */
+function migrateLegacy(): Promise<void> {
+  migrating ??= (async () => {
+    const legacy = readLegacy();
+    if (!legacy.length) return;
+    await Promise.all(
+      legacy.map((t) => createContractTemplate(t.name, fromLegacy(t) as unknown as Record<string, unknown>)),
+    );
+    try {
+      localStorage.removeItem(LEGACY_KEY);
+    } catch {
+      /* storage blocked — the next load would upload them again, harmlessly named twins */
+    }
+  })().finally(() => {
+    migrating = null;
+  });
+  return migrating;
 }
 
-export function listTemplates(): ContractTemplate[] {
-  return read();
+export async function loadTemplates(): Promise<SavedContractTemplate[]> {
+  await migrateLegacy().catch(() => undefined);
+  return (await listContractTemplates()).items;
 }
 
-/** Adds a new template. Names aren't unique — a vendor renaming by
- *  delete-then-save can end up with two of the same name briefly, which is
- *  harmless (the picker keys on id, not name). */
-export function saveTemplate(input: ContractTemplateInput): ContractTemplate {
-  const template: ContractTemplate = { id: crypto.randomUUID(), ...input };
-  write([...read(), template]);
-  return template;
+export function saveTemplate(name: string, body: TemplateBody): Promise<SavedContractTemplate> {
+  return createContractTemplate(name, body as unknown as Record<string, unknown>);
 }
 
-export function deleteTemplate(id: string) {
-  write(read().filter((t) => t.id !== id));
+export function deleteTemplate(templateId: string): Promise<unknown> {
+  return deleteContractTemplate(templateId);
+}
+
+export function templateBody(t: SavedContractTemplate): TemplateBody {
+  return t.body as unknown as TemplateBody;
 }

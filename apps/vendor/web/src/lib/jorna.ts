@@ -11,6 +11,7 @@ import type {
   Contract,
   ContractCreateInput,
   ContractUpdateInput,
+  SavedContractTemplate,
   ConversationSummary,
   Earnings,
   EventCreateInput,
@@ -846,11 +847,42 @@ export function updateContract(bookingId: string, updates: ContractUpdateInput):
 
 /** Send a draft, or resend an expired offer — restarts the date hold. 409s
  *  if the date has been taken meanwhile. */
-export function sendContract(bookingId: string, holdDays?: number): Promise<Contract> {
+export function sendContract(
+  bookingId: string,
+  opts: { holdDays?: number; emailClient?: boolean } = {},
+): Promise<Contract> {
   return apiFetch<Contract>(`/contracts/${bookingId}/send`, {
     method: "POST",
-    body: holdDays ? { hold_days: holdDays } : {},
+    body: {
+      ...(opts.holdDays ? { hold_days: opts.holdDays } : {}),
+      ...(opts.emailClient ? { email_client: true } : {}),
+    },
   });
+}
+
+/** Vendor: one scheduled payment arrived (marked by the client or not). */
+export function confirmInstallment(bookingId: string, installmentId: string): Promise<Contract> {
+  return apiFetch<Contract>(`/contracts/${bookingId}/payments/${installmentId}/confirm`, {
+    method: "POST",
+  });
+}
+
+// Contract templates live on the account (backend 0065). The body is the
+// builder's — see lib/contractDraft.
+
+export function listContractTemplates(): Promise<{ items: SavedContractTemplate[]; total: number }> {
+  return apiFetch("/contract-templates");
+}
+
+export function createContractTemplate(
+  name: string,
+  body: Record<string, unknown>,
+): Promise<SavedContractTemplate> {
+  return apiFetch("/contract-templates", { method: "POST", body: { name, body } });
+}
+
+export function deleteContractTemplate(templateId: string): Promise<{ message: string }> {
+  return apiFetch(`/contract-templates/${templateId}`, { method: "DELETE" });
 }
 
 /** Withdraw an unsigned contract, freeing its date. Signed ones 400. */
@@ -912,10 +944,23 @@ export function fillGuestBookingDetails(
   return apiFetch<GuestBooking>(`/guest-bookings/${token}`, { method: "PATCH", body: details });
 }
 
-export function signGuestBooking(token: string, signerName: string): Promise<GuestBooking> {
+/** revision: the version the client was shown — the backend 409s if the
+ *  vendor has edited since. */
+export function signGuestBooking(
+  token: string,
+  signerName: string,
+  revision?: number | null,
+): Promise<GuestBooking> {
   return apiFetch<GuestBooking>(`/guest-bookings/${token}/sign`, {
     method: "POST",
-    body: { signer_name: signerName },
+    body: { signer_name: signerName, ...(revision != null ? { revision } : {}) },
+  });
+}
+
+/** Client: one scheduled payment is sent. Returns the refreshed booking. */
+export function guestMarkInstallmentPaid(token: string, installmentId: string): Promise<GuestBooking> {
+  return apiFetch<GuestBooking>(`/guest-bookings/${token}/payments/${installmentId}/mark-paid`, {
+    method: "POST",
   });
 }
 

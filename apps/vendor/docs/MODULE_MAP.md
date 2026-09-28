@@ -120,19 +120,26 @@ always "none, verify manually" until a test runner is added.
   `(vendor)/my-dashboard/`, `(vendor)/contracts/`, `(vendor)/clients/`,
   `web/src/components/ServicesManager.tsx`, `VendorCard.tsx`,
   `VendorSidebar.tsx`, `ClientsPanel.tsx`, `LeadsPanel.tsx`.
-- **Contracts list (2026-09):** `(vendor)/contracts/page.tsx` — every
-  contract sent, filterable by whose move it is, with copy-link / view-as-
-  client. No list endpoint: it filters `listVendorBookings` to rows with a
-  `contract_token`; status is `vendorPlan.ts`'s `contractStatus`. Confirming
-  a deposit/payment still happens on `my-bookings/`, which this page links
-  to. The sidebar's Contracts item now lands here, not on `contracts/new/`.
-  `lib/contractLink.ts` builds the share URL for both pages.
-- **Named contract templates (2026-09):** `web/src/lib/contractTemplates.ts`
-  — deposit/cancellation/overtime/equipment/travel presets, saved/loaded from
-  `(vendor)/contracts/new/` and managed from `(vendor)/vendor-profile/`. Pure
-  `localStorage`, per-browser not per-account — there's no backend template
-  concept, only the single `default_*` fields on `VendorDetail`. See
-  `HONEYBOOK_PARITY_PLAN.md` §1.1 for why.
+- **Contracts (2026-09, proposals since Phase 2b):**
+  - `(vendor)/contracts/page.tsx` — every contract, filterable by whose move
+    it is. No list endpoint: it filters `listVendorBookings` to rows with a
+    `contract_token`; status is `vendorPlan.ts`'s `contractStatus` (which
+    reads a payment schedule when there is one). Rows open the detail page.
+  - `(vendor)/contracts/new/page.tsx` — the step builder (Client → Event →
+    Items → Payments → Terms → Review & send); `?lead=` converts a lead,
+    `?edit=` reopens an unsigned contract. The draft model and all its
+    arithmetic (totals, schedule presets, templates, conversion to/from the
+    API) live in `lib/contractDraft.ts`, unit-tested.
+  - `(vendor)/contracts/view/page.tsx` — one contract (`?id=`): items,
+    payments with per-payment confirm, terms, timeline, send/resend, edit,
+    void. A query param, not a route segment — static export.
+  - `lib/contractTemplates.ts` — templates on the account (`/contract-
+    templates`), made from the builder and managed in `vendor-profile/`;
+    moves any a browser saved in `localStorage` before that onto the account
+    once.
+  - `lib/contractLink.ts` builds the client's link; `app/booking-link/` is
+    the client's page (plan, clauses, signs a specific revision, marks each
+    payment sent).
 - **First-time setup:** `web/src/app/vendor-onboarding/` — a resumable
   3-step wizard (identity+bio, reach, first service) that both the
   register-as-vendor flow and "Start selling" route to instead of

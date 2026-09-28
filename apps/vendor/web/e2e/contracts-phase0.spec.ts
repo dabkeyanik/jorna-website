@@ -26,39 +26,48 @@ test.describe("contracts — Phase 0", () => {
     const vendor = mockVendorDetail();
     api.get("/vendors/me", vendor);
     api.get("/services", services(vendor.vendor_id));
+    api.get("/contract-templates", { items: [], total: 0 });
     api.post("/contracts", {
       booking_id: "c-1",
       contract_token: "tok-1",
       status: "approved",
+      contract_status: "sent",
     });
 
     await page.goto("contracts/new/");
     await page.getByLabel("Name", { exact: true }).fill("Meera Iyer");
     await page.getByLabel("Email (optional)").fill("meera@example.com");
-
-    // Flat price fills the total; per-person doesn't until there's a count.
-    await page.locator("select").first().selectOption("svc-flat");
-    await expect(page.getByLabel("Total price ($)")).toHaveValue("1400");
-    await page.locator("select").first().selectOption("svc-pp");
-    await expect(page.getByLabel("Total price ($)")).toHaveValue("");
-    await page.getByLabel("How many guests").fill("200");
-    await expect(page.getByLabel("Total price ($)")).toHaveValue("9000");
-
+    await page.getByRole("button", { name: "Next: Event" }).click();
     await page.getByLabel("Date", { exact: true }).fill("2030-06-01");
     await page.getByLabel("Start time").fill("18:00");
     await page.getByLabel("End time").fill("22:00");
     await page.getByLabel("Venue (optional)").fill("Pines Manor");
-    await page.getByRole("button", { name: "Generate contract & link" }).click();
+
+    // A per-person package is its rate times the head count, not the rate.
+    await page.getByRole("button", { name: "Next: Items" }).click();
+    await page.getByLabel("Add a package").selectOption("svc-pp");
+    await expect(page.getByLabel("Price ($ per guest)")).toHaveValue("45");
+    await page.getByLabel("Qty").fill("200");
+    await expect(page.getByText("$9,000.00").first()).toBeVisible();
+
+    await page.getByRole("button", { name: "Next: Payments" }).click();
+    await page.getByRole("button", { name: "Pay in full" }).click();
+    await page.getByRole("button", { name: "Next: Terms" }).click();
+    await page.getByRole("button", { name: "Next: Review & send" }).click();
+    await page.getByLabel(/Email the link to/).uncheck();
+    await page.getByRole("button", { name: "Send & hold date" }).click();
 
     await expect(page.getByRole("heading", { name: "Send this link" })).toBeVisible();
     const [call] = api.requestsTo("POST", "/contracts");
     expect(call.body).toMatchObject({
-      service_id: "svc-pp",
-      amount_cents: 900000,
+      line_items: [{ kind: "package", service_id: "svc-pp", unit_price_cents: 4500, quantity: 200 }],
+      payment_schedule: [{ amount_cents: 900000, due_type: "on_signing" }],
       guest_name: "Meera Iyer",
       guest_email: "meera@example.com",
       location: "Pines Manor",
       date_end: null,
+      draft: false,
+      email_client: false,
     });
   });
 
@@ -70,24 +79,38 @@ test.describe("contracts — Phase 0", () => {
     const vendor = mockVendorDetail();
     api.get("/vendors/me", vendor);
     api.get("/services", services(vendor.vendor_id));
+    api.get("/contract-templates", { items: [], total: 0 });
     api.get("/leads", {
       items: [mockLead({ lead_id: "lead-9", name: "Rohan Das", email: "rohan@example.com" })],
       total: 1,
     });
-    api.post("/leads/lead-9/convert", { booking_id: "c-2", contract_token: "tok-2", status: "approved" });
+    api.post("/leads/lead-9/convert", {
+      booking_id: "c-2",
+      contract_token: "tok-2",
+      status: "approved",
+      contract_status: "sent",
+      guest_email: "rohan@example.com",
+    });
 
     await page.goto("contracts/new/?lead=lead-9");
     await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Rohan Das");
     await expect(page.getByLabel("Email (optional)")).toHaveValue("rohan@example.com");
 
-    await page.locator("select").first().selectOption("svc-flat");
+    await page.getByRole("button", { name: "2. Event" }).click();
     await page.getByLabel("Date", { exact: true }).fill("2030-07-01");
     await page.getByLabel("Start time").fill("18:00");
     await page.getByLabel("End time").fill("22:00");
-    await page.getByRole("button", { name: "Generate contract & link" }).click();
+    await page.getByRole("button", { name: "3. Items" }).click();
+    await page.getByLabel("Add a package").selectOption("svc-flat");
+    await page.getByRole("button", { name: "6. Review & send" }).click();
+    // Skipped Payments: the review step still needs a plan, so go set one.
+    await page.getByRole("button", { name: "4. Payments" }).click();
+    await page.getByRole("button", { name: "6. Review & send" }).click();
+    await page.getByRole("button", { name: "Send & hold date" }).click();
 
-    await expect(page.getByRole("heading", { name: "Send this link" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "On its way" })).toBeVisible();
     expect(api.requestsTo("POST", "/leads/lead-9/convert")).toHaveLength(1);
+    expect(api.requestsTo("POST", "/leads/lead-9/convert")[0].body).toMatchObject({ email_client: true });
     expect(api.requestsTo("POST", "/contracts")).toHaveLength(0);
   });
 
