@@ -15,12 +15,15 @@ separate marketing page anymore — see "Root routing" in `docs/ARCHITECTURE.md`
 
 ## Deploy
 
-**Automatic:** merging a PR into `main` deploys. `.github/workflows/ci.yml`'s
-`deploy` job runs `npm run deploy` once `build` and `e2e` both pass, using a
-`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` repo secret pair (Pages:Edit
-scope) instead of a local `wrangler login` session. `main` is a protected
-branch (GitHub branch protection, PR required), so this is the only path a
-change reaches production through.
+**Automatic:** merging a PR into `main` deploys in two steps, both in the
+root `.github/workflows/app.yml`. `deploy-staging` builds against the staging
+backend (`STAGING_API_BASE_URL` Actions variable) and publishes to the Pages
+branch `staging` → `https://staging.jorna-events.pages.dev`. Then `deploy` waits
+for a reviewer to approve the `production` GitHub environment and runs
+`npm run deploy` with the production API URL set explicitly. Both use the
+`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` repo secrets. `main` is
+protected (PR, green CI and one approval), so this is the only path a change
+reaches production through.
 
 **Manual** (hotfix, or deploying from a machine when CI itself is down):
 ```bash
@@ -88,11 +91,12 @@ so a preview rendered but every API call failed. The backend now sets
 Railway (ORed with `ALLOWED_ORIGINS` by `CORSMiddleware`), which covers any
 `pr-<n>.jorna-events.pages.dev` preview without editing Railway per PR.
 
-**Not a fully isolated staging environment**: previews call the same
-production backend and production database as `book.jornaevents.com` — there's
-no separate staging API or DB. Good for checking that a change renders and
-behaves correctly against real data; a preview that walks through a booking
-or payment flow is still writing to production. Verify with:
+**Previews use the staging backend** (its own Railway environment and
+database) once `STAGING_API_BASE_URL` is set, so walking a booking or contract
+flow on a preview writes test data, not production data. CI adds the staging
+API to the build's CSP `connect-src` (`.github/scripts/csp-allow-api.sh`); the
+committed `public/_headers` only allows production. Verify the staging
+backend's CORS allows a preview URL (`$API` = the staging API) with:
 
 ```bash
 curl -i -X OPTIONS -H "Origin: https://pr-999.jorna-events.pages.dev" \

@@ -116,9 +116,20 @@ jobs:
       # Everything, wrangler included, installs once at the workspace root.
       - run: npm ci
         working-directory: .
+
+      # Previews talk to the staging backend and its own database, never
+      # production. Until STAGING_API_BASE_URL exists, they fall back to
+      # production as before (api.ts), and the PR comment says so.
       - run: npm run build
         env:
           NEXT_PUBLIC_ESCROW_ENABLED: "false"
+          NEXT_PUBLIC_API_BASE_URL: ${{ vars.STAGING_API_BASE_URL }}
+
+      - name: Allow the staging API in the CSP
+        if: vars.STAGING_API_BASE_URL != ''
+        run: ../../.github/scripts/csp-allow-api.sh public/_headers "$STAGING_API"
+        env:
+          STAGING_API: ${{ vars.STAGING_API_BASE_URL }}
 
       # A non-production --branch makes this a Pages *preview* deployment,
       # which the deploy job leaves alone (it only promotes --branch main).
@@ -133,14 +144,18 @@ jobs:
         env:
           APP: ${{ inputs.app }}
           PROJECT: ${{ inputs.pages_project }}
+          STAGING_API: ${{ vars.STAGING_API_BASE_URL }}
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
-            const { APP, PROJECT } = process.env;
+            const { APP, PROJECT, STAGING_API } = process.env;
             const url = `https://pr-${prNumber}.${PROJECT}.pages.dev`;
             // One comment per app, updated in place on each push.
             const marker = `<!-- pr-preview-comment:${APP} -->`;
-            const body = `${marker}\n🔗 ${APP} preview: ${url}\n\nUses the production backend/DB — see [DEPLOY.md](../blob/main/apps/${APP}/DEPLOY.md) before exercising booking/payment flows.`;
+            const backend = STAGING_API
+              ? `Uses the **staging** backend (${STAGING_API}) and its test database — safe to sign up, book and sign contracts.`
+              : `Uses the **production** backend/DB — see [DEPLOY.md](../blob/main/apps/${APP}/DEPLOY.md) before exercising booking/payment flows.`;
+            const body = `${marker}\n🔗 ${APP} preview: ${url}\n\n${backend}`;
             const { data: comments } = await github.rest.issues.listComments({
               ...context.repo,
               issue_number: prNumber,
@@ -152,11 +167,70 @@ jobs:
               await github.rest.issues.createComment({ ...context.repo, issue_number: prNumber, body });
             }
 
-  deploy:
-    name: Deploy to Cloudflare Pages
+  # Every merge lands on staging first: the same build as production, but
+  # pointed at the staging backend, served at staging.<project>.pages.dev.
+  # Production (below) waits for a reviewer once this succeeds.
+  deploy-staging:
+    name: Deploy to staging
     needs: [build, e2e]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.${{ inputs.pages_project }}.pages.dev
+    defaults:
+      run:
+        working-directory: apps/${{ inputs.app }}
+    concurrency:
+      group: deploy-staging-${{ inputs.app }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      # A staging build that silently fell back to the production API would
+      # defeat the point, so a missing variable stops the pipeline here.
+      - name: Require the staging API URL
+        run: |
+          if [ -z "$STAGING_API" ]; then
+            echo "::error::Set the STAGING_API_BASE_URL Actions variable (see jorna-backend docs/STAGING.md)"; exit 1
+          fi
+        env:
+          STAGING_API: ${{ vars.STAGING_API_BASE_URL }}
+
+      # Everything, wrangler included, installs once at the workspace root.
+      - run: npm ci
+        working-directory: .
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_ESCROW_ENABLED: "false"
+          NEXT_PUBLIC_API_BASE_URL: ${{ vars.STAGING_API_BASE_URL }}
+
+      - run: ../../.github/scripts/csp-allow-api.sh public/_headers "$STAGING_API"
+        env:
+          STAGING_API: ${{ vars.STAGING_API_BASE_URL }}
+
+      - name: Deploy to the staging branch
+        run: npx --no-install wrangler pages deploy public --project-name ${{ inputs.pages_project }} --branch staging --commit-dirty=true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  deploy:
+    name: Deploy to Cloudflare Pages
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    # Requires a reviewer's approval (repo Settings → Environments →
+    # production): check staging, then approve in the Actions tab.
+    environment:
+      name: production
+      url: ${{ inputs.deploy_domain }}
     defaults:
       run:
         working-directory: apps/${{ inputs.app }}
@@ -184,6 +258,7 @@ jobs:
         run: npm run deploy
         env:
           NEXT_PUBLIC_ESCROW_ENABLED: "false"
+          NEXT_PUBLIC_API_BASE_URL: https://desiconnect-production.up.railway.app
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DEPLOY_DOMAIN: ${{ inputs.deploy_domain }}
