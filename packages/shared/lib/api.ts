@@ -8,9 +8,15 @@ export interface TokenPair {
   token_type: string;
 }
 
+// Unset means a local backend under `next dev`, so a fresh clone can't write
+// to production by accident; a production build without it still reaches the
+// live API. CI sets it explicitly for every build it ships (app.yml). `||`,
+// not `??`: an Actions variable that isn't defined arrives as "".
 export const API_BASE = (
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  "https://desiconnect-production.up.railway.app"
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  (process.env.NODE_ENV === "development"
+    ? "http://localhost:8000"
+    : "https://desiconnect-production.up.railway.app")
 ).replace(/\/$/, "");
 
 export class ApiError extends Error {
