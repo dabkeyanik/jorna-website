@@ -13,9 +13,9 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { getInvitation, joinViaInviteLink, sendRsvp } from "@/lib/jorna";
-import { Button, Card, Field, Rule } from "@/components/ui";
+import { Button, Card, Field, Rule } from "@jorna/shared/components/ui";
 import type { EventFunction, Invitation, RsvpReply } from "@/lib/types";
 
 /** "Saturday, 5 June 2027" — no year-less shorthand on a page about a date. */

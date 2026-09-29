@@ -17,7 +17,7 @@ import {
   type BundleOption,
   type BundleItem,
 } from "@/lib/types";
-import { Avatar, Button, Card, Stars } from "./ui";
+import { Avatar, Button, Card, Stars } from "@jorna/shared/components/ui";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;

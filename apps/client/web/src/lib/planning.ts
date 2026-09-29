@@ -19,7 +19,7 @@ import {
   type BundleDetail,
   type BundleEventInfo,
 } from "./types";
-import { isCompleteLocation } from "./address";
+import { isCompleteLocation } from "@jorna/shared/lib/address";
 import { centsMoney, contractStep, nextPayment, paymentRows, shortDate, utcToday } from "./contract";
 
 // Every kind here is something the client can go and do. There used to be one

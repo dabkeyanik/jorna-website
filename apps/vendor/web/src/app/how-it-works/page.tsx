@@ -9,10 +9,10 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
-import { CELEBRATIONS } from "@/lib/celebrations";
-import { LinkButton } from "@/components/ui";
+import { CELEBRATIONS } from "@jorna/shared/lib/celebrations";
+import { LinkButton } from "@jorna/shared/components/ui";
 import { Eyebrow } from "@/components/marketing/Eyebrow";
-import { CELEBRATION_ICONS, IconCalendar, IconCelebration, IconShield, IconUsers } from "@/components/marketing/icons";
+import { CELEBRATION_ICONS, IconCalendar, IconCelebration, IconShield, IconUsers } from "@jorna/shared/components/marketing/icons";
 import { clientAppUrl } from "@/lib/clientApp";
 
 const STEPS = [

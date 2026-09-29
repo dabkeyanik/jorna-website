@@ -21,7 +21,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import {
   getCalendarStatus,
   getGoogleAuthUrl,
@@ -38,7 +38,7 @@ import {
   type DayStatus,
 } from "@/lib/vendorPlan";
 import { WEEKDAYS, type AvailabilitySlot, type VendorBooking } from "@/lib/types";
-import { Button, Card, LinkButton } from "@/components/ui";
+import { Button, Card, LinkButton } from "@jorna/shared/components/ui";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",

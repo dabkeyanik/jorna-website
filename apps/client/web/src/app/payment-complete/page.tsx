@@ -9,7 +9,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { syncBookingPayment } from "@/lib/jorna";
-import { LinkButton } from "@/components/ui";
+import { LinkButton } from "@jorna/shared/components/ui";
 
 type Phase = "working" | "paid" | "cancelled" | "pending";
 

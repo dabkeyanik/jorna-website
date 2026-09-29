@@ -21,8 +21,8 @@ import {
   isValidZip,
   US_STATES,
   type Address,
-} from "@/lib/address";
-import { loadZipIndex, zipDisagrees, type ZipIndex } from "@/lib/zips";
+} from "../lib/address";
+import { loadZipIndex, zipDisagrees, type ZipIndex } from "../lib/zips";
 
 const LABELS: Record<keyof Address, string> = {
   line1: "Street address",

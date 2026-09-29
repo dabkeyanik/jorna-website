@@ -1,13 +1,13 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { ESCROW_ENABLED } from "@/lib/flags";
+import { ESCROW_ENABLED } from "@jorna/shared/lib/flags";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { createBooking, getService, getVendorAvailability, listBundles } from "@/lib/jorna";
-import { crossesMidnight, daysBetweenInclusive, estimateTotal, hoursBetween } from "@/lib/pricing";
+import { crossesMidnight, daysBetweenInclusive, estimateTotal, hoursBetween } from "@jorna/shared/lib/pricing";
 import { hasConflictOn } from "@/lib/availability";
 import {
   categoryLabel,
@@ -16,7 +16,7 @@ import {
   type BundleDetail,
   type ServiceItem,
 } from "@/lib/types";
-import { Button, Card, Field, roundTimeLabel, TimeField } from "@/components/ui";
+import { Button, Card, Field, roundTimeLabel, TimeField } from "@jorna/shared/components/ui";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;

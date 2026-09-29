@@ -18,7 +18,7 @@ import {
   type BundleDetail,
   type BundleEventInfo,
 } from "./types";
-import { isCompleteLocation } from "./address";
+import { isCompleteLocation } from "@jorna/shared/lib/address";
 
 // Every kind here is something the client can go and do. There used to be one
 // that wasn't — "vendor-reply", a sent request the vendor hadn't answered — and

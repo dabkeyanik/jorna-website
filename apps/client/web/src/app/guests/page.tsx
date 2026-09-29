@@ -16,7 +16,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import {
   addFunction,
   addGuest,
@@ -30,7 +30,7 @@ import {
   updateFunction,
   updateGuest,
 } from "@/lib/jorna";
-import { Button, Card, Field, TimeField } from "@/components/ui";
+import { Button, Card, Field, TimeField } from "@jorna/shared/components/ui";
 import {
   headcountGap,
   type EventFunction,

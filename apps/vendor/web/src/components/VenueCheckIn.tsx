@@ -12,12 +12,12 @@
 // every vendor is told once.
 
 import { useState } from "react";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { checkInBooking } from "@/lib/jorna";
 import { getLocation, LocationError } from "@/lib/checkin";
 import { formatCheckInTime, type BundleBooking } from "@/lib/types";
 import { hasLiveVenue, isDeadBooking as isDead } from "@/lib/planning";
-import { Button, Card } from "@/components/ui";
+import { Button, Card } from "@jorna/shared/components/ui";
 
 export { hasLiveVenue };
 

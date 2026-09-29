@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import {
   cancelBooking,
   confirmBookingEvent,
@@ -36,7 +36,7 @@ import { ReviewPanel } from "@/components/ReviewPanel";
 import { VenueCheckIn } from "@/components/VenueCheckIn";
 import { RunSheet } from "@/components/RunSheet";
 import { DateChangePanel } from "@/components/DateChangePanel";
-import { CityCombobox } from "@/components/CityCombobox";
+import { CityCombobox } from "@jorna/shared/components/CityCombobox";
 import {
   BOOKING_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
@@ -79,15 +79,15 @@ import {
   addressFromVenue,
   zipFromVenue,
   type Address,
-} from "@/lib/address";
-import { AddressFields } from "@/components/AddressFields";
+} from "@jorna/shared/lib/address";
+import { AddressFields } from "@jorna/shared/components/AddressFields";
 import { DraftDetails } from "@/components/DraftDetails";
 import { PlanProgress } from "@/components/PlanProgress";
-import { addressPin } from "@/lib/geocode";
+import { addressPin } from "@jorna/shared/lib/geocode";
 import { contractSignUrl, contractStep, contractViewPath, paymentRows } from "@/lib/contract";
 import { PaymentSchedule } from "@/components/PaymentSchedule";
-import { ESCROW_ENABLED } from "@/lib/flags";
-import { Avatar, Button, Card, Field, LinkButton } from "@/components/ui";
+import { ESCROW_ENABLED } from "@jorna/shared/lib/flags";
+import { Avatar, Button, Card, Field, LinkButton } from "@jorna/shared/components/ui";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;

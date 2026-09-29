@@ -22,7 +22,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { createEvent, listBundles, listEvents } from "@/lib/jorna";
 import {
   celebrationProgress,
@@ -42,9 +42,9 @@ import {
   type BundleDetail,
   type EventItem,
 } from "@/lib/types";
-import { Button, Card, Chip, Field, LinkButton } from "@/components/ui";
+import { Button, Card, Chip, Field, LinkButton } from "@jorna/shared/components/ui";
 import { PlanProgress } from "@/components/PlanProgress";
-import { CityCombobox } from "@/components/CityCombobox";
+import { CityCombobox } from "@jorna/shared/components/CityCombobox";
 
 function money(n?: number | null) {
   return n == null ? null : `$${Math.round(n).toLocaleString()}`;

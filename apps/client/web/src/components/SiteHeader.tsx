@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { MobileNavMenu } from "./MobileNavMenu";
 import { MESSAGES, NavBadge, NEEDS_YOU, useAppNav } from "./nav";
-import { Button, LinkButton } from "./ui";
+import { Button, LinkButton } from "@jorna/shared/components/ui";
 
 // The top bar: wordmark, then the primary navigation, then the auth action.
 //

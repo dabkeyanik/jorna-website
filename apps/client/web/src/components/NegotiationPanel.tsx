@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import {
   acceptOffer,
   counterOffer,
@@ -13,7 +13,7 @@ import {
   startNegotiation,
 } from "@/lib/jorna";
 import type { Negotiation } from "@/lib/types";
-import { Button } from "./ui";
+import { Button } from "@jorna/shared/components/ui";
 
 function money(cents: number) {
   return `$${(cents / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;

@@ -1,6 +1,6 @@
 // High-level Jorna API calls used by the UI.
 
-import { ApiError, apiFetch, apiUpload } from "./api";
+import { ApiError, apiFetch, apiUpload } from "@jorna/shared/lib/api";
 import type {
   BundleDetail,
   BundleRequest,

@@ -29,8 +29,8 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
-import { ESCROW_ENABLED } from "@/lib/flags";
+import { ApiError } from "@jorna/shared/lib/api";
+import { ESCROW_ENABLED } from "@jorna/shared/lib/flags";
 import {
   confirmBookingEvent,
   getEarnings,
@@ -73,7 +73,7 @@ import {
   type VendorBooking,
   type VendorDetail,
 } from "@/lib/types";
-import { Avatar, Button, Card, LinkButton } from "@/components/ui";
+import { Avatar, Button, Card, LinkButton } from "@jorna/shared/components/ui";
 import { NegotiationPanel } from "@/components/NegotiationPanel";
 import { DateChangeRequest } from "@/components/DateChangeRequest";
 import { LeadsPanel } from "@/components/LeadsPanel";

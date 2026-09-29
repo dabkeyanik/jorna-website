@@ -14,7 +14,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { CARD_RETURN_KEY, syncSavedCard, type SavedCard } from "@/lib/jorna";
-import { Button } from "@/components/ui";
+import { Button } from "@jorna/shared/components/ui";
 
 type Phase = "working" | "saved" | "cancelled" | "failed";
 

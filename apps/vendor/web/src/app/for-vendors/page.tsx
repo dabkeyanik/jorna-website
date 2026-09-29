@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { Eyebrow } from "@/components/marketing/Eyebrow";
-import { IconCheck } from "@/components/marketing/icons";
+import { IconCheck } from "@jorna/shared/components/marketing/icons";
 
 const VENDOR_PERKS = [
   "Free to list — you only pay when you get booked",

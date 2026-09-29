@@ -3,15 +3,15 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
-import { celebrationByKey } from "@/lib/celebrations";
+import { ApiError } from "@jorna/shared/lib/api";
+import { celebrationByKey } from "@jorna/shared/lib/celebrations";
 import { deleteBundle, generateBundles } from "@/lib/jorna";
 import { CATEGORY_LABELS, categoryLabel, type BundleOption } from "@/lib/types";
 import { unchosenBundleIds } from "@/lib/planning";
-import { Button, Card, Chip, Field, TimeField } from "@/components/ui";
+import { Button, Card, Chip, Field, TimeField } from "@jorna/shared/components/ui";
 import { BundleResults } from "@/components/BundleResults";
-import { CityCombobox, type Coords } from "@/components/CityCombobox";
-import { locateZip, type ZipPlace } from "@/lib/zips";
+import { CityCombobox, type Coords } from "@jorna/shared/components/CityCombobox";
+import { locateZip, type ZipPlace } from "@jorna/shared/lib/zips";
 
 const BUDGETS = [
   { value: "budget-friendly", label: "Budget-friendly", hint: "Smart value" },

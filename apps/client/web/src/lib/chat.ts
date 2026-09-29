@@ -7,7 +7,7 @@
 // slow 5s REST poll (owned by the page) backstops a dropped socket or the
 // single-replica fan-out caveat.
 
-import { API_BASE, currentAccessToken } from "./api";
+import { API_BASE, currentAccessToken } from "@jorna/shared/lib/api";
 import type { GroupMessage } from "./types";
 
 export function conversationWsUrl(conversationId: string): string | null {

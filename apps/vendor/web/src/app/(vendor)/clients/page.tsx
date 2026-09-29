@@ -10,10 +10,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { getMyVendor, getVendorClients } from "@/lib/jorna";
 import type { VendorClient, VendorDetail } from "@/lib/types";
-import { Card, LinkButton } from "@/components/ui";
+import { Card, LinkButton } from "@jorna/shared/components/ui";
 import { ClientsPanel } from "@/components/ClientsPanel";
 
 function money(cents: number): string {

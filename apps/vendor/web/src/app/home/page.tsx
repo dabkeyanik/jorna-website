@@ -44,11 +44,11 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { searchVendors } from "@/lib/jorna";
 import type { VendorSearchItem } from "@/lib/types";
-import { LinkButton } from "@/components/ui";
+import { LinkButton } from "@jorna/shared/components/ui";
 import { VendorCard, VendorCardSkeleton } from "@/components/VendorCard";
 import { VendorHomeRedirect } from "@/components/VendorHomeRedirect";
 import { Eyebrow } from "@/components/marketing/Eyebrow";
-import { IconArrow, IconCalendar, IconShield, IconUsers } from "@/components/marketing/icons";
+import { IconArrow, IconCalendar, IconShield, IconUsers } from "@jorna/shared/components/marketing/icons";
 import { clientAppUrl } from "@/lib/clientApp";
 
 const FAQ_ITEMS = [

@@ -5,7 +5,7 @@
 // is always allowed — typing something not in the list just reports null coords.
 
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { CITIES, type City } from "@/lib/cities";
+import { CITIES, type City } from "../lib/cities";
 
 export interface Coords {
   lat: number;

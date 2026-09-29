@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { deleteMe, listBundles } from "@/lib/jorna";
 import { moneyForBundle } from "@/lib/planning";
-import { disableWebPushForThisDevice } from "@/lib/push";
+import { disableWebPushForThisDevice } from "@jorna/shared/lib/push";
 import { vendorSiteUrl } from "@/lib/vendorSite";
 import { eventIsOver } from "@/lib/types";
-import { Button, Card } from "@/components/ui";
+import { Button, Card } from "@jorna/shared/components/ui";
 
 // Dollars, like everything in MoneyBreakdown — those sums are booking.price,
 // not the cents the Stripe fields carry.

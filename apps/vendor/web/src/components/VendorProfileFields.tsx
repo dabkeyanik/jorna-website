@@ -6,9 +6,9 @@
 // drift between the two.
 
 import { useState } from "react";
-import { ESCROW_ENABLED } from "@/lib/flags";
+import { ESCROW_ENABLED } from "@jorna/shared/lib/flags";
 import type { ContractTerms, TaxonomyCategory, VendorDetail, VendorSpecialization } from "@/lib/types";
-import { Chip, Field } from "./ui";
+import { Chip, Field } from "@jorna/shared/components/ui";
 
 function specKey(s: VendorSpecialization): string {
   return `${s.category}:${s.subcategory ?? ""}`;

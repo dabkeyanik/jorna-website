@@ -15,10 +15,10 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { getLocation, LocationError } from "@/lib/checkin";
 import { checkInWithToken, getCheckInInvite, type CheckInInvite } from "@/lib/jorna";
-import { Button, Card } from "@/components/ui";
+import { Button, Card } from "@jorna/shared/components/ui";
 
 function prettyWhen(invite: CheckInInvite): string | null {
   if (!invite.starts_at) return null;

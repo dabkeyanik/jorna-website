@@ -105,14 +105,16 @@ function assertNoPlaceholders() {
 
 assertNoPlaceholders();
 
-// `npm ci` rather than whatever a developer's local `web/node_modules` happens
+// `npm ci` rather than whatever a developer's local `node_modules` happens
 // to hold — that install could have drifted via a plain `npm install` picking
 // up a newer minor version of an unpinned dependency (e.g. the Supabase or
 // Firebase SDKs, both caret-ranged and both mediating auth) since it was last
 // run. A production deploy should build from exactly what's in the committed
 // lockfile, not from whatever's sitting on one machine.
-log("installing web/ dependencies from the lockfile…");
-execSync("npm ci --prefix web", { cwd: root, stdio: "inherit" });
+// The repo is one npm workspace (both apps + packages/shared), so the lockfile
+// and the install live at its root, two levels up.
+log("installing dependencies from the workspace lockfile…");
+execSync("npm ci", { cwd: join(root, "..", ".."), stdio: "inherit" });
 
 log("building…");
 execSync("npm run build", { cwd: root, stdio: "inherit" });

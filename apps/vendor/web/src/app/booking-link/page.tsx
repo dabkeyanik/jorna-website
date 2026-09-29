@@ -12,7 +12,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import {
   declineGuestBooking,
   fillGuestBookingDetails,
@@ -23,7 +23,7 @@ import {
   signGuestBooking,
 } from "@/lib/jorna";
 import { describeDue } from "@/lib/contractDraft";
-import { Button, Card, Field } from "@/components/ui";
+import { Button, Card, Field } from "@jorna/shared/components/ui";
 import type { GuestBooking, Installment } from "@/lib/types";
 
 function money(cents: number): string {

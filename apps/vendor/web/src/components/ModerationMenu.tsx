@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { blockUser, reportContent } from "@/lib/jorna";
 import { REPORT_REASONS, type ReportTargetType } from "@/lib/types";
-import { Button } from "./ui";
+import { Button } from "@jorna/shared/components/ui";
 
 /**
  * Report or block, for App Store guideline 1.2 (a way to flag content and users).

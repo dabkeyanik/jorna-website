@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import { supabase, takeOAuthNext, takeOAuthRole } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { googleRegister } from "@/lib/jorna";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 
 export default function AuthCallbackPage() {
   const router = useRouter();

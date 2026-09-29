@@ -11,10 +11,10 @@
 // created/edited/deleted.
 
 import { useState } from "react";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { createLead, deleteLead, updateLead } from "@/lib/jorna";
 import type { Lead, LeadStatus } from "@/lib/types";
-import { Button, Card, Field, LinkButton } from "@/components/ui";
+import { Button, Card, Field, LinkButton } from "@jorna/shared/components/ui";
 
 const STATUS_OPTIONS: LeadStatus[] = ["new", "contacted", "quoted", "won", "lost"];
 

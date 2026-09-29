@@ -17,12 +17,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { getMyVendor, listVendorBookings, sendContract, voidContract } from "@/lib/jorna";
 import type { VendorBooking, VendorDetail } from "@/lib/types";
 import { contractNeedsVendor, contractStatus, type ContractStatus } from "@/lib/vendorPlan";
 import { guestBookingLink, guestBookingPreviewLink } from "@/lib/contractLink";
-import { Button, Card, LinkButton } from "@/components/ui";
+import { Button, Card, LinkButton } from "@jorna/shared/components/ui";
 
 const STATUS: Record<ContractStatus, { label: string; tone: string }> = {
   draft: { label: "Draft — not sent", tone: "bg-panel text-ink-soft" },

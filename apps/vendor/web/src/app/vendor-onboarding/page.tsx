@@ -15,8 +15,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
-import { ESCROW_ENABLED } from "@/lib/flags";
+import { ApiError } from "@jorna/shared/lib/api";
+import { ESCROW_ENABLED } from "@jorna/shared/lib/flags";
 import {
   createVendor,
   getMyVendor,
@@ -34,7 +34,7 @@ import {
   type VendorDetail,
   type VendorSpecialization,
 } from "@/lib/types";
-import { Button, Card, LinkButton } from "@/components/ui";
+import { Button, Card, LinkButton } from "@jorna/shared/components/ui";
 import {
   VendorIdentityFields,
   VendorPaymentFields,

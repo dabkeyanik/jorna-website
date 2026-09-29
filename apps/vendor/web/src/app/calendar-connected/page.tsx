@@ -14,7 +14,7 @@
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Card, LinkButton } from "@/components/ui";
+import { Card, LinkButton } from "@jorna/shared/components/ui";
 
 function CalendarConnectedInner() {
   const params = useSearchParams();

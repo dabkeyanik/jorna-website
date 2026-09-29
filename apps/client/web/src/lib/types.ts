@@ -1,11 +1,12 @@
 // API types mirroring the Jorna FastAPI backend. Kept intentionally close to the
 // backend Pydantic schemas so responses decode without transformation.
 
-export interface TokenPair {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-}
+import { priceUnitKind, priceUnitLabel, type PriceUnitKind } from "@jorna/shared/lib/priceUnits";
+
+// Shared with the other app (packages/shared); re-exported so imports from
+// "@/lib/types" keep working.
+export type { TokenPair } from "@jorna/shared/lib/api";
+export { priceUnitKind, priceUnitLabel, type PriceUnitKind };
 
 export interface User {
   user_id: string;
@@ -1208,50 +1209,6 @@ export function paymentMethodBadge(
   return paymentMethod === "manual"
     ? { label: "Direct", tone: "text-gold" }
     : { label: "Protected", tone: "text-green" };
-}
-
-/**
- * What quantity a service's rate is multiplied by. The booking must capture
- * that quantity up front or its total can't be resolved and checkout refuses
- * (see resolve_total_cents / price_pending_quantity on the backend).
- */
-export type PriceUnitKind = "person" | "day" | "hour" | "event" | "performer";
-
-/**
- * What quantity a rate multiplies by.
- *
- * Mirrors the backend's _normalize_unit exactly, because price_unit is free text
- * a vendor types and that function is what actually prices the booking. This
- * used to match only "person", "day" and "hour", so a caterer priced "per head"
- * read as flat-rate here — no guest count demanded before sending, no total
- * resolvable at checkout, and a vendor holding an accepted booking nobody could
- * pay for.
- */
-export function priceUnitKind(unit?: string | null): PriceUnitKind {
-  if (!unit) return "event";
-  let u = unit.trim().toLowerCase();
-  if (u.startsWith("per ")) u = u.slice(4).trim();
-  if (u.startsWith("hour")) return "hour";
-  if (u.startsWith("day")) return "day";
-  if (u.startsWith("event")) return "event";
-  if (
-    u.startsWith("performer") ||
-    ["dancer", "dancers", "entertainer", "entertainers"].includes(u)
-  ) {
-    return "performer";
-  }
-  if (u.startsWith("person") || ["head", "plate", "guest", "pax"].includes(u)) {
-    return "person";
-  }
-  return "event";
-}
-
-/** Human label for a price unit, e.g. "per person"; "" for flat/event pricing. */
-export function priceUnitLabel(unit?: string | null): string {
-  if (!unit) return "";
-  const u = unit.toLowerCase().replace(/^per\s+/, "").trim();
-  if (u === "event" || u === "flat") return "";
-  return `per ${u}`;
 }
 
 // ── What a booking's price figure actually is ────────────────────────

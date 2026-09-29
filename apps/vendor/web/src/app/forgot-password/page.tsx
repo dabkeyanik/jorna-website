@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { requestPasswordReset } from "@/lib/jorna";
-import { Button, Card, Field } from "@/components/ui";
+import { Button, Card, Field } from "@jorna/shared/components/ui";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");

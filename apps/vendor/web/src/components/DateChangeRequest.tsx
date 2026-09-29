@@ -12,7 +12,7 @@
 
 import { useState } from "react";
 import type { VendorBooking } from "@/lib/types";
-import { Button } from "./ui";
+import { Button } from "@jorna/shared/components/ui";
 
 function prettyDate(iso?: string | null): string | null {
   if (!iso || iso === "TBD") return null;

@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@jorna/shared/lib/api";
 import { listConversations } from "@/lib/jorna";
 import type { ConversationSummary } from "@/lib/types";
-import { Card, Chip, LinkButton } from "@/components/ui";
+import { Card, Chip, LinkButton } from "@jorna/shared/components/ui";
 
 function timeAgo(iso?: string | null): string {
   if (!iso) return "";

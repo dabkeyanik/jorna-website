@@ -10,7 +10,7 @@
  * is the authority: the server recomputes before charging and its answer is the
  * one that counts. Anything here is a preview of that number.
  */
-import { priceUnitKind, type PriceUnitKind } from "./types";
+import { priceUnitKind, type PriceUnitKind } from "./priceUnits";
 
 /** The quantities a rate can multiply by. Flat-rate services use none of them. */
 export interface Quantity {
