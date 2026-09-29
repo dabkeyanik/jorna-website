@@ -1,0 +1,114 @@
+import { test, expect } from "./support/fixtures";
+import { loginAs } from "./support/fixtures";
+import { mockStripeStatus, mockVendorBooking, mockVendorDetail } from "./support/mock-data";
+
+test.describe("vendor bookings (/my-bookings)", () => {
+  test("accepting a pending request sends the client a contract to sign", async ({ page, api }) => {
+    await loginAs(page, api);
+    const vendor = mockVendorDetail();
+    api.get("/vendors/me", vendor);
+    api.get(`/bookings/vendor/${vendor.vendor_id}`, {
+      items: [mockVendorBooking({ status: "pending" })],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+    api.get(`/payments/vendors/${vendor.vendor_id}/stripe-status`, mockStripeStatus({
+      stripe_account_id: "acct_1",
+      stripe_onboarding_complete: true,
+    }));
+    api.put("/bookings/:id/status", {});
+
+    await page.goto("my-bookings/");
+    await expect(page.getByText("Priya Shah")).toBeVisible();
+
+    // Or tailor it first in the builder.
+    await expect(page.getByRole("link", { name: "Customize contract" })).toHaveAttribute(
+      "href",
+      "/app/contracts/new/?request=vbooking-1",
+    );
+    await page.getByRole("button", { name: "Accept & send contract" }).click();
+
+    await expect(page.getByText(/we've emailed them a contract to sign/)).toBeVisible();
+    const putCalls = api.requestsTo("PUT", "/bookings/vbooking-1/status");
+    expect(putCalls).toHaveLength(1);
+    expect(putCalls[0].body).toMatchObject({ status: "approved" });
+  });
+
+  test("declining a request requires confirmation before it's sent", async ({ page, api }) => {
+    await loginAs(page, api);
+    const vendor = mockVendorDetail();
+    api.get("/vendors/me", vendor);
+    api.get(`/bookings/vendor/${vendor.vendor_id}`, {
+      items: [mockVendorBooking({ status: "pending" })],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+    api.get(`/payments/vendors/${vendor.vendor_id}/stripe-status`, mockStripeStatus());
+    api.put("/bookings/:id/status", {});
+
+    await page.goto("my-bookings/");
+    await page.getByRole("button", { name: "Decline" }).click();
+
+    // First click only opens the confirmation — nothing sent yet.
+    await expect(page.getByText(/Decline this request\?/)).toBeVisible();
+    expect(api.requestsTo("PUT", "/bookings/vbooking-1/status")).toHaveLength(0);
+
+    await page.getByRole("button", { name: "Decline", exact: true }).click();
+
+    await expect(page.getByText("Declined.")).toBeVisible();
+    const putCalls = api.requestsTo("PUT", "/bookings/vbooking-1/status");
+    expect(putCalls).toHaveLength(1);
+    expect(putCalls[0].body).toMatchObject({ status: "rejected" });
+  });
+
+  test("warns that accepting won't pay out yet when Stripe isn't set up", async ({
+    page,
+    api,
+  }) => {
+    await loginAs(page, api);
+    const vendor = mockVendorDetail();
+    api.get("/vendors/me", vendor);
+    api.get(`/bookings/vendor/${vendor.vendor_id}`, {
+      items: [mockVendorBooking({ status: "pending" })],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+    api.get(`/payments/vendors/${vendor.vendor_id}/stripe-status`, mockStripeStatus());
+
+    await page.goto("my-bookings/");
+
+    await expect(page.getByText(/Accepting won.t pay out yet/)).toBeVisible();
+  });
+
+  test("doesn't nag about Stripe for a vendor who switched to Direct payment", async ({
+    page,
+    api,
+  }) => {
+    await loginAs(page, api);
+    const vendor = mockVendorDetail({ payment_method: "manual" });
+    api.get("/vendors/me", vendor);
+    api.get(`/bookings/vendor/${vendor.vendor_id}`, {
+      items: [mockVendorBooking({ status: "pending" })],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+    // Started Stripe but never finished — on its own this would trip the
+    // "finish your payment setup" gate, but a manual-track vendor has opted
+    // out of Stripe entirely and shouldn't see that nag regardless of its
+    // state.
+    api.get(
+      `/payments/vendors/${vendor.vendor_id}/stripe-status`,
+      mockStripeStatus({ stripe_account_id: "acct_1", details_submitted: false }),
+    );
+
+    await page.goto("my-bookings/");
+    await expect(page.getByText("Priya Shah")).toBeVisible();
+
+    await expect(page.getByText(/Finish your payment setup/)).not.toBeVisible();
+    await expect(page.getByText(/Accepting won.t pay out yet/)).not.toBeVisible();
+  });
+});

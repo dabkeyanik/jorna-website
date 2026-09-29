@@ -1,0 +1,107 @@
+import { describe, expect, it } from "vitest";
+import {
+  centsMoney,
+  contractSignUrl,
+  contractStep,
+  describePayment,
+  nextPayment,
+  paymentRows,
+  utcToday,
+  type PaymentRow,
+} from "./contract";
+import type { BundleBooking, Installment } from "./types";
+
+const booking = (over: Partial<BundleBooking> = {}) =>
+  ({ booking_id: "b", status: "approved", contract_token: "tok", contract_status: "sent", signed_at: null, ...over }) as BundleBooking;
+
+describe("contractStep", () => {
+  it("asks for a signature while the proposal is out", () => {
+    expect(contractStep(booking())).toBe("sign");
+    expect(contractStep(booking({ contract_status: "viewed" }))).toBe("sign");
+  });
+
+  it("says when it lapsed unsigned", () => {
+    expect(contractStep(booking({ contract_status: "expired" }))).toBe("expired");
+  });
+
+  it("has nothing to ask once signed, or with no contract at all", () => {
+    expect(contractStep(booking({ signed_at: "2030-01-01T00:00:00" }))).toBeNull();
+    expect(contractStep(booking({ contract_token: null, contract_status: null }))).toBeNull();
+    expect(contractStep(booking({ contract_status: "voided" }))).toBeNull();
+  });
+});
+
+const installment = (over: Partial<Installment> = {}): Installment => ({
+  id: "i",
+  label: "Deposit",
+  amount_cents: 30_000,
+  due_type: "on_signing",
+  effective_due: "2030-03-10",
+  marked_paid_at: null,
+  confirmed_at: null,
+  ...over,
+});
+
+describe("paymentRows", () => {
+  const signed = (schedule: Installment[]) =>
+    booking({ contract_status: "signed", signed_at: "2030-03-01T00:00:00+00:00", payment_schedule: schedule });
+
+  it("says where each payment stands, by the UTC day", () => {
+    const rows = paymentRows(
+      signed([
+        installment({ id: "a", confirmed_at: "2030-03-02T00:00:00+00:00", marked_paid_at: "2030-03-01T00:00:00+00:00" }),
+        installment({ id: "b", marked_paid_at: "2030-03-02T00:00:00+00:00" }),
+        installment({ id: "c", effective_due: "2030-03-09" }),
+        installment({ id: "d", effective_due: "2030-03-10" }),
+        installment({ id: "e", effective_due: "2030-04-01" }),
+      ]),
+      "2030-03-10",
+    );
+    expect(rows.map((r) => r.state)).toEqual(["received", "sent", "overdue", "due", "upcoming"]);
+  });
+
+  it("owes nothing before signing, or without a schedule", () => {
+    expect(paymentRows(booking({ payment_schedule: [installment()] }), "2030-03-10")).toEqual([]);
+    expect(paymentRows(booking({ signed_at: "2030-03-01T00:00:00", payment_schedule: null }), "2030-03-10")).toEqual([]);
+  });
+
+  it("finds the next payment still to send", () => {
+    const b = signed([
+      installment({ id: "a", marked_paid_at: "2030-03-02T00:00:00+00:00" }),
+      installment({ id: "b", label: "Balance", effective_due: "2030-05-01" }),
+    ]);
+    expect(nextPayment(b, "2030-03-10")?.installment.id).toBe("b");
+    expect(nextPayment(signed([installment({ marked_paid_at: "x" })]), "2030-03-10")).toBeNull();
+  });
+});
+
+describe("describePayment", () => {
+  it("names the vendor while waiting on them, and the day otherwise", () => {
+    const row = (state: PaymentRow["state"], due: string | null = "2030-03-10") =>
+      ({ installment: installment(), state, due }) as PaymentRow;
+    expect(describePayment(row("sent"), "DJ Rav")).toBe("Sent — waiting for DJ Rav to confirm");
+    expect(describePayment(row("received"), "DJ Rav")).toBe("Received by DJ Rav");
+    expect(describePayment(row("due"), "DJ Rav")).toBe("Due today");
+    expect(describePayment(row("upcoming"), "DJ Rav")).toMatch(/^Due /);
+    expect(describePayment(row("overdue"), "DJ Rav")).toMatch(/^Was due /);
+  });
+});
+
+describe("centsMoney", () => {
+  it("shows cents only when there are some", () => {
+    expect(centsMoney(100_000)).toBe("$1,000");
+    expect(centsMoney(133_333)).toBe("$1,333.33");
+  });
+});
+
+describe("utcToday", () => {
+  it("is the UTC calendar day, not the local one", () => {
+    expect(utcToday(new Date("2030-03-10T23:30:00-05:00"))).toBe("2030-03-11");
+  });
+});
+
+describe("contractSignUrl", () => {
+  it("points at the vendor site's signing page", () => {
+    expect(contractSignUrl("a b")).toBe("https://jornaevents.com/app/booking-link?t=a%20b");
+  });
+});

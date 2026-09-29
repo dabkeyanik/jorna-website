@@ -1,0 +1,196 @@
+@import "tailwindcss";
+
+/* Tailwind finds class names by scanning the app it's building, and this
+   package is outside both apps — so its components are listed explicitly, or
+   their classes would silently go missing. Paths are relative to this file. */
+@source "../components";
+@source "../lib";
+
+/*
+  Jorna design system — ported from the marketing site (jornaevents.com).
+  Palette is defined once here; Tailwind v4 exposes each --color-* token as a
+  utility (bg-maroon, text-gold, border-line, …). Light + dark via a data-theme
+  attribute (set by the theme script) with a prefers-color-scheme fallback.
+*/
+
+@theme {
+  --color-ground: #f6eee1;
+  --color-ground-2: #fcf7ee;
+  --color-panel: #fbf4e7;
+  --color-card: #ffffff;
+  --color-ink: #35101b;
+  --color-ink-soft: #6b4a45;
+  --color-ink-faint: #7a5a52;
+  --color-maroon: #6b1226;
+  --color-maroon-deep: #4a0b1a;
+  --color-gold: #a9791f;
+  --color-gold-bright: #c69329;
+  --color-green: #3f6b4e;
+  --color-line: rgba(107, 18, 38, 0.16);
+  --color-line-soft: rgba(107, 18, 38, 0.09);
+  --color-card-edge: rgba(107, 18, 38, 0.12);
+
+  /* One typeface for the whole app. This used to be a separate high-contrast
+     serif stack for headings (Didot/Bodoni/Hoefler/Palatino) — on a system
+     with none of those installed, the fallback chain read as a generic serif
+     (Times New Roman on Windows), which landed as inconsistent and less
+     readable than the sans body text. --font-serif is kept as an alias
+     (rather than deleted) so the 40+ components already using the `.serif`
+     class / `font-serif` token don't need individual edits — they all now
+     render in the same face as everything else. */
+  --font-serif: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-sans: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  --shadow-card: 0 1px 2px rgba(74, 11, 26, 0.05),
+    0 12px 34px -18px rgba(74, 11, 26, 0.28);
+
+  /* How wide a page is allowed to be.
+   *
+   * There were twenty-odd hand-written numbers, and the header was 1080 while
+   * most pages under it stopped at 880 or 680 — so every screen sat visibly
+   * inset from its own chrome. That gap, rather than a shortage of pixels, is
+   * what read as over-centred.
+   *
+   * Two answers, not one: a dashboard, a calendar and a grid of cards want the
+   * room, and a booking form or a chat thread is worse for having it. Used as
+   * w-[min(var(--container-wide),100%-2rem)], which keeps the 1rem gutter the
+   * literal numbers had.
+   *
+   * The small ones that remain — a 560px "you're not selling yet", a 440px
+   * password reset — are deliberately small and stay as they are. Widening
+   * those would be churn pointed the wrong way. */
+  --container-wide: 78rem; /* 1248px — dashboards, grids, calendars, listings */
+  --container-page: 60rem; /* 960px — reading, lists, a booking form */
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+[data-theme="dark"] {
+  --color-ground: #1c0610;
+  --color-ground-2: #250a16;
+  --color-panel: #2a0c19;
+  --color-card: #2b0d1a;
+  --color-ink: #f3e6d6;
+  --color-ink-soft: #d8b79c;
+  --color-ink-faint: #b08e7e;
+  --color-maroon: #8a1b34;
+  --color-maroon-deep: #3a0c1b;
+  --color-gold: #e0b457;
+  --color-gold-bright: #f0c971;
+  --color-green: #7fb48e;
+  --color-line: rgba(224, 180, 87, 0.2);
+  --color-line-soft: rgba(224, 180, 87, 0.11);
+  --color-card-edge: rgba(224, 180, 87, 0.16);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 18px 44px -20px rgba(0, 0, 0, 0.65);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-ground: #1c0610;
+    --color-ground-2: #250a16;
+    --color-panel: #2a0c19;
+    --color-card: #2b0d1a;
+    --color-ink: #f3e6d6;
+    --color-ink-soft: #d8b79c;
+    --color-ink-faint: #b08e7e;
+    --color-maroon: #8a1b34;
+    --color-maroon-deep: #3a0c1b;
+    --color-gold: #e0b457;
+    --color-gold-bright: #f0c971;
+    --color-green: #7fb48e;
+    --color-line: rgba(224, 180, 87, 0.2);
+    --color-line-soft: rgba(224, 180, 87, 0.11);
+    --color-card-edge: rgba(224, 180, 87, 0.16);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3),
+      0 18px 44px -20px rgba(0, 0, 0, 0.65);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+.serif {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  line-height: 1.14;
+  text-wrap: balance;
+}
+
+.eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+  font-weight: 600;
+}
+
+/* Native controls (date pickers, scrollbars) follow the app's chosen theme,
+   not just the OS — otherwise a light OS with the app toggled dark renders a
+   harsh white date popup and a stark black picker button. */
+[data-theme="light"] {
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* Date fields carry their own calendar icon (see Field), so drop the stark
+   native picker button; the field opens the picker on click instead. Time is
+   its own TimeField component now (ui.tsx) — plain selects, nothing here
+   applies to it. */
+input[type="date"],
+input[type="datetime-local"] {
+  cursor: pointer;
+  /* iOS Safari sizes this widget off its own internal icon/spinner content
+     and can ignore an author `width` outright — `max-width` alone doesn't
+     stop it, since the default `min-width: auto` still wins. Also drop
+     Safari's native chrome (-webkit-appearance) so it lays out as a plain
+     textfield inside our own border instead of adding its own. */
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  -webkit-appearance: none;
+  appearance: none;
+}
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+/* iOS/macOS Safari paints the unset mm/dd/yyyy and --:-- -- placeholder
+   segments in a fixed system gray, not the input's `color` — legible on a
+   plain white field, invisible against this app's dark theme. A value
+   picked from the picker renders fine (that part does follow `color`); only
+   the empty state disappears, so force it explicitly on every sub-part
+   rather than trusting inheritance to reach into the shadow tree. */
+input[type="date"]::-webkit-datetime-edit,
+input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+input[type="date"]::-webkit-datetime-edit-text,
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="date"]::-webkit-datetime-edit-year-field {
+  color: var(--color-ink);
+  -webkit-text-fill-color: var(--color-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

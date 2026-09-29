@@ -1,74 +1,37 @@
-# jornaevents.com
+# Jorna web
 
-The Jorna site: the **Jorna web app**, served at both `/` and `/app`, plus a
-small hand-written **help page** at `/help`. Everything is a static export
-from one Cloudflare Pages project (`jorna-events`) out of one repo.
-(Previously a Cloudflare Worker; migrated off Workers Static Assets — see
-`docs/DECISIONS.md` for why.)
+Both of Jorna's web apps, in one repo. They talk to the same FastAPI backend
+(the `Desiconnect` repo, on Railway), which is the source of truth for how
+anything behaves.
 
-```
-public/app/          the web app's static export — GENERATED, gitignored
-public/help/         static help page (hand-written, no build step)
-public/_redirects    rewrites "/" to "/app/" — see "Root routing" below
-web/                 the web app source (Next.js)
-wrangler.jsonc       Cloudflare Pages config (serves ./public)
-```
+| App | Folder | Serves | Cloudflare Pages project |
+| --- | --- | --- | --- |
+| Client | [`apps/client`](apps/client) | [book.jornaevents.com](https://book.jornaevents.com) — hosts plan and book | `jorna-events` |
+| Vendor | [`apps/vendor`](apps/vendor) | [jornaevents.com](https://jornaevents.com) — vendors, and the no-login contract signing page | `jorna-vendor` |
 
-## Root routing
+Code both apps use — the API client, UI kit, styles and the helpers that are
+identical on both sides — lives once in [`packages/shared`](packages/shared)
+(`@jorna/shared`). Everything else is the app's own: its `web/` (Next.js),
+`public/`, deploy script, docs and README. Each app builds and deploys on its
+own.
 
-`/` rewrites (HTTP 200, not a redirect) to `/app/`, which renders
-`web/src/app/page.tsx` → the app's own Home screen (`web/src/app/home/`).
-There is no separate marketing page anymore — the standalone
-`public/index.html` that used to serve `/` was deleted (commit `58ce333`,
-2026-07-31) once the app's own Home page took over the site root
-permanently. See "Root routing" in `docs/ARCHITECTURE.md` for the mechanics
-of the rewrite.
-
-## The web app (`/app`)
-
-A Next.js client for the same FastAPI backend the iOS app uses. It's fully
-client-rendered, so it's exported to static files (`output: "export"`,
-`basePath: "/app"`) and Cloudflare Pages serves them — no SSR runtime.
+The repo is one npm workspace, so dependencies install once, at the root:
 
 ```bash
-npm run install:app        # first time: install the app's dependencies
-npm --prefix web run dev   # http://localhost:3000/app — live reload while developing
+npm install                            # at the root: every app, the shared package, the pre-commit hook
+cd apps/client && npm --prefix web run dev   # or apps/vendor · http://localhost:3000/app
 ```
 
-The backend already allows `http://localhost:3000` via CORS, so dev talks to
-production out of the box. Create an account at `/app/login`, then `/app/plan`.
+## Deploying
 
-Auth, the AI Bundle Builder, browse/search, booking + Stripe checkout/escrow,
-messaging + negotiation, reschedule requests, and the full vendor side
-(onboarding, availability, bookings, check-in, earnings via Stripe Connect)
-are all built. See `docs/BOOKING_FLOW.md` for the full booking lifecycle on
-both the client and vendor sides.
+**Merging to `main` is deploying.** CI (`.github/workflows/ci.yml`) works
+out which apps a change touches and runs lint, typecheck, unit tests, build
+and end-to-end tests for each, publishes a PR preview per app, and on
+`main` deploys each changed app to its Cloudflare Pages project. A change
+outside `apps/` counts as touching both. See each app's `DEPLOY.md`.
 
-See `web/src/lib/` for the API client (`api.ts`), auth (`auth.tsx`), and calls
-(`jorna.ts`). Email/password authenticates directly against the backend, which
-issues Jorna's own JWT; Google OAuth goes through Supabase as an identity
-provider only.
-
-## Deploying (both, together)
-
-```bash
-npm run deploy       # builds, deploys to Cloudflare Pages, verifies every
-                      # route serves 200 (see DEPLOY.md)
-npm run deploy:once  # build + single-shot deploy, unverified
-```
-
-First run needs `npx wrangler login`.
-
-Because `public/app/` is generated and gitignored, **always deploy via
-`npm run deploy`** (or `deploy:once`) — a bare `wrangler pages deploy` would
-ship whatever stale build happens to be on disk.
-
-## Design notes
-
-- Brand tokens (maroon/gold/cream, light + dark) are Tailwind v4 `@theme`
-  variables in `web/src/app/globals.css` — the single source now that there's
-  no separate marketing page to keep in sync by hand.
-- Fonts are system stacks (Didot/Palatino serif for headings, Avenir Next/Segoe UI
-  for body) — nothing is fetched over the network.
-- `public/help/index.html` is still a hand-written, no-build-step static file —
-  open and edit it directly, same as the old marketing page used to be.
+The two apps grew up as separate repos (`jorna-vendor` started as a copy of
+this one). What was identical is now in `packages/shared`; what had drifted
+apart — the typed API layer (`lib/jorna.ts`), most of `lib/types.ts`, auth,
+and the components built on them — is still copied in both apps until it's
+reconciled.
