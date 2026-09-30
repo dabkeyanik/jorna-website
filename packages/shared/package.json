@@ -9,7 +9,7 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "next": "*",
-    "react": "*"
+    "next": "^16.3.6",
+    "react": "^19.3.0"
   }
 }
