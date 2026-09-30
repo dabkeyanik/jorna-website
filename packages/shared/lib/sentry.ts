@@ -16,7 +16,23 @@ export function initSentry() {
     dsn,
     environment: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT ?? process.env.NODE_ENV,
     // No request/session data beyond what Sentry captures by default from the
-    // browser (URL, user agent) — no cookies, no form contents.
-    sendDefaultPii: false,
+    // browser (URL, user agent) — no cookies, no form contents. v11 replaced
+    // sendDefaultPii with dataCollection, and leaving it unset now collects
+    // cookies, user info and request bodies; this spells out v10's restrictive
+    // default instead (per Sentry's MIGRATION.md).
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpHeaders: {
+        request: { deny: ["forwarded", "-ip", "remote-", "via", "-user"] },
+        response: { deny: ["forwarded", "-ip", "remote-", "via", "-user"] },
+      },
+      httpBodies: [],
+      urlQueryParams: { deny: ["forwarded", "-ip", "remote-", "via", "-user"] },
+      genAI: { inputs: false, outputs: false },
+      databaseQueryData: false,
+      queues: false,
+      graphQL: { document: false, variables: false },
+    },
   });
 }
