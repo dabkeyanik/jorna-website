@@ -93,7 +93,9 @@ jobs:
 
   preview:
     name: Deploy PR preview
-    if: github.event_name == 'pull_request'
+    # Dependabot's runs can't read the Cloudflare secrets, so its previews
+    # only ever failed; its PRs are judged on the checks above.
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     defaults:
       run:
