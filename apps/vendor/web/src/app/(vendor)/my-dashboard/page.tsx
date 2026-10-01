@@ -76,7 +76,6 @@ import {
 import { Avatar, Button, Card, LinkButton } from "@jorna/shared/components/ui";
 import { NegotiationPanel } from "@/components/NegotiationPanel";
 import { DateChangeRequest } from "@/components/DateChangeRequest";
-import { LeadsPanel } from "@/components/LeadsPanel";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -218,13 +217,6 @@ const STAGES: { value: PipelineStage; label: string; dot: string }[] = [
   { value: "done", label: "Done", dot: "bg-ink-faint" },
 ];
 
-type DashboardView = "board" | "leads";
-
-const VIEWS: { value: DashboardView; label: string }[] = [
-  { value: "board", label: "Board" },
-  { value: "leads", label: "Leads" },
-];
-
 function PipelineLeadRow({ lead }: { lead: Lead }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft px-4 py-3 first:border-t-0">
@@ -282,7 +274,12 @@ function VendorDashboardInner() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
-  const view: DashboardView = (params.get("view") as DashboardView | null) ?? "board";
+  // The old "Leads" view tab is its own page now; old links and bookmarks
+  // still arrive with ?view=leads.
+  const leadsView = params.get("view") === "leads";
+  useEffect(() => {
+    if (leadsView) router.replace("/leads");
+  }, [leadsView, router]);
 
   const [vendor, setVendor] = useState<VendorDetail | null>(null);
   const [notVendor, setNotVendor] = useState(false);
@@ -344,7 +341,7 @@ function VendorDashboardInner() {
         getUnreadCount()
           .then((r) => r.unread_count)
           .catch(() => 0),
-        // The pipeline board's open-lead cards, and the Leads view tab (see
+        // The pipeline board's open-lead cards (see
         // "Pipeline board" above) — ported from the old /my-pipeline route.
         listLeads()
           .then((r) => r.items)
@@ -561,100 +558,76 @@ function VendorDashboardInner() {
         </LinkButton>
       </header>
 
-      <div className="mt-6 flex flex-wrap gap-2">
-        {VIEWS.map((v) => (
-          <Link
-            key={v.value}
-            href={v.value === "board" ? "/my-dashboard" : `/my-dashboard?view=${v.value}`}
-            className={`rounded-full border px-3.5 py-1.5 text-sm transition ${
-              view === v.value
-                ? "border-gold bg-gold/15 text-maroon dark:text-gold"
-                : "border-card-edge bg-ground-2 text-ink-soft hover:border-gold/50"
-            }`}
-          >
-            {v.label}
-          </Link>
-        ))}
-      </div>
-
       {notice ? (
         <p className="mt-6 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
           {notice}
         </p>
       ) : null}
 
-      {view === "leads" ? (
-        <div className="mt-7">
-          <LeadsPanel leads={leads} onLeadsChange={setLeads} />
-        </div>
-      ) : (
-        <>
-          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Card className="p-4">
-              <p className="text-xs uppercase tracking-wide text-ink-faint">Open inquiries</p>
-              <p className="serif mt-1 text-2xl text-ink">{stats.openInquiries + openLeads.length}</p>
-              <p className="mt-1 text-xs text-ink-faint">Leads not yet booked</p>
-            </Card>
-            <Card className="p-4">
-              <p className="text-xs uppercase tracking-wide text-ink-faint">Awaiting client</p>
-              <p className="serif mt-1 text-2xl text-ink">{stats.awaitingClient}</p>
-              <p className="mt-1 text-xs text-ink-faint">Link sent, not signed yet</p>
-            </Card>
-            <Card className="p-4">
-              <p className="text-xs uppercase tracking-wide text-ink-faint">Deposits still owed</p>
-              <p className="serif mt-1 text-2xl text-maroon dark:text-gold">
-                {centsToMoney(stats.depositsOwedCents)}
-              </p>
-              <p className="mt-1 text-xs text-ink-faint">Across open bookings</p>
-            </Card>
-            <Card className="p-4">
-              <p className="text-xs uppercase tracking-wide text-ink-faint">Confirmed events</p>
-              <p className="serif mt-1 text-2xl text-green">{stats.confirmedEvents}</p>
-            </Card>
-          </div>
+      <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="p-4">
+          <p className="text-xs uppercase tracking-wide text-ink-faint">Open inquiries</p>
+          <p className="serif mt-1 text-2xl text-ink">{stats.openInquiries + openLeads.length}</p>
+          <p className="mt-1 text-xs text-ink-faint">Leads not yet booked</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs uppercase tracking-wide text-ink-faint">Awaiting client</p>
+          <p className="serif mt-1 text-2xl text-ink">{stats.awaitingClient}</p>
+          <p className="mt-1 text-xs text-ink-faint">Link sent, not signed yet</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs uppercase tracking-wide text-ink-faint">Deposits still owed</p>
+          <p className="serif mt-1 text-2xl text-maroon dark:text-gold">
+            {centsToMoney(stats.depositsOwedCents)}
+          </p>
+          <p className="mt-1 text-xs text-ink-faint">Across open bookings</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs uppercase tracking-wide text-ink-faint">Confirmed events</p>
+          <p className="serif mt-1 text-2xl text-green">{stats.confirmedEvents}</p>
+        </Card>
+      </div>
 
-          <div className="mt-6 flex flex-wrap items-center gap-1.5 text-xs text-ink-faint">
-            {STAGES.map((s, i) => (
-              <span key={s.value} className="flex items-center gap-1.5">
-                {s.label}
-                {i < STAGES.length - 1 ? <span aria-hidden="true">→</span> : null}
-              </span>
-            ))}
-          </div>
+      <div className="mt-6 flex flex-wrap items-center gap-1.5 text-xs text-ink-faint">
+        {STAGES.map((s, i) => (
+          <span key={s.value} className="flex items-center gap-1.5">
+            {s.label}
+            {i < STAGES.length - 1 ? <span aria-hidden="true">→</span> : null}
+          </span>
+        ))}
+      </div>
 
-          <div className="mt-4 grid gap-4">
-            {STAGES.map((stage) => {
-              const items = byStage[stage.value];
-              const isInquiry = stage.value === "inquiry";
-              const count = isInquiry ? items.length + openLeads.length : items.length;
-              return (
-                <Card key={stage.value} className="overflow-hidden p-0">
-                  <div className="flex items-center gap-2 bg-ground-2 px-4 py-2.5">
-                    <span aria-hidden="true" className={`size-2 rounded-full ${stage.dot}`} />
-                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-                      {stage.label}
-                    </p>
-                    <span className="rounded-full bg-ground px-2 py-0.5 text-xs text-ink-faint">
-                      {count}
-                    </span>
-                  </div>
-                  {count === 0 ? (
-                    <p className="px-4 py-3 text-xs text-ink-faint">Nothing here.</p>
-                  ) : (
-                    <div>
-                      {isInquiry &&
-                        openLeads.map((lead) => <PipelineLeadRow key={lead.lead_id} lead={lead} />)}
-                      {items.map((b) => (
-                        <PipelineBookingRow key={b.booking_id} b={b} />
-                      ))}
-                    </div>
-                  )}
-                </Card>
-              );
-            })}
-          </div>
-        </>
-      )}
+      <div className="mt-4 grid gap-4">
+        {STAGES.map((stage) => {
+          const items = byStage[stage.value];
+          const isInquiry = stage.value === "inquiry";
+          const count = isInquiry ? items.length + openLeads.length : items.length;
+          return (
+            <Card key={stage.value} className="overflow-hidden p-0">
+              <div className="flex items-center gap-2 bg-ground-2 px-4 py-2.5">
+                <span aria-hidden="true" className={`size-2 rounded-full ${stage.dot}`} />
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                  {stage.label}
+                </p>
+                <span className="rounded-full bg-ground px-2 py-0.5 text-xs text-ink-faint">
+                  {count}
+                </span>
+              </div>
+              {count === 0 ? (
+                <p className="px-4 py-3 text-xs text-ink-faint">Nothing here.</p>
+              ) : (
+                <div>
+                  {isInquiry &&
+                    openLeads.map((lead) => <PipelineLeadRow key={lead.lead_id} lead={lead} />)}
+                  {items.map((b) => (
+                    <PipelineBookingRow key={b.booking_id} b={b} />
+                  ))}
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
 
       {/* Two columns from lg up: the left is what a vendor works through, the
           right is what they refer to. Phones and tablets keep the single stack,

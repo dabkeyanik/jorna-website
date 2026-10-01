@@ -1,92 +1,131 @@
 "use client";
 
-// The persistent shell for the vendor-facing app (see app/(vendor)/layout.tsx):
-// a fixed left rail with every seller destination, ported from the Figma
-// Make prototype "sprint-center" (2026-09-22) that made the vendor dashboard
-// the app's primary surface instead of one destination in the shared header
-// nav (see docs/DECISIONS.md for the full reasoning).
+// The persistent shell for the vendor app (see app/(vendor)/layout.tsx and
+// VendorShellIfVendor): the burgundy rail from the Figma Make "Wedding Vendor
+// Dashboard" design, and the .vendor-shell root that scopes the design's
+// palette and fonts (app/vendor-shell.css) to the vendor pages only.
 //
-// The rail's dark chrome is deliberately NOT one of the app's `--color-*`
-// tokens — both the prototype's light and dark dashboard screens show the
-// identical dark maroon rail, so it's brand chrome, not something the
-// light/dark toggle should touch. Hardcoded to values borrowed from the
-// existing dark palette (globals.css's `[data-theme="dark"]` block) rather
-// than picked fresh, so it stays visually consistent with the rest of the
-// app's dark mode.
+// Below lg the rail becomes a top bar with a hamburger that opens the same
+// nav full-screen. The design's own phone layout is a bottom tab bar, but
+// eight destinations plus Settings don't fit one row at a readable size.
 //
-// SiteHeader's sign-out button and the app's (previously nonexistent)
-// light/dark toggle both have to live somewhere now that SiteHeader is
-// hidden on these routes (see ChromeGate) — both ended up here, in the
-// bottom user card and the top-right of the logo row respectively.
+// The light/dark toggle that used to sit in the rail moved to Settings.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { getMyVendor, getUnreadCount } from "@/lib/jorna";
 import { loadAttention } from "@/lib/attention";
-import { getEffectiveTheme, toggleTheme, type Theme } from "@/lib/theme";
 import { categoryLabel, type VendorDetail } from "@/lib/types";
+import { dmSans, manrope } from "@/lib/vendorFonts";
 import { Avatar } from "@jorna/shared/components/ui";
-import { icon, I } from "@/components/nav";
-
-const RAIL_BG = "#2a0c19";
-const RAIL_BG_ACTIVE = "#3f1424";
-const RAIL_BORDER = "rgba(224,180,87,0.16)";
-const RAIL_INK = "#f3e6d6";
-const RAIL_INK_SOFT = "#c9a891";
-const RAIL_GOLD = "#e0b457";
+import { useOverlay } from "@jorna/shared/components/useOverlay";
+import { Icon, type IconName } from "@/components/vendor/Icon";
+import "@/app/vendor-shell.css";
 
 interface SidebarItem {
   href: string;
   label: string;
-  icon: React.ReactNode;
+  icon: IconName;
   match: (pathname: string) => boolean;
+  badge?: "leads" | "messages";
 }
 
-const prefix = (p: string) => (pathname: string) =>
-  pathname === p || pathname.startsWith(`${p}/`);
+const prefix = (...paths: string[]) => (pathname: string) =>
+  paths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
 const ITEMS: SidebarItem[] = [
-  { href: "/my-dashboard", label: "Dashboard", icon: icon(I.dashboard), match: prefix("/my-dashboard") },
-  { href: "/my-bookings", label: "Bookings", icon: icon(I.pipeline), match: prefix("/my-bookings") },
-  { href: "/contracts", label: "Contracts", icon: icon(I.document), match: prefix("/contracts") },
-  { href: "/clients", label: "Clients", icon: icon(I.clients), match: prefix("/clients") },
-  { href: "/my-calendar", label: "Calendar", icon: icon(I.calendar), match: prefix("/my-calendar") },
-  { href: "/my-earnings", label: "Earnings", icon: icon(I.earnings), match: prefix("/my-earnings") },
+  // Overview keeps /my-dashboard's URL until its own rebuild (plan step 1).
+  { href: "/my-dashboard", label: "Overview", icon: "overview", match: prefix("/my-dashboard") },
+  { href: "/my-bookings", label: "Bookings", icon: "bookings", match: prefix("/my-bookings") },
+  { href: "/contracts", label: "Contracts", icon: "contract", match: prefix("/contracts") },
+  { href: "/my-calendar", label: "Calendar", icon: "calendar", match: prefix("/my-calendar") },
+  { href: "/leads", label: "Leads", icon: "leads", match: prefix("/leads"), badge: "leads" },
+  { href: "/vendor-profile", label: "Vendor Profile", icon: "profile", match: prefix("/vendor-profile") },
   // A thread lives at /conversation, so it keeps Messages lit too.
   {
     href: "/messages",
     label: "Messages",
-    icon: icon(I.messages),
-    match: (p) => prefix("/messages")(p) || prefix("/conversation")(p),
+    icon: "messages",
+    match: prefix("/messages", "/conversation"),
+    badge: "messages",
   },
-  { href: "/vendor-profile", label: "Profile", icon: icon(I.profile), match: prefix("/vendor-profile") },
+  { href: "/my-earnings", label: "Earnings", icon: "earnings", match: prefix("/my-earnings") },
 ];
+
+const SETTINGS: SidebarItem = {
+  href: "/settings",
+  label: "Settings",
+  icon: "settings",
+  match: prefix("/settings"),
+};
+
+function NavLink({
+  item,
+  active,
+  badge,
+  onNavigate,
+}: {
+  item: SidebarItem;
+  active: boolean;
+  badge: number;
+  onNavigate?: () => void;
+}) {
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      style={{
+        color: active ? "white" : "var(--rail-ink)",
+        background: active ? "var(--rail-active)" : undefined,
+        boxShadow: active ? "inset 3px 0 var(--rail-gold)" : undefined,
+      }}
+      className="flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium transition hover:bg-[var(--rail-hover)] hover:text-white"
+    >
+      <Icon name={item.icon} />
+      <span>{item.label}</span>
+      {badge > 0 ? (
+        <span
+          style={{ background: "#d5b768", color: "var(--rail-bg)" }}
+          className="ml-auto grid h-[21px] min-w-[21px] place-items-center rounded-[7px] px-1 text-[0.68rem] font-bold"
+        >
+          <span className="sr-only">, </span>
+          {badge > 99 ? "99+" : badge}
+          <span className="sr-only"> {item.badge === "messages" ? "unread" : "need you"}</span>
+        </span>
+      ) : null}
+    </Link>
+  );
+}
+
+function Brand() {
+  return (
+    <Link href="/my-dashboard" className="flex items-center gap-3 text-white">
+      <span
+        style={{ background: "var(--rail-gold)", color: "var(--rail-bg)" }}
+        className="grid size-[35px] place-items-center rounded-[11px]"
+      >
+        <Icon name="sparkles" size={20} />
+      </span>
+      <span className="serif text-[1.05rem] font-bold tracking-[-0.02em]">Jorna</span>
+    </Link>
+  );
+}
 
 export function VendorSidebar({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
   const { logout } = useAuth();
   const [vendor, setVendor] = useState<VendorDetail | null>(null);
-  const [bookingsBadge, setBookingsBadge] = useState(0);
+  const [leadsBadge, setLeadsBadge] = useState(0);
   const [messagesBadge, setMessagesBadge] = useState(0);
-  // Undefined until mounted: the effective theme depends on localStorage +
-  // matchMedia, neither readable during server-less-but-still-first-render,
-  // so the toggle's icon/label render nothing until this settles rather than
-  // guessing and flashing.
-  const [theme, setThemeState] = useState<Theme | undefined>(undefined);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useOverlay<HTMLDivElement>(menuOpen, () => setMenuOpen(false));
 
   useEffect(() => {
-    setThemeState(getEffectiveTheme());
-  }, []);
-
-  useEffect(() => {
-    // Once per mount, not once per page: this component lives in
-    // app/(vendor)/layout.tsx, which Next keeps mounted across navigations
-    // between vendor routes — so this is one request per vendor session in
-    // the shell, not one per page view. Unlike the badge effect below, the
-    // vendor's name/avatar/category rarely change mid-session, so there's no
-    // pathname dependency to re-run it on navigation.
+    // Once per mount: this lives in app/(vendor)/layout.tsx, which Next keeps
+    // mounted across vendor routes, and the name/category rarely change.
     let cancelled = false;
     getMyVendor()
       .then((v) => !cancelled && setVendor(v))
@@ -97,21 +136,14 @@ export function VendorSidebar({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Re-checked on navigation, same as useAppNav's own attention effect
-    // (nav.tsx) — so the Bookings badge follows you as you act on things.
+    // Re-checked on navigation so the badge follows you as you act on things.
+    // Still lib/attention's whole "needs you" count (requests to answer,
+    // payments to confirm) until Leads gets its own attention rules in plan
+    // step 2.
     let cancelled = false;
     loadAttention()
-      .then((items) => !cancelled && setBookingsBadge(items.length))
+      .then((items) => !cancelled && setLeadsBadge(items.length))
       .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [pathname]);
-
-  // Its own request, same as the header's Messages badge (nav.tsx) — unread
-  // count isn't something lib/attention derives.
-  useEffect(() => {
-    let cancelled = false;
     getUnreadCount()
       .then((r) => !cancelled && setMessagesBadge(r.unread_count))
       .catch(() => {});
@@ -120,118 +152,129 @@ export function VendorSidebar({ children }: { children: React.ReactNode }) {
     };
   }, [pathname]);
 
-  // On a phone the nav is a sideways-scrolling row, and the later items
-  // (Earnings, Messages, Profile) start off-screen — so landing on one showed
-  // no lit tab at all. Bring the current one into view. A no-op at lg, where
-  // nothing overflows.
-  const navRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    navRef.current
-      ?.querySelector('[aria-current="page"]')
-      ?.scrollIntoView({ block: "nearest", inline: "center" });
-  }, [pathname]);
-
   const name = [vendor?.f_name, vendor?.l_name].filter(Boolean).join(" ");
+  const category = vendor?.category ? categoryLabel(vendor.subcategory || vendor.category) : null;
+  const badgeFor = (item: SidebarItem) =>
+    item.badge === "leads" ? leadsBadge : item.badge === "messages" ? messagesBadge : 0;
+  const close = () => setMenuOpen(false);
+
+  const mainNav = (onNavigate?: () => void) => (
+    <div>
+      <p style={{ color: "var(--rail-ink-soft)" }} className="px-3 pb-2.5 text-[0.65rem] font-bold uppercase tracking-[0.14em]">
+        Workspace
+      </p>
+      <nav aria-label="Vendor" className="grid gap-1">
+        {ITEMS.map((item) => (
+          <NavLink
+            key={item.href}
+            item={item}
+            active={item.match(pathname)}
+            badge={badgeFor(item)}
+            onNavigate={onNavigate}
+          />
+        ))}
+      </nav>
+    </div>
+  );
+
+  const footer = (onNavigate?: () => void) => (
+    <div className="mt-8 grid gap-2">
+      <NavLink item={SETTINGS} active={SETTINGS.match(pathname)} badge={0} onNavigate={onNavigate} />
+      <Link
+        href="/vendor-profile"
+        onClick={onNavigate}
+        style={{ background: "var(--rail-hover)", borderColor: "var(--rail-edge)" }}
+        className="flex items-center gap-2.5 rounded-xl border p-2.5 text-white"
+      >
+        <Avatar src={vendor?.pfp_url} name={name} size={36} />
+        <span className="grid min-w-0">
+          <strong className="truncate text-[0.8rem]">{name || "Your business"}</strong>
+          {category ? (
+            <small style={{ color: "var(--rail-ink-soft)" }} className="mt-0.5 truncate text-[0.7rem]">
+              {category}
+            </small>
+          ) : null}
+        </span>
+      </Link>
+      <button
+        type="button"
+        onClick={() => logout()}
+        style={{ color: "var(--rail-ink-soft)" }}
+        className="flex items-center gap-2.5 px-3 py-2 text-xs transition hover:text-white"
+      >
+        <Icon name="logout" size={16} />
+        Sign out
+      </button>
+    </div>
+  );
 
   return (
-    <div className="lg:flex lg:min-h-[calc(100vh-1px)]">
+    <div className={`vendor-shell ${dmSans.variable} ${manrope.variable} lg:grid lg:grid-cols-[236px_minmax(0,1fr)]`}>
       <aside
-        style={{ background: RAIL_BG, borderColor: RAIL_BORDER }}
-        className="flex shrink-0 flex-col border-b lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:border-b-0 lg:border-r"
+        style={{ background: "var(--rail-bg)" }}
+        className="sticky top-0 hidden h-screen flex-col justify-between overflow-y-auto px-[18px] pb-5 pt-[31px] lg:flex"
       >
-        <div className="flex items-center gap-3 px-5 py-5">
-          <Link href="/my-dashboard" className="serif text-2xl" style={{ color: RAIL_GOLD }}>
-            Jorna
-          </Link>
-          <button
-            type="button"
-            onClick={() => setThemeState(toggleTheme())}
-            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            style={{ color: RAIL_INK_SOFT, borderColor: RAIL_BORDER }}
-            className="ml-auto flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition hover:brightness-125"
-          >
-            {theme === "dark" ? "☀" : "☾"}
-            <span className="hidden sm:inline">{theme === "dark" ? "Light" : "Dark"}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => logout()}
-            style={{ color: RAIL_INK_SOFT }}
-            className="text-xs font-medium underline-offset-2 hover:underline lg:hidden"
-          >
-            Sign out
-          </button>
-        </div>
-
-        {/* Below lg the rail sits on top of the page, where eight stacked rows
-            would push the content a screen down — so there it's one row that
-            scrolls sideways instead. */}
-        <nav
-          className="flex gap-0.5 overflow-x-auto px-3 pb-3 lg:flex-col lg:overflow-visible lg:pb-2 lg:pt-2"
-          aria-label="Vendor"
-          ref={navRef}
-        >
-          {ITEMS.map((item) => {
-            const active = item.match(pathname);
-            const badge =
-              item.href === "/my-bookings"
-                ? bookingsBadge
-                : item.href === "/messages"
-                  ? messagesBadge
-                  : 0;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                style={{ background: active ? RAIL_BG_ACTIVE : "transparent" }}
-                className="flex shrink-0 items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition hover:brightness-125 lg:gap-3"
-              >
-                <span style={{ color: active ? RAIL_GOLD : RAIL_INK_SOFT }}>{item.icon}</span>
-                <span style={{ color: active ? RAIL_GOLD : RAIL_INK }}>{item.label}</span>
-                {badge > 0 ? (
-                  <span
-                    aria-hidden="true"
-                    style={{ background: RAIL_GOLD, color: RAIL_BG }}
-                    className="ml-auto min-w-[1.05rem] rounded-full px-1 text-center text-[0.6rem] font-bold leading-[1.05rem]"
-                  >
-                    {badge > 9 ? "9+" : badge}
-                  </span>
-                ) : null}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* The account card is desktop-only: on a phone the rail is a header
-            strip, so sign-out moves up beside the theme toggle instead. */}
-        <div className="mt-auto hidden border-t px-4 py-4 lg:block" style={{ borderColor: RAIL_BORDER }}>
-          <div className="flex items-center gap-3">
-            <Avatar src={vendor?.pfp_url} name={name} size={40} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold" style={{ color: RAIL_INK }}>
-                {name || "Your business"}
-              </p>
-              {vendor?.category ? (
-                <p className="truncate text-xs" style={{ color: RAIL_INK_SOFT }}>
-                  {categoryLabel(vendor.subcategory || vendor.category)}
-                </p>
-              ) : null}
-            </div>
+        <div>
+          <div className="px-2.5 pb-9">
+            <Brand />
           </div>
-          <button
-            type="button"
-            onClick={() => logout()}
-            style={{ color: RAIL_INK_SOFT }}
-            className="mt-3 text-xs font-medium underline-offset-2 hover:underline"
-          >
-            Sign out
-          </button>
+          {mainNav()}
         </div>
+        {footer()}
       </aside>
 
-      <div className="min-w-0 flex-1">
-        <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-10">{children}</div>
+      {/* Phones and tablets: a top bar, and the same nav as a full-screen sheet. */}
+      <div
+        style={{ background: "var(--rail-bg)" }}
+        className="sticky top-0 z-30 flex items-center justify-between px-4 py-3 lg:hidden"
+      >
+        <Brand />
+        <button
+          type="button"
+          onClick={() => setMenuOpen(true)}
+          aria-label="Menu"
+          aria-expanded={menuOpen}
+          style={{ color: "var(--rail-ink)" }}
+          className="relative grid size-11 place-items-center rounded-[10px]"
+        >
+          <Icon name="menu" size={22} />
+          {leadsBadge + messagesBadge > 0 ? (
+            <span
+              aria-hidden="true"
+              style={{ background: "var(--rail-gold)" }}
+              className="absolute right-2 top-2 size-2 rounded-full"
+            />
+          ) : null}
+        </button>
+      </div>
+      {menuOpen ? (
+        <div
+          ref={menuRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu"
+          style={{ background: "var(--rail-bg)" }}
+          className="fixed inset-0 z-50 flex flex-col overflow-y-auto px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 lg:hidden"
+        >
+          <div className="flex items-center justify-between pb-6">
+            <Brand />
+            <button
+              type="button"
+              onClick={close}
+              aria-label="Close menu"
+              style={{ color: "var(--rail-ink)" }}
+              className="grid size-11 place-items-center rounded-[10px]"
+            >
+              <Icon name="close" size={22} />
+            </button>
+          </div>
+          {mainNav(close)}
+          {footer(close)}
+        </div>
+      ) : null}
+
+      <div className="min-w-0">
+        <div className="mx-auto w-full max-w-[var(--container-wide)] px-4 py-7 sm:px-6 lg:px-10 lg:py-9">{children}</div>
       </div>
     </div>
   );

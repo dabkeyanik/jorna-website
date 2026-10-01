@@ -99,27 +99,29 @@ always "none, verify manually" until a test runner is added.
 ## Vendor flow
 
 - **Responsible for:** vendor profile/services management, availability,
-  bookings, contracts, clients, earnings, and the vendor equivalent of the
+  bookings, contracts, leads, earnings, settings, and the vendor equivalent of the
   task-rules module.
-- **Sidebar shell (2026-09-22):** `web/src/app/(vendor)/layout.tsx` +
-  `web/src/components/VendorSidebar.tsx` wrap every seller route —
-  `my-dashboard/`, `my-bookings/`, `contracts/`, `clients/`, `my-calendar/`,
-  `my-earnings/`, `vendor-profile/` — all
-  moved under the `(vendor)/` route group (same URLs; route groups add no
-  path segment). `my-dashboard/` now also holds the pipeline kanban board and
-  the Leads view (`?view=leads`), folded in from the deleted `/my-pipeline`
-  route; `clients/` is a new standalone page (`ClientsPanel` is now
-  prop-driven, not self-fetching). Calendar and Earnings joined the shell
-  later (2026-09-23) and Messages got a sidebar slot for vendors; the old
-  phone pill-strip, `VendorNav.tsx`, was deleted with them. See
-  `docs/DECISIONS.md` for the full reasoning.
+- **Sidebar shell:** `web/src/app/(vendor)/layout.tsx` +
+  `web/src/components/VendorSidebar.tsx` wrap every seller route under the
+  `(vendor)/` route group (route groups add no path segment) —
+  `my-dashboard/` (Overview), `my-bookings/`, `contracts/`, `my-calendar/`,
+  `leads/`, `vendor-profile/`, `my-earnings/`, `settings/` — and Messages for
+  vendors (`VendorShellIfVendor`). Since the 2026-10 redesign the shell
+  carries the Figma design's palette and fonts (`app/vendor-shell.css`, see
+  ARCHITECTURE "Design tokens"), a hamburger menu below `lg`, and shared
+  pieces in `components/vendor/` (`ui.tsx`, `Icon.tsx`). `/clients` is gone
+  (301 to `/leads`); `/my-dashboard?view=leads` forwards to `/leads`. Settings
+  holds account (`AccountSettings`, shared with `/account`), Venmo/Zelle,
+  tentative-hold length, Google Calendar (`GoogleCalendarCard`, also on the
+  calendar page), notifications and theme. See `docs/DECISIONS.md`.
 - **Code:** `web/src/lib/vendorPlan.ts` (task rules, incl. `pipelineStage`/
   `pipelineStats`), `web/src/app/vendor/`, `(vendor)/vendor-profile/`,
   `my-availability/`, `(vendor)/my-bookings/`, `(vendor)/my-calendar/`,
   `(vendor)/my-earnings/`,
-  `(vendor)/my-dashboard/`, `(vendor)/contracts/`, `(vendor)/clients/`,
+  `(vendor)/my-dashboard/`, `(vendor)/contracts/`, `(vendor)/leads/`,
+  `(vendor)/settings/`,
   `web/src/components/ServicesManager.tsx`, `VendorCard.tsx`,
-  `VendorSidebar.tsx`, `ClientsPanel.tsx`, `LeadsPanel.tsx`.
+  `VendorSidebar.tsx`, `components/vendor/`, `LeadsPanel.tsx`.
 - **Contracts (2026-09, proposals since Phase 2b):**
   - `(vendor)/contracts/page.tsx` — every contract, filterable by whose move
     it is. No list endpoint: it filters `listVendorBookings` to rows with a

@@ -147,8 +147,9 @@ export const VENDOR_TABS: NavItem[] = [
       "/vendor",
       "/home",
       "/browse",
-      "/clients",
+      "/leads",
       "/contracts",
+      "/settings",
     ],
   },
   NEEDS_YOU,
@@ -169,7 +170,7 @@ export const VENDOR_TABS: NavItem[] = [
  * bar's own note puts the floor at about 68 — there, the two navigations are at
  * opposite ends of the screen and don't read as a repetition anyway.
  *
- * Their work first, then the account. "Listing" rather than a second "Profile":
+ * Their work first, then the account. "Vendor Profile" rather than a second "Profile":
  * the two went to different pages under one word, and which one you got
  * depended on which bar you happened to click.
  */
@@ -196,10 +197,10 @@ export const VENDOR_DESKTOP_TABS: NavItem[] = [
     match: ["/contracts"],
   },
   {
-    href: "/clients",
-    label: "Clients",
-    icon: icon(I.clients),
-    match: ["/clients"],
+    href: "/leads",
+    label: "Leads",
+    icon: icon(I.leads),
+    match: ["/leads"],
   },
   {
     href: "/my-calendar",
@@ -215,12 +216,18 @@ export const VENDOR_DESKTOP_TABS: NavItem[] = [
   },
   {
     href: "/vendor-profile",
-    label: "Settings",
-    icon: icon(I.gear),
-    // Services live on this page now, so there is no separate tab for them.
+    label: "Vendor Profile",
+    icon: icon(I.profile),
+    // Services live on this page, so there is no separate tab for them.
     // "/vendor" is the public listing view — the same thing a client sees, so
     // it belongs here rather than leaving the bar unlit.
     match: ["/vendor-profile", "/vendor", "/browse"],
+  },
+  {
+    href: "/settings",
+    label: "Settings",
+    icon: icon(I.gear),
+    match: ["/settings"],
   },
   NEEDS_YOU,
   MESSAGES,

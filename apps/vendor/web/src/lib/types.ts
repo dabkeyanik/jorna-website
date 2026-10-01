@@ -774,6 +774,8 @@ export interface VendorUpdateInput {
   default_guest_count_mode?: "required" | "optional" | "not_applicable" | null;
   /** Years in business — on the vendor, not per package (backend 0063). */
   years_experience?: number | null;
+  /** Days a sent contract holds its date (1–60); null for the backend's 7. */
+  contract_hold_days?: number | null;
 }
 
 // ── Moderation ───────────────────────────────────────────────────────
@@ -1305,20 +1307,6 @@ export interface GuestBookingDetailsInput {
   guest_phone?: string | null;
   location?: string | null;
   guest_count?: number | null;
-}
-
-// ── Clients CRM ─────────────────────────────────────────────────────
-
-export interface VendorClient {
-  key: string;
-  user_id: string | null;
-  name: string | null;
-  email: string | null;
-  phone: string | null;
-  event_count: number;
-  lifetime_value_cents: number;
-  is_guest: boolean;
-  repeat_client: boolean;
 }
 
 // ── Leads ────────────────────────────────────────────────────────────

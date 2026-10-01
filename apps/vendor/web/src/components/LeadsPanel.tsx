@@ -1,6 +1,6 @@
 "use client";
 
-// The Leads view inside /my-dashboard (?view=leads) — folded in from the old
+// The leads list on /leads (it was /my-dashboard's ?view=leads) — folded in from the old
 // /my-pipeline route in the 2026-09 sidebar redesign. Informal, off-platform
 // prospects a vendor wants to track before they're a real booking — "DM'd on
 // Instagram, maybe October, no venue yet." A lead isn't a Booking (no

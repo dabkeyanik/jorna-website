@@ -23,8 +23,9 @@ const VENDOR_SHELL_PREFIXES = [
   "/my-calendar",
   "/my-earnings",
   "/contracts",
-  "/clients",
+  "/leads",
   "/vendor-profile",
+  "/settings",
 ];
 
 const SHARED_SHELL_PREFIXES = ["/messages", "/conversation"];

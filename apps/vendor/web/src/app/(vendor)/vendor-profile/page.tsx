@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@jorna/shared/lib/api";
-import { ESCROW_ENABLED } from "@jorna/shared/lib/flags";
 import {
   getMyVendor,
   getVendorReviews,
@@ -26,7 +25,6 @@ import { ServicesManager } from "@/components/ServicesManager";
 import { AvailabilityFields } from "@/components/AvailabilityFields";
 import {
   VendorIdentityFields,
-  VendorPaymentFields,
   VendorReachFields,
   VendorContractDefaultsFields,
   contractDefaultsToStrings,
@@ -63,9 +61,6 @@ export default function VendorProfilePage() {
   const [longDistance, setLongDistance] = useState(false);
   const [locationNegotiable, setLocationNegotiable] = useState(false);
   const [instagram, setInstagram] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"stripe" | "manual">("stripe");
-  const [venmoHandle, setVenmoHandle] = useState("");
-  const [zelleContact, setZelleContact] = useState("");
   const [depositPercent, setDepositPercent] = useState("");
   const [cancellationWindowHours, setCancellationWindowHours] = useState("");
   const [overtimeRate, setOvertimeRate] = useState("");
@@ -119,11 +114,6 @@ export default function VendorProfilePage() {
         setLongDistance(Boolean(mine.open_to_long_distance));
         setLocationNegotiable(Boolean(mine.open_to_price_negotiation));
         setInstagram(mine.instagram_username ?? "");
-        // Escrow disabled → manual regardless of what a not-yet-updated
-        // vendor row still says (see VendorPaymentFields' same normalization).
-        setPaymentMethod(ESCROW_ENABLED ? (mine.payment_method ?? "stripe") : "manual");
-        setVenmoHandle(mine.venmo_handle ?? "");
-        setZelleContact(mine.zelle_contact ?? "");
         const defaults = contractDefaultsToStrings(mine);
         setDepositPercent(defaults.depositPercent);
         setCancellationWindowHours(defaults.cancellationWindowHours);
@@ -162,12 +152,6 @@ export default function VendorProfilePage() {
       setError("Pick at least one category first.");
       return;
     }
-    const trimmedVenmo = venmoHandle.trim();
-    const trimmedZelle = zelleContact.trim();
-    if (paymentMethod === "manual" && !trimmedVenmo && !trimmedZelle) {
-      setError("Add a Venmo handle or Zelle contact so clients know how to pay you directly.");
-      return;
-    }
     setBusy(true);
     setError(null);
     setSaved(false);
@@ -185,9 +169,6 @@ export default function VendorProfilePage() {
         open_to_long_distance: longDistance,
         open_to_price_negotiation: locationNegotiable,
         instagram_username: instagram.trim().replace(/^@/, "") || null,
-        payment_method: paymentMethod,
-        venmo_handle: trimmedVenmo || null,
-        zelle_contact: trimmedZelle || null,
         default_deposit_percent: depositPercent ? Number(depositPercent) : null,
         default_cancellation_window_hours: cancellationWindowHours
           ? Number(cancellationWindowHours)
@@ -240,9 +221,9 @@ export default function VendorProfilePage() {
           service" link on the page's main content rather than under a form. */}
       <ServicesManager vendor={vendor} categories={categories} initial={services} />
 
-      {/* One <form>/submit across every section below, same as before Payment
-          details existed — a vendor saves their whole listing at once, not
-          section by section. `contents` keeps the <form> itself out of the
+      {/* One <form>/submit across every section below — a vendor saves their
+          whole listing at once, not section by section. (Payment details moved
+          to Settings.) `contents` keeps the <form> itself out of the
           layout so each section can still sit in its own <h2>+<Card>. */}
       <form onSubmit={submit} className="contents">
         <h2 className="serif mt-10 text-2xl text-ink">About your business</h2>
@@ -267,20 +248,6 @@ export default function VendorProfilePage() {
               onLongDistanceChange={setLongDistance}
               onLocationNegotiableChange={setLocationNegotiable}
               onInstagramChange={setInstagram}
-            />
-          </div>
-        </Card>
-
-        <h2 className="serif mt-10 text-2xl text-ink">Payment details</h2>
-        <Card className="mt-5 p-6">
-          <div className="grid gap-4">
-            <VendorPaymentFields
-              paymentMethod={paymentMethod}
-              venmoHandle={venmoHandle}
-              zelleContact={zelleContact}
-              onPaymentMethodChange={setPaymentMethod}
-              onVenmoHandleChange={setVenmoHandle}
-              onZelleContactChange={setZelleContact}
             />
           </div>
         </Card>
