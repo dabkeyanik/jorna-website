@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { ApiError } from "@jorna/shared/lib/api";
 import { declineGuestDocument, getGuestDocument, signGuestDocument } from "@/lib/jorna";
 import { KIND_LABEL } from "@/lib/attachedDocuments";
+import { guestDocumentPdfUrl } from "@/lib/download";
 import { Button, Card, Field } from "@jorna/shared/components/ui";
 import type { AttachedDocument } from "@/lib/types";
 
@@ -135,8 +136,17 @@ export function DocumentView({ token, preview }: { token: string; preview: boole
         <Card className="mt-6 p-6">
           <Sections doc={doc} />
         </Card>
+        <div className="mt-6 text-center">
+          <a
+            href={guestDocumentPdfUrl(token)}
+            download
+            className="inline-flex items-center rounded-full border border-card-edge px-4 py-2 text-sm font-semibold text-ink transition hover:border-gold"
+          >
+            Download your signed copy (PDF)
+          </a>
+        </div>
         {doc.signed_snapshot_sha256 ? (
-          <p className="mt-6 break-all text-center text-xs text-ink-faint">
+          <p className="mt-4 break-all text-center text-xs text-ink-faint">
             Your signed copy&apos;s fingerprint (SHA-256): {doc.signed_snapshot_sha256}
           </p>
         ) : null}
@@ -168,6 +178,13 @@ export function DocumentView({ token, preview }: { token: string; preview: boole
           This {kindLabel} is part of your written agreement with {vendorName}. Signing it doesn&apos;t move any money
           or dates by itself — Jorna doesn&apos;t handle payments.
         </p>
+        <a
+          href={guestDocumentPdfUrl(token)}
+          download
+          className="mt-3 inline-block text-sm font-semibold text-gold underline-offset-4 hover:underline"
+        >
+          Download as PDF
+        </a>
       </Card>
 
       <form

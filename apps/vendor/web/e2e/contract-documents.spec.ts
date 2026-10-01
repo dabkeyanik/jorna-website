@@ -1,6 +1,7 @@
 import { test, expect } from "./support/fixtures";
 import { loginAs } from "./support/fixtures";
 import { mockVendorBooking, mockVendorDetail } from "./support/mock-data";
+import type { HandlerArgs } from "./support/api-mock";
 
 // Plan step 7b: the document-style contract editor (title and block order,
 // backend 0067), and addenda / cancellation agreements attached to a signed
@@ -204,5 +205,69 @@ test.describe("contract editor and attached documents (step 7b)", () => {
     await expect(page.getByText("Later finish", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Void", exact: true }).click();
     expect(api.requestsTo("POST", "/contract-documents/d-1/void")).toHaveLength(1);
+  });
+});
+
+test.describe("PDF downloads", () => {
+  test("the vendor saves a signed contract as the server names it", async ({ page, api }) => {
+    await loginAs(page, api);
+    api.get("/contracts/c-1", {
+      booking_id: "c-1",
+      date_iso: "2030-06-01",
+      date_end: null,
+      time_start: "18:00",
+      time_end: "22:00",
+      location: "Pines Manor",
+      amount_cents: 140000,
+      guest_name: "Meera Iyer",
+      signed_at: "2030-01-02T10:00:00",
+      status: "approved",
+      contract_status: "signed",
+      contract_token: "tok-1",
+      line_items: [],
+      payment_schedule: [],
+      timeline: [],
+    });
+    api.get("/contracts/c-1/documents", { items: [], total: 0 });
+    api.get("/contracts/c-1/pdf", async ({ route }: HandlerArgs) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        // What the backend's CORS setup sends: the filename header is exposed
+        // to scripts, or the save falls back to a generic name.
+        headers: {
+          "Content-Disposition": 'attachment; filename="reception-agreement-2030-06-01.pdf"',
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+        body: "%PDF-1.4 test",
+      });
+    });
+
+    await page.goto("contracts/view/?id=c-1");
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "Download signed PDF" }).click(),
+    ]);
+    expect(download.suggestedFilename()).toBe("reception-agreement-2030-06-01.pdf");
+  });
+
+  test("the couple's copy is a plain link on their signing page", async ({ page, api }) => {
+    api.get("/guest-documents/dtok-2", {
+      document_id: "d-2",
+      kind: "cancellation",
+      title: "Cancellation agreement",
+      sections: [{ key: "s", title: "Cancellation", body: "Both parties agree to cancel." }],
+      status: "signed",
+      signer_name: "Meera Iyer",
+      signed_at: "2030-02-01T10:00:00",
+      vendor_display_name: "Sound Studio",
+      date_iso: "2030-06-01",
+    });
+    await page.goto("booking-link/?d=dtok-2");
+    await expect(page.getByRole("link", { name: "Download your signed copy (PDF)" })).toHaveAttribute(
+      "href",
+      /\/guest-documents\/dtok-2\/pdf$/,
+    );
   });
 });
