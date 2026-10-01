@@ -126,12 +126,21 @@ jobs:
         env:
           NEXT_PUBLIC_ESCROW_ENABLED: "false"
           NEXT_PUBLIC_API_BASE_URL: ${{ vars.STAGING_API_BASE_URL }}
+          # Links between the two apps go to the other app's staging site,
+          # never production (they default to jornaevents.com /
+          # book.jornaevents.com).
+          NEXT_PUBLIC_CLIENT_APP_URL: https://staging.jorna-events.pages.dev
+          NEXT_PUBLIC_VENDOR_APP_URL: https://staging.jorna-vendor.pages.dev
 
       - name: Allow the staging API in the CSP
         if: vars.STAGING_API_BASE_URL != ''
         run: ../../.github/scripts/csp-allow-api.sh public/_headers "$STAGING_API"
         env:
           STAGING_API: ${{ vars.STAGING_API_BASE_URL }}
+
+      - name: Point redirects at staging and check for production links
+        if: vars.STAGING_API_BASE_URL != ''
+        run: ../../.github/scripts/point-at-staging.sh
 
       # A non-production --branch makes this a Pages *preview* deployment,
       # which the deploy job leaves alone (it only promotes --branch main).
@@ -212,10 +221,18 @@ jobs:
         env:
           NEXT_PUBLIC_ESCROW_ENABLED: "false"
           NEXT_PUBLIC_API_BASE_URL: ${{ vars.STAGING_API_BASE_URL }}
+          # Links between the two apps go to the other app's staging site,
+          # never production (they default to jornaevents.com /
+          # book.jornaevents.com).
+          NEXT_PUBLIC_CLIENT_APP_URL: https://staging.jorna-events.pages.dev
+          NEXT_PUBLIC_VENDOR_APP_URL: https://staging.jorna-vendor.pages.dev
 
       - run: ../../.github/scripts/csp-allow-api.sh public/_headers "$STAGING_API"
         env:
           STAGING_API: ${{ vars.STAGING_API_BASE_URL }}
+
+      - name: Point redirects at staging and check for production links
+        run: ../../.github/scripts/point-at-staging.sh
 
       - name: Deploy to the staging branch
         run: npx --no-install wrangler pages deploy public --project-name ${{ inputs.pages_project }} --branch staging --commit-dirty=true
