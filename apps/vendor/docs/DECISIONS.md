@@ -559,3 +559,28 @@ offers are Leads now.
 - The shared primary Button's text is white: in dark mode the ground colour
   it used was near-black on maroon.
 
+---
+
+## Decision: Vendor redesign, step 4 — Messages is a hub, and conversation only (2026-10-01)
+
+A vendor's `/messages` is the Figma design's hub (`components/vendor/MessagesHub.tsx`):
+conversations (search, All/Unread, counts), the open thread, and a side
+panel saying what this couple is — a booking ("View booking"), a lead
+("View lead", matched through the pipeline's `conversation_id` or the
+thread's booking), or neither ("Add to leads") — with the event, the
+contract, and "Mark as unread". Clients keep the old list and
+`/conversation` page; a vendor opening `/conversation?id=…` is forwarded to
+`/messages?id=…`, so every existing link still lands.
+
+- The thread itself (socket, 5s poll, send) is one component,
+  `ConversationThread`, used by both, so live delivery can't drift between
+  them.
+- A price offer in a thread links to its lead's drawer ("Answer in Leads");
+  nothing in Messages accepts or counters a price (the plan's rule).
+- "New message" only opens a thread with a couple the vendor already has an
+  account booking or request with (the confirmed assumption) — guest
+  contracts have no account to message.
+- "Mark as unread" closes the thread: the open thread re-reads its messages
+  every few seconds, and reading is what clears the mark.
+- Left out as decided: "Active now" and file attachments.
+
