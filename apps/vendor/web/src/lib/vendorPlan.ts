@@ -1004,3 +1004,130 @@ export function calendarMonth(
   }
   return days;
 }
+
+// ── Overview ─────────────────────────────────────────────────────────
+//
+// The vendor redesign's Overview page (2026-10): a summary of the other
+// pages, so its numbers are reducers over the same rules they use.
+
+/**
+ * A booking's tab on the Overview card (and, from plan step 3, the Bookings
+ * page): Deposit due, Confirmed, or Over. A booking exists once it's agreed —
+ * a contract signed, or a marketplace request accepted — so anything before
+ * that (a lead) is null, as is anything dead or fully settled after the event.
+ *
+ * "Over" holds an event that has happened until its money is all confirmed,
+ * same accuracy-over-tidiness reasoning as pipelineStage's "done".
+ */
+export type BookingTab = "deposit_due" | "confirmed" | "over";
+
+export function bookingTab(b: VendorBooking): BookingTab | null {
+  if (isDeadVendorBooking(b)) return null;
+  const agreed = b.contract_token ? Boolean(b.signed_at) : b.status === "approved" || b.status === "payment_confirmed";
+  if (!agreed) return null;
+  const settled = pipelineStage(b) === "done";
+  const left = daysUntil(b.date_end || b.date_iso);
+  if (left != null && left < 0) return settled ? null : "over";
+  const status = contractStatus(b);
+  return status === "deposit_due" || status === "confirm_deposit" ? "deposit_due" : "confirmed";
+}
+
+/**
+ * Money the vendor confirmed receiving in the calendar month containing `now`:
+ * every schedule installment confirmed that month, or — for a booking from
+ * before payment schedules — its deposit. The balance on such a booking has
+ * no confirmation timestamp in the payload, so it can't be placed in a month
+ * and isn't counted.
+ */
+export function receivedThisMonthCents(bookings: VendorBooking[], now = new Date()): number {
+  const inMonth = (iso: string | null | undefined) => {
+    if (!iso) return false;
+    const d = new Date(iso);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  };
+  let total = 0;
+  for (const b of bookings) {
+    if (isDeadVendorBooking(b)) continue;
+    if (b.payment_schedule?.length) {
+      for (const i of b.payment_schedule) if (inMonth(i.confirmed_at)) total += i.amount_cents;
+    } else if (inMonth(b.deposit_confirmed_received_at) && b.deposit_amount_cents) {
+      total += b.deposit_amount_cents;
+    }
+  }
+  return total;
+}
+
+/** What's owed as deposits on agreed bookings that haven't had one confirmed. */
+export function depositsOwedCents(bookings: VendorBooking[]): number {
+  let total = 0;
+  for (const b of bookings) {
+    if (bookingTab(b) !== "deposit_due") continue;
+    const first = b.payment_schedule?.[0];
+    if (b.payment_schedule && b.payment_schedule.length > 1 && first && !first.confirmed_at) {
+      total += first.amount_cents;
+    } else if (b.deposit_amount_cents && !b.deposit_confirmed_received_at) {
+      total += b.deposit_amount_cents;
+    }
+  }
+  return total;
+}
+
+/** Upcoming agreed bookings, soonest first — the Overview's "Your schedule". */
+export function upcomingBookings(bookings: VendorBooking[]): VendorBooking[] {
+  return bookings
+    .filter((b) => {
+      const tab = bookingTab(b);
+      return tab === "deposit_due" || tab === "confirmed";
+    })
+    .filter((b) => b.date_iso && b.date_iso !== "TBD")
+    .sort((a, b) => {
+      const byDate = (a.date_iso ?? "").localeCompare(b.date_iso ?? "");
+      return byDate !== 0 ? byDate : (a.time_start ?? "").localeCompare(b.time_start ?? "");
+    });
+}
+
+/** "Today", "Tomorrow", "In 4 days", "In 3 weeks". */
+export function countdownLabel(iso?: string | null): string | null {
+  const days = daysUntil(iso);
+  if (days == null || days < 0) return null;
+  if (days === 0) return "Today";
+  if (days === 1) return "Tomorrow";
+  if (days < 21) return `In ${days} days`;
+  if (days < 70) return `In ${Math.round(days / 7)} weeks`;
+  return `In ${Math.round(days / 30)} months`;
+}
+
+export interface LeadSummary {
+  /** Everything not yet agreed: requests, offers on the table, open informal leads. */
+  open: number;
+  /** Of those, the ones waiting on the vendor's answer. */
+  needReply: number;
+}
+
+/**
+ * The Overview's lead tiles, until plan step 2 gives leads one list of their
+ * own. Bookings not yet agreed (requests, negotiations, sent contracts) plus
+ * the informal leads that haven't been won or lost; "need a reply" is the
+ * request/offer tasks vendorTasks already derives, plus informal leads still
+ * marked new.
+ */
+export function leadSummary(
+  bookings: VendorBooking[],
+  leads: { status: string; converted_booking_id: string | null }[],
+): LeadSummary {
+  const live = bookings.filter((b) => !isDeadVendorBooking(b));
+  const pendingBookings = live.filter((b) => {
+    const stage = pipelineStage(b);
+    return stage === "inquiry" || stage === "awaiting_client";
+  });
+  const openLeads = leads.filter(
+    (l) => !l.converted_booking_id && l.status !== "won" && l.status !== "lost",
+  );
+  const replyTasks = vendorTasks(live, null).filter(
+    (t) => t.kind === "request" || t.kind === "negotiation",
+  ).length;
+  return {
+    open: pendingBookings.length + openLeads.length,
+    needReply: replyTasks + openLeads.filter((l) => l.status === "new").length,
+  };
+}

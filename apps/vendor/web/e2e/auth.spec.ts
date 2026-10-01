@@ -2,7 +2,7 @@ import { test, expect } from "./support/fixtures";
 import { mockTokenPair, mockUser, mockVendorDetail } from "./support/mock-data";
 
 test.describe("authentication", () => {
-  test("signs in with a valid identifier/password and lands on /my-dashboard", async ({ page, api }) => {
+  test("signs in with a valid identifier/password and lands on /overview", async ({ page, api }) => {
     const user = mockUser();
     api.post("/auth/login", mockTokenPair());
     api.get("/me", user);
@@ -13,7 +13,7 @@ test.describe("authentication", () => {
     await page.getByLabel("Password").fill("correct-horse-battery-staple");
     await page.getByRole("button", { name: "Sign in" }).click();
 
-    await expect(page).toHaveURL(/\/app\/my-dashboard\/?$/);
+    await expect(page).toHaveURL(/\/app\/overview\/?$/);
 
     const loginCalls = api.requestsTo("POST", "/auth/login");
     expect(loginCalls).toHaveLength(1);
@@ -48,7 +48,7 @@ test.describe("authentication", () => {
     await page.getByLabel("Password").fill("correct-horse-battery-staple");
     await page.getByRole("button", { name: "Sign in" }).click();
 
-    await expect(page).toHaveURL(/\/app\/my-dashboard\/?$/);
+    await expect(page).toHaveURL(/\/app\/overview\/?$/);
   });
 
   test("an explicit next still wins over the role default", async ({ page, api }) => {

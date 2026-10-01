@@ -23,8 +23,8 @@
 # The seller pages moved to the vendor app on jornaevents.com (the jorna-vendor
 # repo) and are gone from here. Old bookmarks and links go to the same page
 # there. 301: they aren't coming back.
-/app/my-dashboard       https://jornaevents.com/app/my-dashboard/        301
-/app/my-dashboard/*     https://jornaevents.com/app/my-dashboard/        301
+/app/my-dashboard       https://jornaevents.com/app/overview/            301
+/app/my-dashboard/*     https://jornaevents.com/app/overview/            301
 /app/my-bookings        https://jornaevents.com/app/my-bookings/         301
 /app/my-bookings/*      https://jornaevents.com/app/my-bookings/         301
 /app/my-calendar        https://jornaevents.com/app/my-calendar/         301

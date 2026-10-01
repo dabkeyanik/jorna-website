@@ -159,7 +159,7 @@ export function FilterTabs<T extends string>({
             aria-selected={selected}
             onClick={() => onChange(o.value)}
             className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[7px] px-3 py-1.5 text-xs font-semibold transition sm:flex-none ${
-              selected ? "bg-card text-ink shadow-[0_2px_7px_rgba(45,40,35,0.07)]" : "text-ink-faint hover:text-ink-soft"
+              selected ? "bg-card text-ink shadow-[0_2px_7px_rgba(45,40,35,0.07)] ring-1 ring-card-edge" : "text-ink-faint hover:text-ink-soft"
             }`}
           >
             {o.label}

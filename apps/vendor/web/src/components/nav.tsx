@@ -127,8 +127,8 @@ export const NO_VENDOR_TABS: NavItem[] = [
 // of them, when they're working, and what they're owed.
 export const VENDOR_TABS: NavItem[] = [
   {
-    href: "/my-dashboard",
-    label: "Dashboard",
+    href: "/overview",
+    label: "Overview",
     icon: icon(I.dashboard),
     // Every seller page hangs off the dashboard now, reached through the
     // vendor sidebar, so they all keep this tab current. They used to light Profile, back when
@@ -139,7 +139,7 @@ export const VENDOR_TABS: NavItem[] = [
     // "/vendor" is safe beside "/vendor-profile" — isActive matches a whole
     // segment, so the shorter one can't swallow the longer.
     match: [
-      "/my-dashboard",
+      "/overview",
       "/my-bookings",
       "/my-calendar",
       "/my-earnings",
@@ -176,13 +176,13 @@ export const VENDOR_TABS: NavItem[] = [
  */
 export const VENDOR_DESKTOP_TABS: NavItem[] = [
   {
-    href: "/my-dashboard",
-    label: "Dashboard",
+    href: "/overview",
+    label: "Overview",
     icon: icon(I.dashboard),
     // Just itself here. The phone bar's Dashboard stands in for every seller
     // page because it's the only seller tab there; up here each page has a tab
     // of its own to light.
-    match: ["/my-dashboard", "/home", "/browse"],
+    match: ["/overview", "/home", "/browse"],
   },
   {
     href: "/my-bookings",
@@ -317,7 +317,7 @@ export function useAppNav(): {
     messagesUnread,
     // Where the wordmark goes. A logo goes home, and home for a seller is their
     // dashboard — not the page selling the builder to everyone else.
-    home: isVendor ? "/my-dashboard" : "/home",
+    home: isVendor ? "/overview" : "/home",
     isActive: (item) =>
       item.match.some((m) => pathname === m || pathname.startsWith(`${m}/`)),
   };

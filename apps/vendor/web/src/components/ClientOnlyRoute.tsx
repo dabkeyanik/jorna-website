@@ -36,7 +36,7 @@ export function ClientOnlyRoute({ children }: { children: React.ReactNode }) {
   }, [loading, user]);
 
   useEffect(() => {
-    if (isVendor === true) router.replace("/my-dashboard");
+    if (isVendor === true) router.replace("/overview");
   }, [isVendor, router]);
 
   if (!loading && !user) return <>{children}</>;

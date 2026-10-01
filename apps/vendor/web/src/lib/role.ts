@@ -51,7 +51,7 @@ export async function loadIsVendor(): Promise<boolean> {
  */
 export async function defaultLanding(): Promise<string> {
   const isVendor = await vendorStatus();
-  return isVendor === false ? "/vendor-onboarding" : "/my-dashboard";
+  return isVendor === false ? "/vendor-onboarding" : "/overview";
 }
 
 /** Called when a session ends, so the next sign-in doesn't inherit this role. */

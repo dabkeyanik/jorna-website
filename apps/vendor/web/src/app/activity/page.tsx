@@ -81,7 +81,7 @@ export default function ActivityPage() {
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             {isVendor ? (
               <>
-                <LinkButton href="/my-dashboard" size="md">
+                <LinkButton href="/overview" size="md">
                   Your dashboard
                 </LinkButton>
                 <LinkButton href="/my-calendar" variant="ghost" size="md">

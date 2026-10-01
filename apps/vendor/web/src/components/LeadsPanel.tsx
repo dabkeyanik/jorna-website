@@ -5,10 +5,9 @@
 // prospects a vendor wants to track before they're a real booking — "DM'd on
 // Instagram, maybe October, no venue yet." A lead isn't a Booking (no
 // committed date/price yet); converting one creates a real Contract and the
-// lead stays around as CRM history of how that client was won. The Board
-// view (my-dashboard's own page.tsx) renders the same, unconverted leads
-// read-only in its Inquiry column — this panel is where they're actually
-// created/edited/deleted.
+// lead stays around as CRM history of how that client was won. Overview counts
+// the unconverted ones among its open leads; this panel is where they're
+// created, edited and deleted.
 
 import { useState } from "react";
 import { ApiError } from "@jorna/shared/lib/api";
