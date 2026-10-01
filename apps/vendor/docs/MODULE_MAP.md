@@ -131,11 +131,18 @@ always "none, verify manually" until a test runner is added.
     it is. No list endpoint: it filters `listVendorBookings` to rows with a
     `contract_token`; status is `vendorPlan.ts`'s `contractStatus` (which
     reads a payment schedule when there is one). Rows open the detail page.
-  - `(vendor)/contracts/new/page.tsx` — the step builder (Client → Event →
-    Items → Payments → Terms → Review & send); `?lead=` converts a lead,
-    `?edit=` reopens an unsigned contract. The draft model and all its
-    arithmetic (totals, schedule presets, templates, conversion to/from the
-    API) live in `lib/contractDraft.ts`, unit-tested.
+  - `(vendor)/contracts/new/page.tsx` — the document editor: title, then
+    blocks (parties, event, items, schedule, terms sections, signature) in an
+    order the vendor sets, with a right rail for the total and Send / Copy
+    link / Save as draft. `?lead=` converts a lead, `?edit=` reopens an
+    unsigned contract, `?request=` accepts a marketplace request,
+    `?template=` starts from a template. The draft model and all its
+    arithmetic (totals, schedule presets, layout, templates, conversion
+    to/from the API) live in `lib/contractDraft.ts`, unit-tested.
+  - `(vendor)/contracts/document/page.tsx` — addenda and cancellation
+    agreements attached to a signed booking (`?kind=`, `?booking=`, `?id=`);
+    starter wording and status in `lib/attachedDocuments.ts`. The couple
+    signs at `booking-link?d=` (`app/booking-link/DocumentView.tsx`).
   - `(vendor)/contracts/view/page.tsx` — one contract (`?id=`): items,
     payments with per-payment confirm, terms, timeline, send/resend, edit,
     void. A query param, not a route segment — static export.

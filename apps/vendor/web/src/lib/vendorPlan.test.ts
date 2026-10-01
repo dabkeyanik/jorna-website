@@ -3,6 +3,7 @@ import {
   bookingMoney,
   bookingProgress,
   bookingTab,
+  canAttachDocument,
   paymentsToConfirm,
   contractNeedsVendor,
   contractStatus,
@@ -453,3 +454,18 @@ describe("bookingMoney and paymentsToConfirm", () => {
   });
 });
 
+
+describe("canAttachDocument", () => {
+  const b = (over: Partial<VendorBooking>) => ({ status: "approved", payment_status: "unpaid", ...over }) as VendorBooking;
+
+  it("needs a contract to be signed, and a plain booking to be accepted", () => {
+    expect(canAttachDocument(b({ contract_token: "t", signed_at: null }))).toBe(false);
+    expect(canAttachDocument(b({ contract_token: "t", signed_at: "2030-01-01" }))).toBe(true);
+    expect(canAttachDocument(b({ status: "pending" }))).toBe(false);
+    expect(canAttachDocument(b({ status: "approved" }))).toBe(true);
+  });
+
+  it("never attaches to a voided or declined booking", () => {
+    expect(canAttachDocument(b({ status: "rejected", contract_token: "t", signed_at: "x" }))).toBe(false);
+  });
+});

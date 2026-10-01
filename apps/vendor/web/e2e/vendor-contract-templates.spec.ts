@@ -32,13 +32,9 @@ test.describe("contract templates (/contracts/new, /contracts)", () => {
     });
 
     await page.goto("contracts/new/");
-    await page.getByRole("button", { name: "3. Items" }).click();
     await page.getByLabel("Add a package").selectOption("svc-1");
-    await page.getByRole("button", { name: "4. Payments" }).click();
     await page.getByRole("button", { name: "Deposit + balance" }).click();
-    await page.getByRole("button", { name: "5. Terms" }).click();
     await page.getByRole("button", { name: "+ Travel" }).click();
-    await page.getByRole("button", { name: "6. Review & send" }).click();
 
     await page.getByLabel("Template name").fill("Standard DJ package");
     await page.getByRole("button", { name: "Save template" }).click();
@@ -89,11 +85,9 @@ test.describe("contract templates (/contracts/new, /contracts)", () => {
 
     await page.goto("contracts/new/");
     await page.getByLabel("Start from a template").selectOption({ label: "Sangeet" });
-    await page.getByRole("button", { name: "4. Payments" }).click();
     await expect(page.getByLabel("Amount ($)").first()).toHaveValue("600");
     await expect(page.getByLabel("Amount ($)").last()).toHaveValue("1400");
-    await page.getByRole("button", { name: "5. Terms" }).click();
-    await expect(page.getByLabel("Title")).toHaveValue("Meals");
+    await expect(page.getByLabel("Title", { exact: true })).toHaveValue("Meals");
   });
 
   test("moves templates saved in this browser onto the account, then lists them on Contracts", async ({
@@ -185,7 +179,6 @@ test.describe("contract templates (/contracts/new, /contracts)", () => {
     await page.goto("contracts/new/?template=t-1");
 
     await expect(page.getByText("Loaded “Sangeet”.", { exact: false })).toBeVisible();
-    await page.getByRole("button", { name: "5. Terms" }).click();
-    await expect(page.getByLabel("Title")).toHaveValue("Meals");
+    await expect(page.getByLabel("Title", { exact: true })).toHaveValue("Meals");
   });
 });

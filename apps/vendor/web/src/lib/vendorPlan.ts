@@ -351,6 +351,16 @@ export type ContractStatus =
   | "paid"
   | "cancelled";
 
+/** Whether an addendum or cancellation agreement can be attached: the
+ *  booking is agreed — a signed contract, or a marketplace booking accepted
+ *  before contracts — and not dead. Mirrors the backend's document_service
+ *  check (its DECISIONS #21), which has the last word. */
+export function canAttachDocument(b: VendorBooking): boolean {
+  if (isDeadVendorBooking(b)) return false;
+  if (b.contract_token) return Boolean(b.signed_at);
+  return b.status === "approved" || b.status === "payment_confirmed";
+}
+
 export function contractStatus(b: VendorBooking): ContractStatus {
   if (b.contract_status === "declined") return "declined";
   if (isDeadVendorBooking(b)) return "cancelled";

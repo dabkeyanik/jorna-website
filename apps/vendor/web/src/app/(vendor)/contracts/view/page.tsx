@@ -12,12 +12,27 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@jorna/shared/lib/api";
-import { confirmInstallment, getContract, sendContract, voidContract } from "@/lib/jorna";
+import {
+  confirmInstallment,
+  getContract,
+  listDocuments,
+  sendContract,
+  sendDocument,
+  voidContract,
+  voidDocument,
+} from "@/lib/jorna";
+import { KIND_LABEL, documentStatus } from "@/lib/attachedDocuments";
 import { describeDue, describeWhen, money } from "@/lib/contractDraft";
-import { guestBookingLink, guestBookingPreviewLink } from "@/lib/contractLink";
+import {
+  guestBookingLink,
+  guestBookingPreviewLink,
+  guestDocumentLink,
+  guestDocumentPreviewLink,
+} from "@/lib/contractLink";
 import { describeEvent, prettyDate } from "@/lib/contractTimeline";
-import type { Contract, Installment } from "@/lib/types";
+import type { AttachedDocument, Contract, Installment } from "@/lib/types";
 import { Button, Card, LinkButton } from "@jorna/shared/components/ui";
+import { StatusPill } from "@/components/vendor/ui";
 
 
 function when(iso: string): string {
@@ -52,6 +67,8 @@ function ContractViewInner() {
   const id = useSearchParams().get("id") ?? "";
 
   const [c, setC] = useState<Contract | null>(null);
+  const [docs, setDocs] = useState<AttachedDocument[]>([]);
+  const [copiedDoc, setCopiedDoc] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -68,8 +85,12 @@ function ContractViewInner() {
   useEffect(() => {
     if (!user || !id) return;
     let cancelled = false;
-    load()
-      .then((res) => !cancelled && setC(res))
+    Promise.all([load(), listDocuments(id).catch(() => ({ items: [] as AttachedDocument[] }))])
+      .then(([res, attached]) => {
+        if (cancelled) return;
+        setC(res);
+        setDocs(attached.items);
+      })
       .catch((err) => !cancelled && setError(err instanceof ApiError ? err.message : "Couldn't load this contract."))
       .finally(() => !cancelled && setLoading(false));
     return () => {
@@ -83,11 +104,24 @@ function ContractViewInner() {
     setError(null);
     try {
       await fn();
-      setC(await load());
+      const [fresh, attached] = await Promise.all([load(), listDocuments(id).catch(() => null)]);
+      setC(fresh);
+      if (attached) setDocs(attached.items);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "That didn't work — try again.");
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function copyDocLink(d: AttachedDocument) {
+    if (!d.token) return;
+    try {
+      await navigator.clipboard.writeText(guestDocumentLink(d.token));
+      setCopiedDoc(d.document_id);
+      setTimeout(() => setCopiedDoc((x) => (x === d.document_id ? null : x)), 2000);
+    } catch {
+      /* clipboard can be denied — "View as client" still opens it */
     }
   }
 
@@ -129,6 +163,7 @@ function ContractViewInner() {
       </Link>
       <header className="mt-3 flex flex-wrap items-end justify-between gap-3">
         <div>
+          {c.document_title ? <p className="eyebrow">{c.document_title}</p> : null}
           <h1 className="serif text-3xl text-maroon dark:text-gold">
             {c.guest_name || "Client hasn't filled in details"}
           </h1>
@@ -323,6 +358,95 @@ function ContractViewInner() {
                 </p>
               ))}
             </div>
+          </Card>
+        ) : null}
+
+        {c.signed_at || docs.length ? (
+          <Card className="p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="serif text-lg text-ink">Attached documents</h2>
+              {c.signed_at && !closed ? (
+                <span className="flex flex-wrap gap-2">
+                  <LinkButton href={`/contracts/document?kind=addendum&booking=${c.booking_id}`} variant="ghost" size="md">
+                    Add an addendum
+                  </LinkButton>
+                  <LinkButton href={`/contracts/document?kind=cancellation&booking=${c.booking_id}`} variant="ghost" size="md">
+                    Cancellation agreement
+                  </LinkButton>
+                </span>
+              ) : null}
+            </div>
+            {docs.length === 0 ? (
+              <p className="mt-2 text-sm text-ink-faint">
+                Need to change or end what was signed? An addendum or cancellation agreement goes to your client to
+                sign on its own link. It doesn&apos;t change the price, date or payments here.
+              </p>
+            ) : (
+              <ul className="mt-3 grid gap-2">
+                {docs.map((d) => {
+                  const st = documentStatus(d);
+                  const open = d.status === "draft" || d.status === "sent" || d.status === "viewed";
+                  return (
+                    <li key={d.document_id} className="flex flex-wrap items-center justify-between gap-2 border-t border-line-soft pt-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-ink">{d.title}</p>
+                        <p className="text-xs text-ink-faint">
+                          {KIND_LABEL[d.kind]}
+                          {d.signed_at ? ` · signed by ${d.signer_name} ${prettyDate(d.signed_at)}` : ""}
+                          {d.decline_reason ? ` · “${d.decline_reason}”` : ""}
+                        </p>
+                      </div>
+                      <span className="flex flex-wrap items-center gap-1">
+                        <StatusPill tone={st.tone}>{st.label}</StatusPill>
+                        {d.status === "draft" ? (
+                          <button
+                            type="button"
+                            disabled={busy !== null}
+                            onClick={() => act(`doc-send-${d.document_id}`, () => sendDocument(d.document_id, Boolean(c.guest_email)))}
+                            className="px-2 py-1 text-xs font-semibold text-gold disabled:opacity-50"
+                          >
+                            Send
+                          </button>
+                        ) : null}
+                        {d.token && d.status !== "draft" && d.status !== "voided" ? (
+                          <>
+                            <button type="button" onClick={() => copyDocLink(d)} className="px-2 py-1 text-xs font-semibold text-ink-soft hover:text-ink">
+                              {copiedDoc === d.document_id ? "Copied!" : "Copy link"}
+                            </button>
+                            <a
+                              href={guestDocumentPreviewLink(d.token)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2 py-1 text-xs font-semibold text-ink-soft hover:text-ink"
+                            >
+                              View as client
+                            </a>
+                          </>
+                        ) : null}
+                        {open ? (
+                          <>
+                            <Link
+                              href={`/contracts/document?booking=${c.booking_id}&id=${d.document_id}`}
+                              className="px-2 py-1 text-xs font-semibold text-ink-soft hover:text-ink"
+                            >
+                              Edit
+                            </Link>
+                            <button
+                              type="button"
+                              disabled={busy !== null}
+                              onClick={() => act(`doc-void-${d.document_id}`, () => voidDocument(d.document_id))}
+                              className="px-2 py-1 text-xs font-semibold text-ink-faint hover:text-ink disabled:opacity-50"
+                            >
+                              Void
+                            </button>
+                          </>
+                        ) : null}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </Card>
         ) : null}
 

@@ -1,6 +1,8 @@
 "use client";
 
-// Where a vendor-authored contract link lands (/booking-link?t=…).
+// Where a vendor-authored contract link lands (/booking-link?t=…). An
+// addendum or cancellation agreement attached to a signed booking has its
+// own link, ?d=…, read and signed in DocumentView.
 //
 // The only page in this app with no account behind it, same shape as the
 // old RSVP flow this was cloned from — no sign-in, no app, just the token
@@ -25,6 +27,7 @@ import {
 import { describeDue } from "@/lib/contractDraft";
 import { Button, Card, Field } from "@jorna/shared/components/ui";
 import type { GuestBooking, Installment } from "@/lib/types";
+import { DocumentView } from "./DocumentView";
 
 function money(cents: number): string {
   return `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -571,10 +574,20 @@ function BookingLinkInner() {
   );
 }
 
+function LinkRouter() {
+  const params = useSearchParams();
+  const documentToken = params.get("d");
+  return documentToken ? (
+    <DocumentView token={documentToken} preview={params.get("preview") === "1"} />
+  ) : (
+    <BookingLinkInner />
+  );
+}
+
 export default function BookingLinkPage() {
   return (
     <Suspense fallback={<p className="py-20 text-center text-ink-soft">Loading…</p>}>
-      <BookingLinkInner />
+      <LinkRouter />
     </Suspense>
   );
 }

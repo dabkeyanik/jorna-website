@@ -1062,6 +1062,8 @@ export interface VendorBooking {
   guest_email?: string | null;
   guest_phone?: string | null;
   contract_token?: string | null;
+  /** The contract editor's heading (backend 0067); null on older ones. */
+  document_title?: string | null;
   deposit_percent?: number | null;
   deposit_amount_cents?: number | null;
   cancellation_window_hours?: number | null;
@@ -1137,6 +1139,10 @@ export interface Contract {
   discount_cents?: number | null;
   payment_schedule?: Installment[] | null;
   terms_clauses?: Clause[] | null;
+  /** The editor's title and block order (backend 0067) — null on a contract
+   *  written before it. */
+  document_title?: string | null;
+  document_layout?: LayoutBlock[] | null;
   revision?: number | null;
   signed_snapshot_sha256?: string | null;
   /** GET /contracts/{id} only. */
@@ -1192,6 +1198,22 @@ export interface Clause {
   body: string;
 }
 
+/** One block of the contract editor's document. A terms block's text lives
+ *  in terms_clauses under the same key; the rest are drawn from the
+ *  contract's own fields. Each structured type appears at most once. */
+export type BlockType = "parties" | "event" | "items" | "schedule" | "signature" | "terms";
+
+export interface LayoutBlock {
+  id: string;
+  type: BlockType;
+}
+
+/** What the editor sends: a terms block carries its title and body. */
+export interface LayoutBlockInput extends LayoutBlock {
+  title?: string;
+  body?: string;
+}
+
 export interface ContractEvent {
   at: string;
   kind: string;
@@ -1221,9 +1243,13 @@ export interface InstallmentInput {
   due_days?: number | null;
 }
 
+export type TemplateKind = "agreement" | "addendum" | "cancellation";
+
 export interface SavedContractTemplate {
   template_id: string;
   name: string;
+  /** Older templates come back as "agreement". */
+  kind?: TemplateKind;
   /** The builder's own shape — see lib/contractDraft's TemplateBody. */
   body: Record<string, unknown>;
   created_at: string;
@@ -1242,6 +1268,8 @@ export interface ContractCreateInput {
   discount_cents?: number | null;
   payment_schedule?: InstallmentInput[];
   terms_clauses?: Clause[];
+  document_title?: string | null;
+  document_layout?: LayoutBlockInput[];
   guest_count?: number | null;
   draft?: boolean;
   hold_days?: number | null;
@@ -1259,6 +1287,37 @@ export interface ContractCreateInput {
 }
 
 export type ContractUpdateInput = Partial<ContractCreateInput>;
+
+// ── Documents attached to a booking (backend 0067, DECISIONS #21) ─────
+
+/** An addendum or cancellation agreement: text only, signed on its own link,
+ *  never changing the booking's price, date or hold. */
+export type AttachedDocumentKind = "addendum" | "cancellation";
+
+export interface AttachedDocument {
+  document_id: string;
+  booking_id: string;
+  kind: AttachedDocumentKind;
+  title: string;
+  sections: Clause[];
+  status: "draft" | "sent" | "viewed" | "signed" | "declined" | "voided";
+  sent_at: string | null;
+  viewed_at: string | null;
+  signed_at: string | null;
+  signer_name: string | null;
+  declined_at: string | null;
+  decline_reason: string | null;
+  voided_at: string | null;
+  signed_snapshot_sha256: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  vendor_display_name: string | null;
+  client_name: string | null;
+  date_iso: string | null;
+  location: string | null;
+  /** The vendor's view only — the couple's link is the token. */
+  token?: string;
+}
 
 /** The public, no-login view of a guest booking — GET/PATCH
  *  /guest-bookings/{token}, POST .../sign. Includes the vendor's payment
@@ -1300,6 +1359,8 @@ export interface GuestBooking {
   discount_cents?: number | null;
   payment_schedule?: Installment[] | null;
   terms_clauses?: Clause[] | null;
+  document_title?: string | null;
+  document_layout?: LayoutBlock[] | null;
   /** Sent back with the signature; a stale one is refused. */
   revision?: number | null;
   signed_snapshot_sha256?: string | null;

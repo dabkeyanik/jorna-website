@@ -637,3 +637,27 @@ document editor (7b) replaces it.
   signed opens read-only. The hold line (opened yet, held until) stays on
   each unsigned row, as do Send/Resend, Copy link, View as client and Void.
 
+## Decision: Vendor redesign, step 7b — a document editor; addenda and cancellations signed as attachments (2026-10-01)
+
+**Context.** The step builder (Client → Event → Items → Payments → Terms →
+Review) didn't read like the agreement a couple receives. Vendors also had
+no written way to change or end a booking once it was signed.
+
+**Decision.**
+
+- `/contracts/new` is one document. Its title and block order go to the
+  backend as `document_title` and `document_layout` (backend 0067). A terms
+  block's text stays in `terms_clauses`, so the signing page is unchanged.
+- The payment plan follows the total until the vendor edits it. The old
+  builder got the same result by drafting the plan on arrival at Payments.
+- **Copy link sends the contract too**, just without the email. Either way
+  the date is held and a lead moves to Negotiation (the step 4 rule).
+- **Addendum and Cancellation are signable, attached documents.** They are
+  text only, belong to an agreed booking (`vendorPlan.canAttachDocument`,
+  mirroring the backend), and are signed on `booking-link?d=` with their own
+  token. Signing one changes nothing on the booking; both editors and the
+  signing page say so. Any change to price or date still goes through the
+  booking itself.
+- Templates carry a `kind`. The contract editor lists only `agreement`
+  templates, and the document editor lists only its own kind.
+

@@ -16,6 +16,10 @@ function cents(detail: ContractEvent["detail"]): string {
   return typeof detail?.amount_cents === "number" ? ` (${money(detail.amount_cents)})` : "";
 }
 
+function docTitle(detail: Record<string, unknown>): string {
+  return typeof detail.title === "string" ? detail.title : "a document";
+}
+
 /** One timeline row in words. */
 export function describeEvent(e: ContractEvent, c: { signer_name?: string | null }): string {
   const d = e.detail ?? {};
@@ -54,8 +58,26 @@ export function describeEvent(e: ContractEvent, c: { signer_name?: string | null
           ? `Reminded your client ${what} is due today`
           : `Reminded your client ${what} is due ${due}`;
     }
-        case "expired":
+    case "expired":
       return "The hold ended — the date opened up again";
+    // Addenda and cancellation agreements attached to it (backend 0067).
+    // Only some events carry the document's title.
+    case "document_created":
+      return `You wrote “${docTitle(d)}”`;
+    case "document_sent":
+      return `You sent “${docTitle(d)}”`;
+    case "document_emailed":
+      return `A document was emailed to ${typeof d.to === "string" ? d.to : "your client"}`;
+    case "document_edited":
+      return "You edited an attached document";
+    case "document_viewed":
+      return "Your client opened an attached document";
+    case "document_signed":
+      return `${typeof d.signer_name === "string" ? d.signer_name : "Your client"} signed “${docTitle(d)}”`;
+    case "document_declined":
+      return `Your client declined an attached document${typeof d.reason === "string" && d.reason ? ` — “${d.reason}”` : ""}`;
+    case "document_voided":
+      return "You voided an attached document";
     default:
       return e.kind;
   }

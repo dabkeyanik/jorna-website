@@ -12,6 +12,9 @@ import type {
   ContractCreateInput,
   ContractUpdateInput,
   SavedContractTemplate,
+  TemplateKind,
+  AttachedDocument,
+  AttachedDocumentKind,
   ConversationSummary,
   Earnings,
   EventCreateInput,
@@ -887,12 +890,54 @@ export function listContractTemplates(): Promise<{ items: SavedContractTemplate[
 export function createContractTemplate(
   name: string,
   body: Record<string, unknown>,
+  kind: TemplateKind = "agreement",
 ): Promise<SavedContractTemplate> {
-  return apiFetch("/contract-templates", { method: "POST", body: { name, body } });
+  return apiFetch("/contract-templates", { method: "POST", body: { name, body, kind } });
 }
 
 export function deleteContractTemplate(templateId: string): Promise<{ message: string }> {
   return apiFetch(`/contract-templates/${templateId}`, { method: "DELETE" });
+}
+
+// Addenda and cancellation agreements attached to an agreed booking
+// (backend DECISIONS #21). Text only — signing one changes nothing on the
+// booking itself.
+
+export function listDocuments(bookingId: string): Promise<{ items: AttachedDocument[]; total: number }> {
+  return apiFetch(`/contracts/${bookingId}/documents`);
+}
+
+export function createDocument(
+  bookingId: string,
+  input: {
+    kind: AttachedDocumentKind;
+    title?: string | null;
+    sections: { key?: string; title: string; body: string }[];
+    send?: boolean;
+    email_client?: boolean;
+  },
+): Promise<AttachedDocument> {
+  return apiFetch(`/contracts/${bookingId}/documents`, { method: "POST", body: input });
+}
+
+export function updateDocument(
+  documentId: string,
+  input: { title?: string | null; sections?: { key?: string; title: string; body: string }[] },
+): Promise<AttachedDocument> {
+  return apiFetch(`/contract-documents/${documentId}`, { method: "PATCH", body: input });
+}
+
+/** Copying the link calls this too, without email — that's what makes the
+ *  link open. */
+export function sendDocument(documentId: string, emailClient = false): Promise<AttachedDocument> {
+  return apiFetch(`/contract-documents/${documentId}/send`, {
+    method: "POST",
+    body: emailClient ? { email_client: true } : {},
+  });
+}
+
+export function voidDocument(documentId: string): Promise<AttachedDocument> {
+  return apiFetch(`/contract-documents/${documentId}/void`, { method: "POST" });
 }
 
 /** Withdraw an unsigned contract, freeing its date. Signed ones 400. */
@@ -955,6 +1000,19 @@ export function markConversationUnread(conversationId: string): Promise<Conversa
 /** preview: the vendor's own "View as client" — doesn't mark it viewed. */
 export function getGuestBooking(token: string, preview = false): Promise<GuestBooking> {
   return apiFetch<GuestBooking>(`/guest-bookings/${token}${preview ? "?preview=true" : ""}`);
+}
+
+/** An addendum or cancellation agreement, by its own link. */
+export function getGuestDocument(token: string, preview = false): Promise<AttachedDocument> {
+  return apiFetch(`/guest-documents/${token}${preview ? "?preview=true" : ""}`);
+}
+
+export function signGuestDocument(token: string, signerName: string): Promise<AttachedDocument> {
+  return apiFetch(`/guest-documents/${token}/sign`, { method: "POST", body: { signer_name: signerName } });
+}
+
+export function declineGuestDocument(token: string, reason: string | null): Promise<AttachedDocument> {
+  return apiFetch(`/guest-documents/${token}/decline`, { method: "POST", body: { reason } });
 }
 
 /** The client turns the offer down; frees the vendor's date. */

@@ -12,3 +12,13 @@ export function guestBookingLink(token: string): string {
 export function guestBookingPreviewLink(token: string): string {
   return `${guestBookingLink(token)}&preview=1`;
 }
+
+/** An addendum or cancellation agreement's own link — same page, its own
+ *  token (?d=), never the contract's. */
+export function guestDocumentLink(token: string): string {
+  return `${window.location.origin}/app/booking-link?d=${token}`;
+}
+
+export function guestDocumentPreviewLink(token: string): string {
+  return `${guestDocumentLink(token)}&preview=1`;
+}
