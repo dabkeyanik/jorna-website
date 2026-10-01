@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@jorna/shared/lib/api";
@@ -12,6 +12,7 @@ import {
   updateMyVendor,
 } from "@/lib/jorna";
 import {
+  categoryLabel,
   vendorSpecializations,
   type Review,
   type ServiceItem,
@@ -20,8 +21,9 @@ import {
   type VendorSpecialization,
 } from "@/lib/types";
 type GuestCountMode = NonNullable<VendorDetail["default_guest_count_mode"]>;
-import { Button, Card, LinkButton, Stars } from "@jorna/shared/components/ui";
-import { ServicesManager } from "@/components/ServicesManager";
+import { Avatar, Button, Card, LinkButton, Stars } from "@jorna/shared/components/ui";
+import { ServicesManager, type ServicesManagerHandle } from "@/components/ServicesManager";
+import { PageHeader, PrimaryAction } from "@/components/vendor/ui";
 import { AvailabilityFields } from "@/components/AvailabilityFields";
 import {
   VendorIdentityFields,
@@ -49,6 +51,7 @@ export default function VendorProfilePage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const packagesRef = useRef<ServicesManagerHandle>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -193,41 +196,52 @@ export default function VendorProfilePage() {
     return <p className="py-20 text-center text-ink-soft">Loading…</p>;
   }
 
+  const displayName = [vendor.f_name, vendor.l_name].filter(Boolean).join(" ");
+
   return (
     <div>
-      {/* Everything a client sees, in one place: what you sell, who you are,
-          and what people have said. Services used to be a page of their own,
-          so setting up meant finding two — and neither was the whole listing. */}
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <span className="eyebrow">Selling</span>
-          <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold">Your listing</h1>
-          <p className="mt-3 text-ink-soft">
-            What clients see when they find you in search or an AI bundle.
-          </p>
+      <PageHeader
+        eyebrow="Public presence"
+        title="Vendor profile"
+        subtitle="What couples see when they find you — your packages and your story."
+        action={<PrimaryAction onClick={() => packagesRef.current?.startNew()}>Add package</PrimaryAction>}
+      />
+
+      {/* The design's identity card: who couples see, and a way to look. */}
+      <section className="overflow-hidden rounded-2xl border border-card-edge bg-card shadow-[var(--shadow-card)]">
+        <div className="relative h-24 bg-[#641f34] [background-image:radial-gradient(circle_at_85%_20%,#9b5365_0,transparent_40%),radial-gradient(circle_at_10%_100%,#3b0f1b_0,transparent_55%)]" />
+        <div className="relative flex flex-wrap items-end justify-between gap-4 px-5 pb-5 pt-12 sm:px-6">
+          <div className="absolute -top-9 left-5 rounded-full border-4 border-card sm:left-6">
+            <Avatar src={vendor.pfp_url} name={displayName} size={72} />
+          </div>
+          <div className="min-w-0">
+            <strong className="serif block truncate text-xl text-ink">{displayName || "Your business"}</strong>
+            <p className="mt-0.5 text-sm text-ink-faint">
+              {[vendor.category ? categoryLabel(vendor.subcategory || vendor.category) : null, vendor.location]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          </div>
+          <LinkButton href={`/vendor?id=${vendor.vendor_id}`} variant="ghost" size="md" className="shrink-0">
+            Preview public profile
+          </LinkButton>
         </div>
-        <LinkButton
-          href={`/vendor?id=${vendor.vendor_id}`}
-          variant="ghost"
-          size="md"
-          className="shrink-0"
-        >
-          See what clients see
-        </LinkButton>
-      </header>
+      </section>
 
       {/* Services first: a price change or a new photo is a weekly job, and the
-          details below are set once. It also puts the listing-health "add a
-          service" link on the page's main content rather than under a form. */}
-      <ServicesManager vendor={vendor} categories={categories} initial={services} />
+          details below are set once. */}
+      <ServicesManager ref={packagesRef} vendor={vendor} categories={categories} initial={services} />
 
       {/* One <form>/submit across every section below — a vendor saves their
           whole listing at once, not section by section. (Payment details moved
           to Settings.) `contents` keeps the <form> itself out of the
           layout so each section can still sit in its own <h2>+<Card>. */}
       <form onSubmit={submit} className="contents">
-        <h2 className="serif mt-10 text-2xl text-ink">About your business</h2>
-        <Card className="mt-5 p-6">
+        <section className="mt-9">
+        <p className="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-ink-faint">Profile details</p>
+        <h2 className="serif mt-1 text-xl text-ink">About your business</h2>
+        <p className="mt-1 text-sm text-ink-soft">Help couples understand your style, story and where you&apos;ll travel.</p>
+        <Card className="mt-4 p-6">
           <div className="grid gap-4">
             <VendorIdentityFields
               categories={categories}
@@ -251,8 +265,9 @@ export default function VendorProfilePage() {
             />
           </div>
         </Card>
+        </section>
 
-        <h2 className="serif mt-10 text-2xl text-ink">Contract defaults</h2>
+        <h2 className="serif mt-9 text-xl text-ink">Contract defaults</h2>
         <Card className="mt-5 p-6">
           <div className="grid gap-4">
             <VendorContractDefaultsFields
@@ -297,7 +312,7 @@ export default function VendorProfilePage() {
           endpoints (lib/contractTemplates.ts) and are made from the builder. */}
       {templates.length > 0 ? (
         <>
-          <h2 className="serif mt-10 text-2xl text-ink">Saved contract templates</h2>
+          <h2 className="serif mt-9 text-xl text-ink">Saved contract templates</h2>
           <Card className="mt-5 p-6">
             <p className="text-sm text-ink-soft">
               Saved to your account — pick one when you start a contract on{" "}
@@ -325,7 +340,7 @@ export default function VendorProfilePage() {
           button rather than joining the form. Folded in from the old
           /my-availability route — same page a host filtering by date is
           matched against, so it belongs beside the rest of the listing. */}
-      <h2 className="serif mt-10 text-2xl text-ink">Availability</h2>
+      <h2 className="serif mt-9 text-xl text-ink">Availability</h2>
       <Card className="mt-5 p-6">
         <AvailabilityFields />
       </Card>
