@@ -50,20 +50,23 @@ test.describe("vendor contracts list (/contracts)", () => {
 
     await page.goto("contracts/");
 
-    await expect(page.getByRole("heading", { name: "Contracts" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contracts", level: 1 })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Blank contract/ })).toHaveAttribute("href", "/app/contracts/new/");
     await expect(page.getByText("Priya Shah")).not.toBeVisible();
 
-    // Needs-you sorts ahead of an earlier-dated contract still with the client.
-    const rows = page.locator("div.grid > div.rounded-2xl").filter({ hasText: "View as client" });
+    // Needs-you sorts ahead of a contract still with the client.
+    const rows = page.getByRole("region", { name: "Document library" }).locator("li");
     await expect(rows).toHaveCount(2);
     await expect(rows.first()).toContainText("Meera Iyer");
     await expect(rows.first().getByRole("link", { name: "Confirm deposit" })).toHaveAttribute(
       "href",
-      "/app/my-bookings/",
+      "/app/my-bookings/?id=c-deposit",
     );
-    await expect(rows.nth(1)).toContainText("Awaiting signature");
+    await expect(rows.nth(1)).toContainText("Sent");
+    // Sent or signed opens read-only.
+    await expect(rows.nth(1).getByRole("link").first()).toHaveAttribute("href", /contracts\/view\/?\?id=c-unsigned/);
 
-    await page.getByRole("tab", { name: "Waiting on client" }).click();
+    await page.getByRole("tab", { name: /Waiting on client/ }).click();
     await expect(page.getByText("Meera Iyer")).not.toBeVisible();
     await expect(rows).toHaveCount(1);
 
