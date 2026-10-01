@@ -112,8 +112,9 @@ always "none, verify manually" until a test runner is added.
   pieces in `components/vendor/` (`ui.tsx`, `Icon.tsx`). `/clients` is gone
   (301 to `/leads`); `/my-dashboard` 301s to `/overview` (step 1), and
   `?view=leads` there forwards to `/leads`. Leads (step 2) draws the backend's
-  `GET /leads/pipeline` with a per-stage drawer; conversation threads have
-  "Add to leads" and "Mark as unread" for vendors. Settings
+  `GET /leads/pipeline` with a per-stage drawer. Messages (step 4) is
+  `components/vendor/MessagesHub.tsx` for vendors, on the shared
+  `ConversationThread`; vendors' `/conversation?id=` forwards into it. Settings
   holds account (`AccountSettings`, shared with `/account`), Venmo/Zelle,
   tentative-hold length, Google Calendar (`GoogleCalendarCard`, also on the
   calendar page), notifications and theme. See `docs/DECISIONS.md`.

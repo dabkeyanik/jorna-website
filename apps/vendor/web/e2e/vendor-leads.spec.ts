@@ -186,34 +186,3 @@ test.describe("vendor leads (/leads)", () => {
     expect(api.requestsTo("PUT", "/bookings/b1/status")).toHaveLength(0);
   });
 });
-
-test.describe("adding a couple to leads from Messages", () => {
-  test("a vendor adds the other person in a thread, and can mark it unread", async ({ page, api }) => {
-    await loginAs(page, api);
-    api.get("/vendors/me", mockVendorDetail());
-    api.get("/leads/pipeline", PIPELINE);
-    api.get("/conversations/conv1", {
-      conversation_id: "conv1",
-      name: "Meera Shah",
-      subject_type: "enquiry",
-      member_count: 2,
-      members: [
-        { user_id: "user-1", name: "You" },
-        { user_id: "client-9", name: "Meera Shah" },
-      ],
-    });
-    api.get("/conversations/conv1/messages", { items: [], total: 0, limit: 100, offset: 0 });
-    api.get("/conversations", []);
-    api.get("/conversations/unread-count", { unread_count: 0 });
-    api.post("/conversations/conv1/lead", { lead_id: "l9", name: "Meera Shah", status: "new" });
-    api.post("/conversations/conv1/unread", { conversation_id: "conv1", unread_count: 1 });
-
-    await page.goto("conversation/?id=conv1");
-    await page.getByRole("button", { name: "Add to leads" }).click();
-    await expect(page.getByRole("link", { name: /In your leads/ })).toHaveAttribute("href", /leads\/?\?open=lead:l9/);
-
-    await page.getByRole("button", { name: "Mark as unread" }).click();
-    await expect(page).toHaveURL(/\/messages\/?$/);
-    expect(api.requestsTo("POST", "/conversations/conv1/unread")).toHaveLength(1);
-  });
-});

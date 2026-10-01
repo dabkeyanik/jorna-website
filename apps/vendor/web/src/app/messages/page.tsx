@@ -10,6 +10,9 @@ import { loadIsVendor } from "@/lib/role";
 import type { ConversationSummary } from "@/lib/types";
 import { Card, Chip, LinkButton } from "@jorna/shared/components/ui";
 import { clientAppUrl } from "@/lib/clientApp";
+import { Suspense } from "react";
+import { useVendorShell } from "@/components/ChromeGate";
+import { MessagesHub } from "@/components/vendor/MessagesHub";
 
 function timeAgo(iso?: string | null): string {
   if (!iso) return "";
@@ -78,7 +81,7 @@ function preview(c: ConversationSummary): string {
   return last.content;
 }
 
-export default function MessagesPage() {
+function ClientMessages() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -257,5 +260,17 @@ export default function MessagesPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Vendors get the Messages hub (redesign step 4); clients keep this list. */
+export default function MessagesPage() {
+  const shell = useVendorShell();
+  if (shell === null) return <p className="py-20 text-center text-ink-soft">Loading…</p>;
+  if (!shell) return <ClientMessages />;
+  return (
+    <Suspense fallback={<p className="py-20 text-center text-ink-soft">Loading…</p>}>
+      <MessagesHub />
+    </Suspense>
   );
 }
