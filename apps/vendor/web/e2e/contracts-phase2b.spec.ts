@@ -113,9 +113,7 @@ test.describe("contracts — Phase 2b (proposals)", () => {
     await page.goto("contracts/new/?edit=c-1");
     await expect(page.getByRole("heading", { name: "Edit contract" })).toBeVisible();
     await page.locator("#discount").fill("300");
-    await page.getByRole("button", { name: "4. Payments" }).click();
     await page.getByRole("button", { name: "Put the difference on the last payment" }).click();
-    await page.getByRole("button", { name: "6. Review & send" }).click();
     await page.getByRole("button", { name: "Save changes" }).click();
 
     await expect(page).toHaveURL(/contracts\/view\/?\?id=c-1/);

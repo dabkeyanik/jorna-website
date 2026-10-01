@@ -35,26 +35,22 @@ test.describe("contracts — Phase 0", () => {
     });
 
     await page.goto("contracts/new/");
-    await page.getByLabel("Name", { exact: true }).fill("Meera Iyer");
-    await page.getByLabel("Email (optional)").fill("meera@example.com");
-    await page.getByRole("button", { name: "Next: Event" }).click();
+    await page.getByLabel("Client name").fill("Meera Iyer");
+    await page.getByLabel("Client email").fill("meera@example.com");
     await page.getByLabel("Date", { exact: true }).fill("2030-06-01");
     await page.getByLabel("Start time").fill("18:00");
     await page.getByLabel("End time").fill("22:00");
     await page.getByLabel("Venue (optional)").fill("Pines Manor");
 
     // A per-person package is its rate times the head count, not the rate.
-    await page.getByRole("button", { name: "Next: Items" }).click();
     await page.getByLabel("Add a package").selectOption("svc-pp");
     await expect(page.getByLabel("Price ($ per guest)")).toHaveValue("45");
     await page.getByLabel("Qty").fill("200");
     await expect(page.getByText("$9,000.00").first()).toBeVisible();
 
-    await page.getByRole("button", { name: "Next: Payments" }).click();
     await page.getByRole("button", { name: "Pay in full" }).click();
-    await page.getByRole("button", { name: "Next: Terms" }).click();
-    await page.getByRole("button", { name: "Next: Review & send" }).click();
-    await page.getByLabel(/Email the link to/).uncheck();
+    await expect(page.getByTestId("rail-total")).toHaveText("$9,000.00");
+    await page.getByLabel(/Email it to/).uncheck();
     await page.getByRole("button", { name: "Send & hold date" }).click();
 
     await expect(page.getByRole("heading", { name: "Send this link" })).toBeVisible();
@@ -93,19 +89,14 @@ test.describe("contracts — Phase 0", () => {
     });
 
     await page.goto("contracts/new/?lead=lead-9");
-    await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Rohan Das");
-    await expect(page.getByLabel("Email (optional)")).toHaveValue("rohan@example.com");
+    await expect(page.getByLabel("Client name")).toHaveValue("Rohan Das");
+    await expect(page.getByLabel("Client email")).toHaveValue("rohan@example.com");
 
-    await page.getByRole("button", { name: "2. Event" }).click();
     await page.getByLabel("Date", { exact: true }).fill("2030-07-01");
     await page.getByLabel("Start time").fill("18:00");
     await page.getByLabel("End time").fill("22:00");
-    await page.getByRole("button", { name: "3. Items" }).click();
+    // Adding the package drafts the usual payment plan — nothing more to set.
     await page.getByLabel("Add a package").selectOption("svc-flat");
-    await page.getByRole("button", { name: "6. Review & send" }).click();
-    // Skipped Payments: the review step still needs a plan, so go set one.
-    await page.getByRole("button", { name: "4. Payments" }).click();
-    await page.getByRole("button", { name: "6. Review & send" }).click();
     await page.getByRole("button", { name: "Send & hold date" }).click();
 
     await expect(page.getByRole("heading", { name: "On its way" })).toBeVisible();

@@ -8,12 +8,15 @@
 // the problem while typing instead of after pressing Send.
 
 import type {
+  BlockType,
   Clause,
   Contract,
   ContractCreateInput,
   DueType,
   InstallmentInput,
   LineItemInput,
+  LayoutBlock,
+  LayoutBlockInput,
   LineItemKind,
   LineUnit,
   ServiceItem,
@@ -50,6 +53,11 @@ export interface ClauseDraft {
 }
 
 export interface Draft {
+  /** The agreement's heading; blank reads as "<package> agreement". */
+  title: string;
+  /** The document's block order. Terms blocks point at clauses by key —
+   *  the clause holds the text. See layoutOf. */
+  layout: LayoutBlock[];
   clientName: string;
   clientEmail: string;
   clientPhone: string;
@@ -81,6 +89,8 @@ export function newKey(): string {
 
 export function emptyDraft(): Draft {
   return {
+    title: "",
+    layout: defaultLayout(),
     clientName: "",
     clientEmail: "",
     clientPhone: "",
@@ -242,6 +252,84 @@ export function defaultClauses(vendor: VendorDetail | null): ClauseDraft[] {
   return out;
 }
 
+// ── The document's layout (backend 0067) ─────────────────────────────
+
+/** The blocks every agreement has, once each. Terms sections are the only
+ *  ones a vendor adds or removes. */
+export const STRUCTURED: Exclude<BlockType, "terms">[] = ["parties", "event", "items", "schedule", "signature"];
+
+/** Who, when, what, how it's paid, then the terms, then signatures — the
+ *  order a written agreement usually takes. */
+export function defaultLayout(clauseKeys: string[] = []): LayoutBlock[] {
+  return [
+    { id: "parties", type: "parties" },
+    { id: "event", type: "event" },
+    { id: "items", type: "items" },
+    { id: "schedule", type: "schedule" },
+    ...clauseKeys.map((id) => ({ id, type: "terms" as const })),
+    { id: "signature", type: "signature" },
+  ];
+}
+
+/**
+ * The layout as it should be drawn: one terms block per clause, none for a
+ * clause that's gone, each structured block once. A clause the layout
+ * doesn't place yet (a template's, the vendor's defaults) goes just before
+ * the signature. Clauses are the truth for what terms exist; the layout
+ * only says where they sit.
+ */
+export function reconcileLayout(layout: LayoutBlock[], clauses: { key: string }[]): LayoutBlock[] {
+  const keys = new Set(clauses.map((c) => c.key));
+  const seen = new Set<string>();
+  const out: LayoutBlock[] = [];
+  for (const b of layout) {
+    const tag = b.type === "terms" ? `terms:${b.id}` : b.type;
+    if (seen.has(tag) || (b.type === "terms" && !keys.has(b.id))) continue;
+    seen.add(tag);
+    out.push(b);
+  }
+  for (const type of STRUCTURED) {
+    if (!seen.has(type)) {
+      const sig = out.findIndex((b) => b.type === "signature");
+      out.splice(type === "signature" || sig < 0 ? out.length : sig, 0, { id: type, type });
+    }
+  }
+  for (const c of clauses) {
+    if (seen.has(`terms:${c.key}`)) continue;
+    const sig = out.findIndex((b) => b.type === "signature");
+    out.splice(sig < 0 ? out.length : sig, 0, { id: c.key, type: "terms" });
+  }
+  return out;
+}
+
+export function layoutOf(draft: Draft): LayoutBlock[] {
+  return reconcileLayout(draft.layout, draft.clauses);
+}
+
+/** Move a block up (-1) or down (+1); at either end it stays put. */
+export function moveBlock(draft: Draft, id: string, delta: -1 | 1): LayoutBlock[] {
+  const layout = layoutOf(draft);
+  const from = layout.findIndex((b) => b.id === id);
+  const to = from + delta;
+  if (from < 0 || to < 0 || to >= layout.length) return layout;
+  const next = [...layout];
+  [next[from], next[to]] = [next[to], next[from]];
+  return next;
+}
+
+/** A new terms section at a position in the document (default: before the
+ *  signature). */
+export function insertClause(draft: Draft, clause: Omit<ClauseDraft, "key">, at?: number): Partial<Draft> {
+  const key = newKey();
+  const layout = layoutOf(draft);
+  const sig = layout.findIndex((b) => b.type === "signature");
+  const pos = at ?? (sig < 0 ? layout.length : sig);
+  return {
+    clauses: [...draft.clauses, { ...clause, key }],
+    layout: [...layout.slice(0, pos), { id: key, type: "terms" }, ...layout.slice(pos)],
+  };
+}
+
 // ── What goes to the backend ─────────────────────────────────────────
 
 export type Step = "client" | "event" | "items" | "payments" | "terms" | "review";
@@ -348,8 +436,22 @@ export function toDocument(draft: Draft) {
     due_date: i.dueType === "date" ? i.dueDate : null,
     due_days: i.dueType === "before_event" ? Number(i.dueDays) : null,
   }));
-  const clauses: Clause[] = draft.clauses.map((c) => ({ key: c.key, title: c.title.trim(), body: c.body.trim() }));
+  const layout = layoutOf(draft);
+  const byKey = new Map(draft.clauses.map((c) => [c.key, c]));
+  // In the document's order, so a client reading clauses sees the same.
+  const clauses: Clause[] = layout
+    .filter((b) => b.type === "terms" && byKey.has(b.id))
+    .map((b) => {
+      const c = byKey.get(b.id)!;
+      return { key: c.key, title: c.title.trim(), body: c.body.trim() };
+    });
+  const clauseOf = new Map(clauses.map((c) => [c.key, c]));
+  const documentLayout: LayoutBlockInput[] = layout.map((b) =>
+    b.type === "terms" ? { id: b.id, type: "terms", title: clauseOf.get(b.id)?.title, body: clauseOf.get(b.id)?.body } : b,
+  );
   return {
+    document_title: draft.title.trim() || null,
+    document_layout: documentLayout,
     guest_name: draft.clientName.trim() || null,
     guest_email: draft.clientEmail.trim() || null,
     guest_phone: draft.clientPhone.trim() || null,
@@ -399,7 +501,12 @@ export function fromContract(c: Contract): Draft {
   const legacy: ClauseDraft[] = [];
   if (c.contract_terms?.equipment_power) legacy.push({ key: "equipment_power", title: "Equipment & power", body: c.contract_terms.equipment_power });
   if (c.contract_terms?.travel) legacy.push({ key: "travel", title: "Travel", body: c.contract_terms.travel });
+  const clauses: ClauseDraft[] = c.terms_clauses?.length
+    ? c.terms_clauses.map((t) => ({ key: t.key, title: t.title, body: t.body }))
+    : legacy;
   return {
+    title: c.document_title ?? "",
+    layout: reconcileLayout(c.document_layout ?? defaultLayout(clauses.map((x) => x.key)), clauses),
     clientName: c.guest_name ?? "",
     clientEmail: c.guest_email ?? "",
     clientPhone: c.guest_phone ?? "",
@@ -413,9 +520,7 @@ export function fromContract(c: Contract): Draft {
     lines,
     discount: c.discount_cents ? toDollars(c.discount_cents) : "",
     schedule,
-    clauses: c.terms_clauses?.length
-      ? c.terms_clauses.map((t) => ({ key: t.key, title: t.title, body: t.body }))
-      : legacy,
+    clauses,
     cancellationDays: c.cancellation_window_hours != null ? String(Math.round(c.cancellation_window_hours / 24)) : "",
     overtimeRate: c.overtime_rate_cents != null ? toDollars(c.overtime_rate_cents) : "",
     holdDays: "",
@@ -467,6 +572,9 @@ export function fromRequest(b: VendorBooking): Draft {
  */
 export interface TemplateBody {
   version: 1;
+  title?: string;
+  /** Block order by type; each "terms" takes the next clause in order. */
+  layout?: BlockType[];
   lines?: Omit<LineDraft, "key">[];
   discount?: string;
   schedule?: { label: string; percent: number; dueType: DueType; dueDays: string }[];
@@ -484,8 +592,13 @@ function withoutKey<T extends { key: string }>(row: T): Omit<T, "key"> {
 
 export function toTemplate(draft: Draft): TemplateBody {
   const total = totalCents(draft);
+  const layout = layoutOf(draft);
+  const byKey = new Map(draft.clauses.map((c) => [c.key, c]));
+  const ordered = layout.filter((b) => b.type === "terms" && byKey.has(b.id)).map((b) => byKey.get(b.id)!);
   return {
     version: 1,
+    title: draft.title,
+    layout: layout.map((b) => b.type),
     lines: draft.lines.map(withoutKey),
     discount: draft.discount,
     schedule:
@@ -498,7 +611,7 @@ export function toTemplate(draft: Draft): TemplateBody {
             dueDays: i.dueType === "date" ? "14" : i.dueDays,
           }))
         : [],
-    clauses: draft.clauses.map(withoutKey),
+    clauses: ordered.map(withoutKey),
     cancellationDays: draft.cancellationDays,
     overtimeRate: draft.overtimeRate,
     holdDays: draft.holdDays,
@@ -516,7 +629,22 @@ export function applyTemplate(draft: Draft, body: TemplateBody, services: Servic
       .map((l) => ({ ...l, key: newKey() }));
   }
   if (body.discount != null) next.discount = body.discount;
+  if (body.title) next.title = body.title;
   if (body.clauses?.length) next.clauses = body.clauses.map((c) => ({ ...c, key: newKey() }));
+  if (body.layout?.length) {
+    // Terms blocks take the template's clauses in order; any left over (or
+    // the draft's own, when the template has none) land before the signature.
+    const keys = next.clauses.map((c) => c.key);
+    let t = 0;
+    const blocks: LayoutBlock[] = [];
+    for (const type of body.layout) {
+      if (type !== "terms") blocks.push({ id: type, type });
+      else if (t < keys.length) blocks.push({ id: keys[t++], type: "terms" });
+    }
+    next.layout = reconcileLayout(blocks, next.clauses);
+  } else {
+    next.layout = reconcileLayout(next.layout, next.clauses);
+  }
   if (body.cancellationDays != null) next.cancellationDays = body.cancellationDays;
   if (body.overtimeRate != null) next.overtimeRate = body.overtimeRate;
   if (body.holdDays != null) next.holdDays = body.holdDays;

@@ -47,21 +47,19 @@ test.describe("contracts — Phase 4 (requests become proposals)", () => {
     await page.goto("contracts/new/?request=vbooking-1");
     await expect(page.getByRole("heading", { name: /Accept Priya Shah/ })).toBeVisible();
 
-    // Starts on Items with the requested package at the request's total.
-    await expect(page.getByLabel("Item")).toHaveValue("Full Day Wedding Photography");
+    // Starts with the requested package at the request's total.
+    await expect(page.getByLabel("Item", { exact: true })).toHaveValue("Full Day Wedding Photography");
     await expect(page.getByLabel(/^Price/)).toHaveValue("2500");
     await page.getByRole("button", { name: "+ Add a custom item" }).click();
-    await page.getByLabel("Item").last().fill("Second shooter");
+    await page.getByLabel("Item", { exact: true }).last().fill("Second shooter");
     await page.getByLabel(/^Price/).last().fill("500");
 
     // The client's date is shown, not editable.
-    await page.getByRole("button", { name: "2. Event" }).click();
     await expect(page.getByText("“Can you do a first look?”")).toBeVisible();
     await expect(page.getByLabel("Start time")).toHaveCount(0);
 
-    await page.getByRole("button", { name: "4. Payments" }).click();
+    // The plan follows the total until the vendor edits it.
     await expect(page.getByLabel("Amount ($)").first()).toHaveValue("750");
-    await page.getByRole("button", { name: "6. Review & send" }).click();
     await expect(page.getByRole("button", { name: "Save as draft" })).toHaveCount(0);
     await page.getByRole("button", { name: "Accept & send contract" }).click();
 

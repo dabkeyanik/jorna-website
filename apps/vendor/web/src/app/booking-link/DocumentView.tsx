@@ -1,0 +1,236 @@
+"use client";
+
+// An addendum or cancellation agreement, opened from its own link
+// (/booking-link?d=…; backend DECISIONS #21). Same no-account trust model
+// as the contract itself: the token is the credential, the couple types
+// their name to sign. It's text only — signing it doesn't move money or
+// dates on its own, and the page says so.
+
+import { useEffect, useState } from "react";
+import { ApiError } from "@jorna/shared/lib/api";
+import { declineGuestDocument, getGuestDocument, signGuestDocument } from "@/lib/jorna";
+import { KIND_LABEL } from "@/lib/attachedDocuments";
+import { Button, Card, Field } from "@jorna/shared/components/ui";
+import type { AttachedDocument } from "@/lib/types";
+
+function prettyDate(iso?: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return <div className="mx-auto w-[min(560px,100%-2rem)] py-20 text-center">{children}</div>;
+}
+
+/** Paragraphs as the vendor wrote them — a blank line starts a new one. */
+function Body({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/\n\s*\n/).map((p, i) => (
+        <p key={i} className="mt-2 whitespace-pre-line text-[0.95rem] leading-relaxed text-ink-soft">
+          {p}
+        </p>
+      ))}
+    </>
+  );
+}
+
+function Sections({ doc }: { doc: AttachedDocument }) {
+  return (
+    <div className="grid gap-5">
+      {doc.sections.map((s) => (
+        <section key={s.key}>
+          <h2 className="serif text-lg text-ink">{s.title}</h2>
+          <Body text={s.body} />
+        </section>
+      ))}
+    </div>
+  );
+}
+
+export function DocumentView({ token, preview }: { token: string; preview: boolean }) {
+  const [doc, setDoc] = useState<AttachedDocument | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [signerName, setSignerName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [declining, setDeclining] = useState(false);
+  const [reason, setReason] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    getGuestDocument(token, preview)
+      .then((d) => !cancelled && setDoc(d))
+      .catch((err) => {
+        if (cancelled) return;
+        setLoadError(
+          err instanceof ApiError && err.status === 404
+            ? "This link isn't valid any more. Ask your vendor for a new one."
+            : "Couldn't open this document. Check your connection and try again.",
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, preview]);
+
+  async function act(fn: () => Promise<AttachedDocument>) {
+    setBusy(true);
+    setError(null);
+    try {
+      setDoc(await fn());
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't send that. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loadError) {
+    return (
+      <Shell>
+        <h1 className="serif text-2xl text-maroon dark:text-gold">We couldn&apos;t open this</h1>
+        <p className="mt-3 text-ink-soft">{loadError}</p>
+      </Shell>
+    );
+  }
+  if (!doc) return <p className="py-20 text-center text-ink-soft">Opening your document…</p>;
+
+  const vendorName = doc.vendor_display_name ?? "your vendor";
+  const kindLabel = KIND_LABEL[doc.kind].toLowerCase();
+  const forBooking = `your booking with ${vendorName}${doc.date_iso ? ` on ${prettyDate(doc.date_iso)}` : ""}`;
+
+  if (doc.status === "voided") {
+    return (
+      <Shell>
+        <p className="eyebrow">Withdrawn</p>
+        <h1 className="serif mt-2 text-2xl text-maroon dark:text-gold">{vendorName} withdrew this {kindLabel}</h1>
+        <p className="mt-3 text-ink-soft">Nothing was signed. Your booking stays as it was agreed.</p>
+      </Shell>
+    );
+  }
+  if (doc.status === "declined") {
+    return (
+      <Shell>
+        <p className="eyebrow">Declined</p>
+        <h1 className="serif mt-2 text-2xl text-maroon dark:text-gold">You declined this {kindLabel}</h1>
+        <p className="mt-3 text-ink-soft">
+          We let {vendorName} know. Your booking stays as it was agreed — talk to them if you&apos;d like a new version.
+        </p>
+      </Shell>
+    );
+  }
+
+  if (doc.status === "signed") {
+    return (
+      <div className="mx-auto w-[min(640px,100%-2rem)] py-14">
+        <div className="text-center">
+          <p className="eyebrow">Signed</p>
+          <h1 className="serif mt-2 text-3xl text-maroon dark:text-gold">{doc.title}</h1>
+          <p className="mt-2 text-ink-soft">
+            Signed by {doc.signer_name} on {prettyDate(doc.signed_at)}. It&apos;s part of {forBooking}.
+          </p>
+        </div>
+        <Card className="mt-6 p-6">
+          <Sections doc={doc} />
+        </Card>
+        {doc.signed_snapshot_sha256 ? (
+          <p className="mt-6 break-all text-center text-xs text-ink-faint">
+            Your signed copy&apos;s fingerprint (SHA-256): {doc.signed_snapshot_sha256}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto w-[min(640px,100%-2rem)] py-12">
+      {preview ? (
+        <p className="mb-6 rounded-lg bg-panel px-3 py-2 text-center text-sm text-ink-soft">
+          Preview — this is what your client sees. Opening it here doesn&apos;t count as them opening it.
+        </p>
+      ) : null}
+      <div className="text-center">
+        <p className="eyebrow">
+          {KIND_LABEL[doc.kind]} from {vendorName}
+        </p>
+        <h1 className="serif mt-2 text-3xl text-maroon dark:text-gold">{doc.title}</h1>
+        <p className="mt-2 text-sm text-ink-soft">
+          For {forBooking}
+          {doc.client_name ? `, with ${doc.client_name}` : ""}.
+        </p>
+      </div>
+
+      <Card className="mt-8 p-6">
+        <Sections doc={doc} />
+        <p className="mt-6 rounded-lg bg-gold/10 px-3 py-2.5 text-sm text-ink-soft">
+          This {kindLabel} is part of your written agreement with {vendorName}. Signing it doesn&apos;t move any money
+          or dates by itself — Jorna doesn&apos;t handle payments.
+        </p>
+      </Card>
+
+      <form
+        className="mt-6 grid gap-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          act(() => signGuestDocument(token, signerName.trim()));
+        }}
+      >
+        <Card className="p-5">
+          <p className="text-sm font-medium text-ink-soft">Your signature</p>
+          <p className="mt-1 text-xs text-ink-soft">Type your full legal name to electronically sign this {kindLabel}</p>
+          <div className="mt-3">
+            <Field
+              placeholder="Type your full name to sign"
+              value={signerName}
+              onChange={(e) => setSignerName(e.target.value)}
+              required
+            />
+          </div>
+        </Card>
+        {error ? (
+          <p role="alert" className="rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
+            {error}
+          </p>
+        ) : null}
+        <Button type="submit" size="lg" className="w-full" disabled={busy || preview || !signerName.trim()}>
+          {busy ? "Signing…" : `Sign the ${kindLabel} →`}
+        </Button>
+      </form>
+
+      <div className="mt-8 border-t border-line-soft pt-6 text-center">
+        {declining ? (
+          <div className="grid gap-3 text-left">
+            <Field
+              label={`Anything you'd like ${vendorName} to know? (optional)`}
+              value={reason}
+              maxLength={500}
+              onChange={(e) => setReason(e.target.value)}
+            />
+            <div className="flex justify-center gap-2">
+              <Button
+                variant="ghost"
+                disabled={busy || preview}
+                onClick={() => act(() => declineGuestDocument(token, reason.trim() || null))}
+              >
+                {busy ? "Sending…" : `Decline this ${kindLabel}`}
+              </Button>
+              <Button variant="quiet" onClick={() => setDeclining(false)}>
+                Never mind
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setDeclining(true)}
+            className="text-sm text-ink-faint underline-offset-4 hover:text-ink hover:underline"
+          >
+            Don&apos;t agree with this? Let {vendorName} know
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

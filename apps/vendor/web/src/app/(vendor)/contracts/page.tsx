@@ -9,9 +9,10 @@
 // comes from vendorPlan's contractStatus. Confirming a payment stays on
 // Bookings, which owns it.
 //
-// The gallery opens today's builder (/contracts/new) — on the vendor's usual
-// terms, or on one of their saved templates. Addendum and Cancellation need
-// the new document editor (step 7b) and say so.
+// The gallery opens the contract editor (/contracts/new) — on the vendor's
+// usual terms, or on one of their saved templates — or the addendum and
+// cancellation editor (/contracts/document), which first asks which signed
+// booking the document is for.
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -22,7 +23,8 @@ import { getMyVendor, listVendorBookings, sendContract, voidContract } from "@/l
 import { categoryLabel, type SavedContractTemplate, type VendorBooking, type VendorDetail } from "@/lib/types";
 import { contractNeedsVendor, contractStatus, type ContractStatus } from "@/lib/vendorPlan";
 import { guestBookingLink, guestBookingPreviewLink } from "@/lib/contractLink";
-import { deleteTemplate, loadTemplates } from "@/lib/contractTemplates";
+import { deleteTemplate, loadTemplates, templatesOfKind } from "@/lib/contractTemplates";
+import { KIND_LABEL } from "@/lib/attachedDocuments";
 import { Button } from "@jorna/shared/components/ui";
 import { Drawer, FilterTabs, PageHeader, PrimaryAction, StatusPill, type Tone } from "@/components/vendor/ui";
 import { Icon } from "@/components/vendor/Icon";
@@ -92,7 +94,8 @@ function offerLine(b: VendorBooking, s: ContractStatus): string | null {
 }
 
 const clientOf = (b: VendorBooking) => b.guest_name || b.client_name || "Client";
-const titleOf = (b: VendorBooking) => b.event_name || `${b.service_name || "Services"} agreement`;
+const titleOf = (b: VendorBooking) =>
+  b.document_title || b.event_name || `${b.service_name || "Services"} agreement`;
 
 /** The latest thing that happened to it. */
 function lastModified(b: VendorBooking): string | null {
@@ -163,10 +166,10 @@ function ManageTemplates({
   onDelete: (id: string) => void;
 }) {
   return (
-    <Drawer open={open} onClose={onClose} title="Your templates" subtitle="Saved from the contract builder. Pick one in the gallery to start from it.">
+    <Drawer open={open} onClose={onClose} title="Your templates" subtitle="Saved from the contract and document editors. Pick one to start from it.">
       {templates.length === 0 ? (
         <p className="text-sm text-ink-faint">
-          No saved templates yet. In the contract builder, &ldquo;Save as template&rdquo; keeps the items,
+          No saved templates yet. In the contract editor, &ldquo;Save template&rdquo; keeps the items,
           payments and terms for next time.
         </p>
       ) : (
@@ -178,9 +181,18 @@ function ManageTemplates({
             >
               <span className="grid min-w-0">
                 <strong className="truncate text-sm text-ink">{t.name}</strong>
-                <Link href={`/contracts/new?template=${t.template_id}`} className="text-xs font-semibold text-gold">
-                  Start a contract from it
-                </Link>
+                {(t.kind ?? "agreement") === "agreement" ? (
+                  <Link href={`/contracts/new?template=${t.template_id}`} className="text-xs font-semibold text-gold">
+                    Start a contract from it
+                  </Link>
+                ) : (
+                  <Link
+                    href={`/contracts/document?kind=${t.kind}&template=${t.template_id}`}
+                    className="text-xs font-semibold text-gold"
+                  >
+                    New {KIND_LABEL[t.kind as "addendum" | "cancellation"].toLowerCase()} from it
+                  </Link>
+                )}
               </span>
               <Button variant="quiet" onClick={() => onDelete(t.template_id)}>
                 Delete template
@@ -296,6 +308,7 @@ export default function ContractsPage() {
   }
 
   const brand = [vendor.f_name, vendor.l_name].filter(Boolean).join(" ") || "Your business";
+  const agreements = templatesOfKind(templates, "agreement");
   const speciality = vendor.category ? categoryLabel(vendor.subcategory || vendor.category) : "Services";
   const count = (f: Filter) => (contracts ?? []).filter((b) => FILTER_TEST[f](contractStatus(b))).length;
 
@@ -329,7 +342,7 @@ export default function ContractsPage() {
             name="Blank contract"
             note="Starts from your usual terms"
           />
-          {templates.slice(0, 1).map((t) => (
+          {agreements.slice(0, 1).map((t) => (
             <GalleryCard
               key={t.template_id}
               href={`/contracts/new?template=${t.template_id}`}
@@ -338,7 +351,7 @@ export default function ContractsPage() {
               note="Your saved template"
             />
           ))}
-          {templates.length === 0 ? (
+          {agreements.length === 0 ? (
             <GalleryCard
               href="/contracts/new"
               preview={<DocPreview brand={brand} title={`${speciality} services agreement`} foot="Signature" />}
@@ -347,21 +360,22 @@ export default function ContractsPage() {
             />
           ) : null}
           <GalleryCard
-            disabled
-            preview={<DocPreview brand={brand} title="Service addendum" foot="Initials" />}
+            href="/contracts/document?kind=addendum"
+            preview={<DocPreview brand={brand} title="Service addendum" foot="Signature" />}
             name="Service addendum"
-            note="Coming with the new editor"
+            note="Changes to a signed booking"
           />
           <GalleryCard
-            disabled
+            href="/contracts/document?kind=cancellation"
             preview={<DocPreview brand={brand} title="Cancellation agreement" foot="Signature" />}
             name="Cancellation agreement"
-            note="Coming with the new editor"
+            note="Ends a signed booking, in writing"
           />
         </div>
-        {templates.length > 1 ? (
+        {templates.length > Math.min(1, agreements.length) ? (
           <p className="mt-2 text-xs text-ink-faint">
-            {templates.length - 1} more saved template{templates.length - 1 === 1 ? "" : "s"} in{" "}
+            {templates.length - Math.min(1, agreements.length)} more saved template
+            {templates.length - Math.min(1, agreements.length) === 1 ? "" : "s"} in{" "}
             <button type="button" onClick={() => setManaging(true)} className="font-semibold text-gold">
               Manage templates
             </button>

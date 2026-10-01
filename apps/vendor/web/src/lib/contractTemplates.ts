@@ -15,7 +15,7 @@ import {
   listContractTemplates,
 } from "./jorna";
 import type { TemplateBody } from "./contractDraft";
-import type { SavedContractTemplate } from "./types";
+import type { AttachedDocumentKind, SavedContractTemplate, TemplateKind } from "./types";
 
 const LEGACY_KEY = "jorna_contract_templates";
 
@@ -89,6 +89,28 @@ export async function loadTemplates(): Promise<SavedContractTemplate[]> {
 
 export function saveTemplate(name: string, body: TemplateBody): Promise<SavedContractTemplate> {
   return createContractTemplate(name, body as unknown as Record<string, unknown>);
+}
+
+/** An addendum or cancellation agreement kept for reuse: its title and
+ *  sections, nothing tied to one booking. */
+export interface DocumentTemplateBody {
+  version: 1;
+  title: string;
+  sections: { title: string; body: string }[];
+}
+
+export function saveDocumentTemplate(
+  name: string,
+  kind: AttachedDocumentKind,
+  body: DocumentTemplateBody,
+): Promise<SavedContractTemplate> {
+  return createContractTemplate(name, body as unknown as Record<string, unknown>, kind);
+}
+
+/** Agreements are the builder's; addenda and cancellations the document
+ *  editor's. A template saved before kinds existed is an agreement. */
+export function templatesOfKind(all: SavedContractTemplate[], kind: TemplateKind): SavedContractTemplate[] {
+  return all.filter((t) => (t.kind ?? "agreement") === kind);
 }
 
 export function deleteTemplate(templateId: string): Promise<unknown> {

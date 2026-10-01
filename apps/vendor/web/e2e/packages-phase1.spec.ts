@@ -157,15 +157,12 @@ test.describe("packages — Phase 1", () => {
     });
 
     await page.goto("contracts/new/");
-    await page.getByRole("button", { name: "3. Items" }).click();
     const picker = page.getByLabel("Add a package");
     await expect(picker.locator("option", { hasText: "Retired set" })).toHaveCount(0);
     await picker.selectOption("svc-1");
 
     // The payment plan starts from the package's 40%, not the vendor's 25%.
-    await page.getByRole("button", { name: "4. Payments" }).click();
     await expect(page.getByLabel("Amount ($)").first()).toHaveValue("560");
-    await page.getByRole("button", { name: "5. Terms" }).click();
     await expect(page.getByLabel("Cancellation window (days)")).toHaveValue("60");
   });
 

@@ -7,6 +7,9 @@ import {
   fromContract,
   fromRequest,
   describeWhen,
+  insertClause,
+  layoutOf,
+  moveBlock,
   presetSchedule,
   problems,
   scheduledCents,
@@ -199,3 +202,53 @@ describe("describeWhen", () => {
   });
 });
 
+
+describe("layout", () => {
+  const types = (d: Draft) => layoutOf(d).map((b) => (b.type === "terms" ? `terms:${b.id}` : b.type));
+
+  it("places clauses the layout doesn't know yet before the signature", () => {
+    const d = { ...emptyDraft(), clauses: [{ key: "travel", title: "Travel", body: "30 miles." }] };
+    expect(types(d)).toEqual(["parties", "event", "items", "schedule", "terms:travel", "signature"]);
+  });
+
+  it("drops a removed clause's block, and moves blocks within bounds", () => {
+    let d: Draft = { ...emptyDraft(), clauses: [{ key: "a", title: "A", body: "a" }] };
+    d = { ...d, layout: moveBlock(d, "a", -1) };
+    expect(types(d).slice(3, 5)).toEqual(["terms:a", "schedule"]);
+    expect(moveBlock(d, "parties", -1)[0].type).toBe("parties");
+    expect(types({ ...d, clauses: [] })).not.toContain("terms:a");
+  });
+
+  it("inserts a section where it's asked for", () => {
+    const d = emptyDraft();
+    const next = { ...d, ...insertClause(d, { title: "Scope", body: "DJ." }, 1) };
+    expect(layoutOf(next)[1].type).toBe("terms");
+    expect(next.clauses[0].title).toBe("Scope");
+  });
+
+  it("sends terms in the document's order, inside the layout", () => {
+    let d: Draft = ready({
+      title: " Wedding DJ agreement ",
+      clauses: [
+        { key: "x", title: "Travel", body: "30 miles." },
+        { key: "y", title: "Meals", body: "Dinner." },
+      ],
+    });
+    d = { ...d, layout: moveBlock(d, "y", -1) };
+    const doc = toDocument(d);
+    expect(doc.document_title).toBe("Wedding DJ agreement");
+    expect(doc.terms_clauses.map((c) => c.key)).toEqual(["y", "x"]);
+    expect(doc.document_layout.find((b) => b.id === "y")).toMatchObject({ type: "terms", title: "Meals", body: "Dinner." });
+  });
+
+  it("a template keeps the block order and lays it over new clause keys", () => {
+    let d: Draft = ready({ clauses: [{ key: "x", title: "Scope", body: "DJ." }] });
+    d = { ...d, layout: moveBlock(d, "x", -1) };
+    d = { ...d, layout: moveBlock(d, "x", -1) };
+    const body = toTemplate(d);
+    expect(body.layout).toEqual(["parties", "event", "terms", "items", "schedule", "signature"]);
+    const applied = applyTemplate(emptyDraft(), body, [{ service_id: "svc-1" } as ServiceItem]);
+    expect(types(applied)[2]).toMatch(/^terms:/);
+    expect(applied.clauses[0].title).toBe("Scope");
+  });
+});
