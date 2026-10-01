@@ -29,12 +29,19 @@
 # sidebar redesign — see docs/DECISIONS.md), which is also why the
 # /my-leads and /my-clients targets below changed from pointing at
 # /my-pipeline's view tabs to /my-dashboard's and the new standalone /clients
-# page respectively.
+# page respectively — and since 2026-10 both point at /leads.
 /app/my-pipeline        /app/my-dashboard               301
 /app/my-pipeline/       /app/my-dashboard               301
-/app/my-leads           /app/my-dashboard?view=leads    301
-/app/my-leads/          /app/my-dashboard?view=leads    301
-/app/my-clients         /app/clients                    301
-/app/my-clients/        /app/clients                    301
+/app/my-leads           /app/leads                      301
+/app/my-leads/          /app/leads                      301
+/app/my-clients         /app/leads                      301
+/app/my-clients/        /app/leads                      301
 /app/my-availability    /app/vendor-profile             301
 /app/my-availability/   /app/vendor-profile             301
+
+# The Clients page was dropped in the vendor redesign (2026-10): a couple is a
+# lead until they sign, then a booking. /my-dashboard?view=leads can't be
+# matched here (Pages ignores the query string), so the dashboard forwards
+# that one to /leads itself.
+/app/clients            /app/leads                      301
+/app/clients/           /app/leads                      301

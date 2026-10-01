@@ -103,7 +103,7 @@ test.describe("vendor onboarding", () => {
     // VendorSidebar, so the vendor-tabs switch shows up as the sidebar
     // itself appearing rather than a header link changing.
     await expect(
-      page.getByRole("navigation", { name: "Vendor" }).getByRole("link", { name: "Dashboard" }),
+      page.getByRole("navigation", { name: "Vendor" }).getByRole("link", { name: "Overview" }),
     ).toBeVisible();
     await expect(page.getByRole("link", { name: "Get started" })).not.toBeVisible();
   });

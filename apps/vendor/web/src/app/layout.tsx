@@ -6,6 +6,7 @@ import { SiteFooter } from "@jorna/shared/components/SiteFooter";
 import { PushRuntime } from "@/components/PushRuntime";
 import { SentryRuntime } from "@jorna/shared/components/SentryRuntime";
 import { ChromeGate } from "@/components/ChromeGate";
+import { THEME_BOOT_SCRIPT } from "@/lib/themeBoot";
 
 export const metadata: Metadata = {
   title: "Jorna — Plan your celebration",
@@ -26,7 +27,12 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className="h-full antialiased">
+    // suppressHydrationWarning: THEME_BOOT_SCRIPT sets data-theme on <html>
+    // before React hydrates, which React would otherwise report as a mismatch.
+    <html lang="en" className="h-full antialiased" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body className="flex min-h-full flex-col">
         <SentryRuntime />
         <AuthProvider>

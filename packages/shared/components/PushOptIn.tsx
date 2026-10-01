@@ -15,7 +15,9 @@ import {
 } from "../lib/push";
 import { Button, Card } from "./ui";
 
-export function PushOptIn() {
+/** `showWhenOn`: say notifications are on rather than render nothing — for a
+ *  settings page, where an empty section reads as missing. */
+export function PushOptIn({ showWhenOn = false }: { showWhenOn?: boolean } = {}) {
   const [avail, setAvail] = useState<PushAvailability | null>(null);
   const [perm, setPerm] = useState<PermissionState>("default");
   const [busy, setBusy] = useState(false);
@@ -70,7 +72,7 @@ export function PushOptIn() {
   }
 
   // Just turned on — confirm, since the card would otherwise just disappear.
-  if (done) {
+  if (done || (showWhenOn && perm === "granted")) {
     return (
       <Card className="mb-6 p-4">
         <p className="text-sm text-green">Notifications are on for this browser.</p>

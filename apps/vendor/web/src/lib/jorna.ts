@@ -33,7 +33,6 @@ import type {
   User,
   TaxonomyCategory,
   VendorBooking,
-  VendorClient,
   VendorCreateInput,
   VendorUpdateInput,
   MediaItem,
@@ -898,12 +897,6 @@ export function deleteContractTemplate(templateId: string): Promise<{ message: s
 /** Withdraw an unsigned contract, freeing its date. Signed ones 400. */
 export function voidContract(bookingId: string): Promise<Contract> {
   return apiFetch<Contract>(`/contracts/${bookingId}/void`, { method: "POST" });
-}
-
-// ── Clients CRM ─────────────────────────────────────────────────────
-
-export function getVendorClients(): Promise<{ items: VendorClient[]; total: number }> {
-  return apiFetch("/vendors/me/clients");
 }
 
 // ── Leads ────────────────────────────────────────────────────────────

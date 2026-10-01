@@ -215,21 +215,6 @@ export function mockLead(overrides: Record<string, unknown> = {}) {
   };
 }
 
-export function mockVendorClient(overrides: Record<string, unknown> = {}) {
-  return {
-    key: "client-1",
-    user_id: "client-1",
-    name: "Priya Shah",
-    email: null,
-    phone: null,
-    event_count: 1,
-    lifetime_value_cents: 250000,
-    is_guest: false,
-    repeat_client: false,
-    ...overrides,
-  };
-}
-
 export function mockBundleDetail(overrides: Record<string, unknown> = {}) {
   return {
     bundle_id: "bundle-1",

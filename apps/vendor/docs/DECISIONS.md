@@ -456,3 +456,30 @@ profile) could ever show.
   travel radius is left out of the update instead of sent as null (which
   the backend rejects).
 
+---
+
+## Decision: Vendor redesign, step 0 — the shell (2026-10-01)
+
+The vendor app is being rebuilt page by page from the Figma Make "Wedding
+Vendor Dashboard" design (plan: the "Vendor Dashboard Redesign Plan" doc,
+2026-10-01). Step 0 changes the frame every page sits in:
+
+- The palette and fonts (DM Sans, Manrope) are scoped to `.vendor-shell`
+  (`app/vendor-shell.css`) instead of edited into the shared `globals.css`,
+  which the client app and this app's marketing/signing pages also use.
+  The design is light only; dark keeps the existing dark palette.
+- Sidebar: Overview, Bookings, Contracts, Calendar, Leads, Vendor Profile,
+  Messages, Earnings; Settings, the profile card and Sign out in the footer.
+  Below `lg` it's a top bar and a full-screen menu rather than the design's
+  bottom tab bar, which can't fit nine destinations legibly. Badges: Leads
+  (lib/attention's count until step 2 gives leads their own rules) and
+  Messages (unread).
+- Clients is dropped (no per-client history in v1): `/clients` 301s to
+  `/leads`, which for now hosts the leads list that was the dashboard's
+  `?view=leads` tab. Overview keeps the `/my-dashboard` URL until its rebuild.
+- Settings collects what a vendor sets once: account, Venmo/Zelle (moved off
+  Vendor Profile), tentative-hold length (`contract_hold_days`, previously
+  only overridable per contract), Google Calendar, notifications, theme. The
+  theme toggle left the sidebar, and a stored theme is now applied before
+  first paint (`lib/themeBoot.ts`) — before, a reload dropped it.
+

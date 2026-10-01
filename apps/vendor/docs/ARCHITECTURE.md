@@ -145,9 +145,20 @@ source — nothing to hand-sync anymore. `public/help/index.html` is the one
 remaining no-build-step static file, and does not currently share these
 tokens.
 
+**Vendor shell palette (2026-10):** every page inside `VendorSidebar` takes
+the Figma "Wedding Vendor Dashboard" look from `web/src/app/vendor-shell.css`,
+which redefines the same `--color-*` tokens under `.vendor-shell` (so existing
+pages restyle without edits) and maps `--font-sans`/`--font-serif` to DM Sans
+and Manrope (`web/src/lib/vendorFonts.ts`, self-hosted by `next/font`). Scoped
+there, not in `@jorna/shared/styles/globals.css`, because the client app and
+this app's marketing and signing pages share that file. The shell's own
+pieces (page header, stat tile, status pill, filter tabs, list table, drawer)
+are `web/src/components/vendor/ui.tsx`.
+
 **Light/dark mechanism:** a `data-theme="light"|"dark"` attribute on the root
-element is the primary switch (set by a small inline theme script so there's
-no flash-of-wrong-theme); `@media (prefers-color-scheme: dark)` is only a
+element is the primary switch, re-applied from localStorage before first
+paint by the inline script in `web/src/lib/themeBoot.ts` (root layout); the
+choice is made on the vendor Settings page (`lib/theme.ts`); `@media (prefers-color-scheme: dark)` is only a
 fallback for when no explicit `data-theme` is set. Native form controls
 (date pickers, scrollbars) get their own `color-scheme` per `data-theme` too
 — see the comment block in `globals.css` above the `input[type="date"]`
