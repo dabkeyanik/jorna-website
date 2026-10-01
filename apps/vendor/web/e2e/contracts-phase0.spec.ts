@@ -141,8 +141,10 @@ test.describe("contracts — Phase 0", () => {
     await expect(page.getByText("The link stops working")).toBeVisible();
     await page.getByRole("button", { name: "Void contract" }).click();
 
-    await page.getByRole("tab", { name: "Declined & voided" }).click();
-    await expect(page.getByText("Anita Shah")).toBeVisible();
+    await page.getByRole("tab", { name: /Declined & void/ }).click();
+    const row = page.getByRole("region", { name: "Document library" }).locator("li").first();
+    await expect(row).toContainText("Anita Shah");
+    await expect(row).toContainText("Void");
     expect(api.requestsTo("POST", "/contracts/c-void/void")).toHaveLength(1);
   });
 

@@ -31,8 +31,6 @@ import {
   VendorContractDefaultsFields,
   contractDefaultsToStrings,
 } from "@/components/VendorProfileFields";
-import { deleteTemplate, loadTemplates } from "@/lib/contractTemplates";
-import type { SavedContractTemplate } from "@/lib/types";
 
 function prettyDate(iso?: string | null): string | null {
   if (!iso || iso === "TBD") return null;
@@ -70,29 +68,10 @@ export default function VendorProfilePage() {
   const [equipmentPower, setEquipmentPower] = useState("");
   const [travel, setTravel] = useState("");
   const [guestCountMode, setGuestCountMode] = useState<GuestCountMode>("optional");
-  const [templates, setTemplates] = useState<SavedContractTemplate[]>([]);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login?next=/vendor-profile&role=vendor");
   }, [authLoading, user, router]);
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    // Not worth an error banner on the profile page: without them the
-    // section just doesn't show.
-    loadTemplates()
-      .then((items) => !cancelled && setTemplates(items))
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
-
-  function removeTemplate(id: string) {
-    setTemplates((prev) => prev.filter((t) => t.template_id !== id));
-    deleteTemplate(id).catch(() => loadTemplates().then(setTemplates).catch(() => undefined));
-  }
 
   useEffect(() => {
     if (!user) return;
@@ -307,33 +286,6 @@ export default function VendorProfilePage() {
           </Button>
         </div>
       </form>
-
-      {/* Not part of the profile save above — templates have their own
-          endpoints (lib/contractTemplates.ts) and are made from the builder. */}
-      {templates.length > 0 ? (
-        <>
-          <h2 className="serif mt-9 text-xl text-ink">Saved contract templates</h2>
-          <Card className="mt-5 p-6">
-            <p className="text-sm text-ink-soft">
-              Saved to your account — pick one when you start a contract on{" "}
-              <span className="font-medium text-ink">Contracts → New contract</span>.
-            </p>
-            <div className="mt-4 grid gap-2">
-              {templates.map((t) => (
-                <div
-                  key={t.template_id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5"
-                >
-                  <span className="text-sm font-medium text-ink">{t.name}</span>
-                  <Button variant="ghost" size="md" onClick={() => removeTemplate(t.template_id)}>
-                    Delete template
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </>
-      ) : null}
 
       {/* Availability saves through a different endpoint (setMyAvailability,
           not updateMyVendor) than everything above, so it keeps its own save

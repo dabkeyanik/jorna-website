@@ -7,7 +7,7 @@ import { mockTaxonomyCategories, mockVendorDetail } from "./support/mock-data";
 // Covers saving one from the builder, starting a contract from one, managing
 // them in Settings, and the one-time move of templates this browser saved
 // before they were on the account.
-test.describe("contract templates (/contracts/new, /vendor-profile)", () => {
+test.describe("contract templates (/contracts/new, /contracts)", () => {
   const services = (vendorId: string) => ({
     items: [
       { service_id: "svc-1", vendor_id: vendorId, name: "4-Hour Reception Package", price: 1400, add_ons: [] },
@@ -96,7 +96,7 @@ test.describe("contract templates (/contracts/new, /vendor-profile)", () => {
     await expect(page.getByLabel("Title")).toHaveValue("Meals");
   });
 
-  test("moves templates saved in this browser onto the account, then lists them in Settings", async ({
+  test("moves templates saved in this browser onto the account, then lists them on Contracts", async ({
     page,
     api,
   }) => {
@@ -131,9 +131,11 @@ test.describe("contract templates (/contracts/new, /vendor-profile)", () => {
     });
     api.delete("/contract-templates/t-old", { message: "Template deleted" });
 
-    await page.goto("vendor-profile/");
-    await expect(page.getByRole("heading", { name: "Saved contract templates" })).toBeVisible();
-    await expect(page.getByText("Old terms")).toBeVisible();
+    api.get(`/bookings/vendor/${vendor.vendor_id}`, { items: [], total: 0, limit: 100, offset: 0 });
+
+    await page.goto("contracts/");
+    // The gallery offers it, and opens the builder on it.
+    await expect(page.getByRole("link", { name: /Old terms/ })).toHaveAttribute("href", /contracts\/new\/?\?template=t-old/);
 
     const [upload] = api.requestsTo("POST", "/contract-templates");
     expect(upload.body).toMatchObject({
@@ -147,8 +149,43 @@ test.describe("contract templates (/contracts/new, /vendor-profile)", () => {
     });
     expect(await page.evaluate(() => localStorage.getItem("jorna_contract_templates"))).toBeNull();
 
-    await page.getByRole("button", { name: "Delete template" }).click();
-    await expect(page.getByRole("heading", { name: "Saved contract templates" })).not.toBeVisible();
+    await page.getByRole("button", { name: "Manage templates" }).first().click();
+    const drawer = page.getByRole("dialog");
+    await expect(drawer.getByText("Old terms")).toBeVisible();
+    await drawer.getByRole("button", { name: "Delete template" }).click();
+    await expect(drawer.getByText("Old terms")).toHaveCount(0);
     expect(api.requestsTo("DELETE", "/contract-templates/t-old")).toHaveLength(1);
+  });
+
+  test("a gallery link opens the builder already on that template", async ({ page, api }) => {
+    await loginAs(page, api);
+    const vendor = mockVendorDetail();
+    api.get("/vendors/me", vendor);
+    api.get("/services", services(vendor.vendor_id));
+    api.get("/contract-templates", {
+      items: [
+        {
+          template_id: "t-1",
+          name: "Sangeet",
+          body: {
+            version: 1,
+            lines: [
+              { kind: "package", serviceId: "svc-1", addonId: null, name: "4-Hour Reception Package", unit: "event", price: "2000", quantity: "1" },
+            ],
+            schedule: [{ label: "Full payment", percent: 100, dueType: "on_signing", dueDays: "" }],
+            clauses: [{ title: "Meals", body: "Dinner for two." }],
+          },
+          created_at: "2030-01-01T00:00:00",
+          updated_at: "2030-01-01T00:00:00",
+        },
+      ],
+      total: 1,
+    });
+
+    await page.goto("contracts/new/?template=t-1");
+
+    await expect(page.getByText("Loaded “Sangeet”.", { exact: false })).toBeVisible();
+    await page.getByRole("button", { name: "5. Terms" }).click();
+    await expect(page.getByLabel("Title")).toHaveValue("Meals");
   });
 });

@@ -122,6 +122,9 @@ function NewContractInner() {
   const leadId = params.get("lead");
   const editId = params.get("edit");
   const requestId = params.get("request");
+  // A gallery card on /contracts opens the builder on one of the vendor's
+  // saved templates.
+  const templateId = params.get("template");
 
   const [vendor, setVendor] = useState<VendorDetail | null>(null);
   const [services, setServices] = useState<ServiceItem[]>([]);
@@ -202,7 +205,14 @@ function NewContractInner() {
           start.clientPhone = lead.phone ?? "";
           if (lead.event_date_iso && lead.event_date_iso >= todayIso()) start.dateIso = lead.event_date_iso;
         }
-        setDraft(start);
+        const picked = templateId ? tpl.find((t) => t.template_id === templateId) : undefined;
+        if (picked) {
+          const usable = (svc?.items ?? []).filter((x) => x.status !== "archived");
+          setDraft(applyTemplate(start, templateBody(picked), usable));
+          setTemplateNotice(`Loaded “${picked.name}”. Check the items and payments before sending.`);
+        } else {
+          setDraft(start);
+        }
       })
       .catch((err) =>
         !cancelled &&
@@ -212,7 +222,7 @@ function NewContractInner() {
     return () => {
       cancelled = true;
     };
-  }, [user, router, leadId, editId, requestId]);
+  }, [user, router, leadId, editId, requestId, templateId]);
 
   const issues = useMemo(() => problemsByStep(draft, todayIso()), [draft]);
   const issuesFor = (s: Step) => issues.filter((i) => i.step === s).map((i) => i.message);

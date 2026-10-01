@@ -616,3 +616,24 @@ changed, as planned. One fix rode along: Earnings' "Payment details → Edit"
 pointed at Vendor Profile, but Venmo/Zelle have been on Settings since
 step 0.
 
+---
+
+## Decision: Vendor redesign, step 7a — Contracts library and template gallery (2026-10-01)
+
+Contracts is the design's template gallery over a document library; the
+builder behind "New contract" is still today's (`/contracts/new`) until the
+document editor (7b) replaces it.
+
+- Gallery: Blank (the vendor's usual terms), the vendor's first saved
+  template (opens `/contracts/new?template=<id>`, which the builder now
+  reads), a "<speciality> services agreement" when nothing is saved, and
+  Addendum / Cancellation shown as coming with the new editor — they need
+  backend template types (plan's backend change 4).
+- Saved templates moved from Vendor Profile to "Manage templates" here.
+- Library: search, filters, and a table of name, client, status, last
+  modified. Statuses are the plan's (Draft, Sent, Viewed, Signed, Deposit
+  due, Paid, Expired, Declined, Void) plus "Confirm payment" when the
+  couple says they've paid. A draft opens in the builder; anything sent or
+  signed opens read-only. The hold line (opened yet, held until) stays on
+  each unsigned row, as do Send/Resend, Copy link, View as client and Void.
+
