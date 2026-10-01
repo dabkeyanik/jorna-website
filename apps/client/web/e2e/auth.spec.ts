@@ -61,7 +61,7 @@ test.describe("authentication", () => {
     await expect(page.getByRole("heading", { name: "This is a vendor account" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Go to jornaevents.com" })).toHaveAttribute(
       "href",
-      "https://jornaevents.com/app/my-dashboard",
+      "https://jornaevents.com/app/overview",
     );
   });
 
