@@ -584,3 +584,25 @@ contract, and "Mark as unread". Clients keep the old list and
   every few seconds, and reading is what clears the mark.
 - Left out as decided: "Active now" and file attachments.
 
+---
+
+## Decision: Vendor redesign, step 5 — Vendor Profile in the design's layout (2026-10-01)
+
+Vendor Profile has the design's header ("Add package"), identity card (photo,
+name, category · city, "Preview public profile"), the package list, then
+"About your business".
+
+- Packages are the design's numbered, expandable rows: name (and Private),
+  coverage (included hours, else duration), "best for" (the speciality),
+  starting price. A row opens to "What's included" and a summary that adds
+  the real fields the design doesn't show — open to offers, add-ons, listing
+  — plus the existing controls: reorder, duplicate, private/public,
+  preview, delete, photos and video.
+- "Edit package" opens `ServicesManager`'s existing editor inside that row,
+  so every field (price unit, add-ons, photos, negotiable, per-package terms)
+  is edited exactly as before; a new package's editor still opens at the
+  top. The page header reaches it through a ref (`ServicesManagerHandle`).
+- No "Most popular" badge: nothing records which package is most popular.
+- Contract defaults, saved templates, availability and reviews stay below,
+  restyled; Contracts (step 7) is where contract defaults may move.
+

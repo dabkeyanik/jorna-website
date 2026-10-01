@@ -50,12 +50,14 @@ test.describe("packages — Phase 1", () => {
       return services[0];
     });
 
-    await page.getByRole("button", { name: "Add a package" }).click();
+    // The page header's "Add package" opens the form.
+    await page.getByRole("button", { name: "Add package" }).first().click();
     await page.getByLabel("Package name").fill("Sangeet DJ set");
 
     // No pricing chosen yet → no price field, and saving says why.
     await expect(page.getByLabel("Price", { exact: true })).toHaveCount(0);
-    await page.getByRole("button", { name: "Add package" }).click();
+    const save = page.locator("form").getByRole("button", { name: "Add package" });
+    await save.click();
     await expect(page.getByText("Choose how this package is priced.")).toBeVisible();
 
     await page.getByRole("button", { name: "Flat price" }).click();
@@ -75,7 +77,7 @@ test.describe("packages — Phase 1", () => {
     await page.getByLabel("Cancellation window (days)").first().fill("30");
 
     await page.getByRole("button", { name: "Private" }).click();
-    await page.getByRole("button", { name: "Add package" }).click();
+    await save.click();
 
     await expect(page.getByText("Sangeet DJ set")).toBeVisible();
     const [call] = api.requestsTo("POST", "/services");
@@ -93,6 +95,25 @@ test.describe("packages — Phase 1", () => {
     expect(call.body).not.toHaveProperty("experience");
   });
 
+  test("the profile shows who couples see, and a package opens to its details and editor", async ({
+    page,
+    api,
+  }) => {
+    await openProfile(page, api, () => [
+      pkg({ included_hours: 5, inclusions: ["Sound system", "MC for the night"], negotiable: true }),
+    ]);
+
+    await expect(page.getByRole("link", { name: "Preview public profile" })).toHaveAttribute("href", /vendor\/?\?id=/);
+    const row = page.getByRole("button", { name: /Reception set/ });
+    await expect(row).toContainText("5 hours");
+    await row.click();
+    await expect(page.getByText("MC for the night")).toBeVisible();
+    await expect(page.getByText("Open to offers", { exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "Edit package" }).click();
+    await expect(page.getByLabel("Package name")).toHaveValue("Reception set");
+  });
+
   test("making a package private, and deleting a booked one archives it", async ({
     page,
     api,
@@ -108,8 +129,11 @@ test.describe("packages — Phase 1", () => {
       return {};
     });
 
+    // A package's actions are inside its row, as in the design.
+    await page.getByRole("button", { name: /Reception set/ }).click();
+    await expect(page.getByText("What's included", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Make private" }).click();
-    await expect(page.getByText("Private", { exact: true })).toBeVisible();
+    await expect(page.getByText("Private", { exact: true }).first()).toBeVisible();
     expect(api.requestsTo("PATCH", "/services/svc-1")[0].body).toEqual({ status: "hidden" });
 
     await page.getByRole("button", { name: "Delete", exact: true }).click();

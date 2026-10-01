@@ -17,7 +17,7 @@
 // terms that override the vendor's defaults. Years in business moved to the
 // vendor's own profile — it was asked again on every package.
 
-import { useEffect, useState } from "react";
+import { useEffect, useImperativeHandle, useState, type Ref } from "react";
 import { ApiError } from "@jorna/shared/lib/api";
 import {
   createService,
@@ -31,6 +31,7 @@ import {
   type ServiceInput,
 } from "@/lib/jorna";
 import {
+  categoryLabel,
   priceUnitLabel,
   usableMedia,
   type AddOn,
@@ -46,6 +47,28 @@ import { Button, Card, Chip, Field } from "@jorna/shared/components/ui";
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
+}
+
+/** "6 hours" — included hours if set, else the listing's duration. */
+function coverage(s: ServiceItem): string {
+  if (s.included_hours) return `${s.included_hours} hour${s.included_hours === 1 ? "" : "s"}`;
+  if (s.duration_minutes) {
+    const h = Math.round((s.duration_minutes / 60) * 10) / 10;
+    return `${h} hour${h === 1 ? "" : "s"}`;
+  }
+  return "Flexible";
+}
+
+/** The speciality it's listed under, in words. */
+function bestFor(s: ServiceItem, categories: TaxonomyCategory[]): string {
+  const cat = categories.find((c) => c.value === s.category);
+  const sub = cat?.subcategories?.find((x) => x.value === s.subcategory);
+  return sub?.label ?? cat?.label ?? (s.category ? categoryLabel(s.subcategory || s.category) : "Any event");
+}
+
+/** Lets the page's header button open the new-package form. */
+export interface ServicesManagerHandle {
+  startNew: () => void;
 }
 
 // A locally-generated preview — an object URL for a File the vendor just
@@ -162,6 +185,7 @@ export function ServicesManager({
   initial,
   autoStartNew = false,
   onServiceAdded,
+  ref,
 }: {
   vendor: VendorDetail;
   categories: TaxonomyCategory[];
@@ -176,6 +200,7 @@ export function ServicesManager({
    *  upload doesn't hold it back — the service itself is already saved by
    *  then). Used by the onboarding wizard to move to the next step. */
   onServiceAdded?: () => void;
+  ref?: Ref<ServicesManagerHandle>;
 }) {
   const [services, setServices] = useState<ServiceItem[]>(initial);
   const [error, setError] = useState<string | null>(null);
@@ -184,6 +209,8 @@ export function ServicesManager({
   const [matched, setMatched] = useState<string | null>(null);
 
   const [editing, setEditing] = useState<string | "new" | null>(autoStartNew ? "new" : null);
+  // Which package row is open (the design's expandable list).
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(
     autoStartNew
       ? { ...blank, category: vendor.category ?? "", subcategory: vendor.subcategory ?? "" }
@@ -285,6 +312,13 @@ export function ServicesManager({
     // different service entirely — leaks into this blank form.
     setMatched(null);
   }
+  useImperativeHandle(ref, () => ({
+    startNew: () => {
+      startNew();
+      setExpanded(null);
+    },
+  }));
+
 
   function startEdit(s: ServiceItem) {
     const f = formFrom(s);
@@ -292,6 +326,7 @@ export function ServicesManager({
     setNewPhotos([]);
     setNewVideos([]);
     setEditing(s.service_id);
+    setExpanded(s.service_id);
     setShowTerms(hasCustomTerms(f));
     setError(null);
     setNotice(null);
@@ -650,31 +685,10 @@ export function ServicesManager({
   const archived = services.filter((x) => x.status === "archived");
   const unitNoun = PRICE_UNITS.find((u) => u.value === form.price_unit)?.label.toLowerCase();
 
-  return (
-    <section id="services" className="mt-9 scroll-mt-20">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="serif text-2xl text-ink">Packages</h2>
-          <p className="mt-1 text-sm text-ink-soft">
-            What clients can book. Each one has its own price and terms.
-          </p>
-        </div>
-        {editing === null ? <Button onClick={startNew}>Add a package</Button> : null}
-      </div>
-
-      {error && editing === null ? (
-        <p
-          role="alert"
-          className="mt-4 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold"
-        >
-          {error}
-        </p>
-      ) : null}
-      {notice ? (
-        <p className="mt-4 rounded-lg bg-gold/10 px-3 py-2 text-sm text-ink-soft">{notice}</p>
-      ) : null}
-
-      {editing !== null ? (
+  // The full editor: shown at the top for a new package, and inside the
+  // package's own row when editing one.
+  const editorCard =
+    editing !== null ? (
         <Card className="mt-5 p-6">
           <h3 className="serif text-xl text-ink">
             {editing === "new" ? "New package" : "Edit package"}
@@ -1245,14 +1259,49 @@ export function ServicesManager({
             </div>
           </form>
         </Card>
+    ) : null;
+
+  return (
+    <section id="services" className="mt-9 scroll-mt-20">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-ink-faint">Services &amp; pricing</p>
+          <h2 className="serif mt-1 text-xl text-ink">Your packages</h2>
+          <p className="mt-1 text-sm text-ink-soft">
+            Show couples what they can book with you. Each one has its own price and terms.
+          </p>
+        </div>
+        {editing === null ? (
+          <button
+            type="button"
+            onClick={startNew}
+            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-line bg-card px-3 text-sm font-semibold text-ink-soft hover:text-ink"
+          >
+            <span className="text-lg leading-none text-gold">+</span> Add package
+          </button>
+        ) : null}
+      </div>
+
+      {error && editing === null ? (
+        <p
+          role="alert"
+          className="mt-4 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold"
+        >
+          {error}
+        </p>
       ) : null}
+      {notice ? (
+        <p className="mt-4 rounded-lg bg-gold/10 px-3 py-2 text-sm text-ink-soft">{notice}</p>
+      ) : null}
+
+      {editing === "new" ? editorCard : null}
 
       {ordered.length === 0 && editing === null ? (
         <p className="mt-8 text-center text-ink-soft">
           No packages yet. Clients can&apos;t book you until you list at least one.
         </p>
       ) : (
-        <div className="mt-5 grid gap-3">
+        <div className="mt-5 grid gap-2">
           {ordered.map((s, index) => {
             const unit = priceUnitLabel(s.price_unit);
             const details = [
@@ -1264,80 +1313,152 @@ export function ServicesManager({
               s.negotiable ? "open to offers" : null,
             ].filter(Boolean);
             return (
-              <Card key={s.service_id} className="p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="serif flex items-center gap-2 text-lg text-ink">
-                      {s.name}
+              <article
+                key={s.service_id}
+                className={`overflow-hidden rounded-[13px] border bg-card transition ${
+                  expanded === s.service_id ? "border-line shadow-[0_8px_24px_rgba(50,44,38,0.06)]" : "border-card-edge"
+                }`}
+              >
+                <button
+                  type="button"
+                  aria-expanded={expanded === s.service_id}
+                  onClick={() => setExpanded(expanded === s.service_id ? null : s.service_id)}
+                  className="grid w-full grid-cols-[2.25rem_minmax(0,1fr)_auto_auto] items-center gap-3 px-3.5 py-3.5 text-left md:grid-cols-[2.25rem_minmax(0,1.4fr)_minmax(0,0.7fr)_minmax(0,0.8fr)_8rem_auto]"
+                >
+                  <span className="serif text-sm text-ink-faint">{String(index + 1).padStart(2, "0")}</span>
+                  <span className="grid min-w-0">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <strong className="truncate text-sm text-ink">{s.name}</strong>
                       {s.status === "hidden" ? (
-                        <span className="rounded-full bg-panel px-2 py-0.5 font-sans text-xs text-ink-soft">
+                        <span className="shrink-0 rounded-full bg-panel px-2 py-0.5 text-[0.68rem] font-semibold text-ink-soft">
                           Private
                         </span>
                       ) : null}
-                    </h3>
-                    <p className="mt-0.5 text-sm text-ink-soft">{details.join(" · ")}</p>
-                    {s.inclusions?.length ? (
-                      <p className="mt-1 text-sm text-ink-faint">
-                        Includes {s.inclusions.slice(0, 3).join(", ")}
-                        {s.inclusions.length > 3 ? ` and ${s.inclusions.length - 3} more` : ""}
-                      </p>
-                    ) : s.description ? (
-                      <p className="mt-1 text-sm text-ink-faint">{s.description}</p>
-                    ) : null}
+                    </span>
+                    <small className="truncate text-xs text-ink-faint">{s.description || details.slice(1).join(" · ")}</small>
+                  </span>
+                  <span className="hidden min-w-0 md:grid">
+                    <small className="text-[0.68rem] text-ink-faint">Coverage</small>
+                    <strong className="truncate text-sm text-ink">{coverage(s)}</strong>
+                  </span>
+                  <span className="hidden min-w-0 md:grid">
+                    <small className="text-[0.68rem] text-ink-faint">Best for</small>
+                    <strong className="truncate text-sm text-ink">{bestFor(s, categories)}</strong>
+                  </span>
+                  <span className="grid text-right">
+                    <small className="text-[0.68rem] text-ink-faint">Starting at</small>
+                    <strong className="serif text-sm text-ink">
+                      {money(s.price)}
+                      {unit ? <span className="font-sans text-xs font-normal text-ink-faint"> {unit}</span> : null}
+                    </strong>
+                  </span>
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.7}
+                    className={`size-4 text-ink-faint transition ${expanded === s.service_id ? "rotate-90" : ""}`}
+                  >
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </button>
+
+                {expanded === s.service_id ? (
+                <div className="border-t border-line-soft bg-ground-2/60 px-4 py-5 sm:px-6">
+                {editing === s.service_id ? (
+                  editorCard
+                ) : (
+                <>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-ink-faint">Package overview</p>
+                    <p className="serif mt-0.5 text-lg text-ink">What&apos;s included</p>
                   </div>
-                  <div className="flex shrink-0 flex-wrap items-center gap-1">
-                    {/* Order: the list clients see follows this. */}
-                    <button
-                      type="button"
-                      aria-label={`Move ${s.name} up`}
-                      disabled={busy || index === 0}
-                      onClick={() => move(s, -1)}
-                      className="px-2 py-1 text-ink-faint hover:text-ink disabled:opacity-30"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Move ${s.name} down`}
-                      disabled={busy || index === ordered.length - 1}
-                      onClick={() => move(s, 1)}
-                      className="px-2 py-1 text-ink-faint hover:text-ink disabled:opacity-30"
-                    >
-                      ↓
-                    </button>
-                    <Button variant="ghost" size="md" onClick={() => startEdit(s)}>
-                      Edit
-                    </Button>
-                    <Button variant="quiet" size="md" onClick={() => duplicate(s)}>
-                      Duplicate
-                    </Button>
-                    <Button
-                      variant="quiet"
-                      size="md"
-                      disabled={busy}
-                      onClick={() => setStatus(s, s.status === "hidden" ? "active" : "hidden")}
-                    >
-                      {s.status === "hidden" ? "List publicly" : "Make private"}
-                    </Button>
-                    {/* The public page a client lands on — a private package's
-                        still opens there by id, which is how the vendor can
-                        check it. */}
-                    <a
-                      href={`/app/service/?id=${s.service_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-2 py-1 text-sm font-semibold text-ink-soft hover:text-ink"
-                    >
-                      Preview
-                    </a>
-                    <Button
-                      variant="quiet"
-                      size="md"
-                      onClick={() => setConfirmDelete(s.service_id)}
-                    >
-                      Delete
-                    </Button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => startEdit(s)}
+                    className="inline-flex h-9 items-center rounded-[9px] border border-line bg-card px-3 text-sm font-semibold text-ink"
+                  >
+                    Edit package
+                  </button>
+                </div>
+                <div className="mt-4 grid gap-5 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+                  {s.inclusions?.length ? (
+                    <ul className="grid content-start gap-2 sm:grid-cols-2">
+                      {s.inclusions.map((inc) => (
+                        <li key={inc} className="flex items-start gap-2 text-sm text-ink-soft">
+                          <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full bg-green/15 text-[0.6rem] text-green">✓</span>
+                          {inc}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-ink-faint">
+                      Nothing listed yet — add what&apos;s included so couples can compare.
+                    </p>
+                  )}
+                  <dl className="grid grid-cols-2 overflow-hidden rounded-xl border border-card-edge bg-card text-sm">
+                    {[
+                      ["Coverage", coverage(s)],
+                      ["Event type", bestFor(s, categories)],
+                      ["Starting price", `${money(s.price)} ${unit}`.trim()],
+                      ["Open to offers", s.negotiable ? "Yes" : "No"],
+                      ["Add-ons", s.add_ons?.length ? s.add_ons.map((a) => a.name).join(", ") : "None"],
+                      ["Listing", s.status === "hidden" ? "Private" : "Public"],
+                    ].map(([label, value]) => (
+                      <div key={label} className="min-w-0 border-b border-r border-line-soft px-3 py-2.5 [&:nth-child(2n)]:border-r-0">
+                        <dt className="text-[0.68rem] font-semibold uppercase tracking-[0.06em] text-ink-faint">{label}</dt>
+                        <dd className="mt-0.5 truncate text-ink">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-1">
+                  {/* Order: the list clients see follows this. */}
+                  <button
+                    type="button"
+                    aria-label={`Move ${s.name} up`}
+                    disabled={busy || index === 0}
+                    onClick={() => move(s, -1)}
+                    className="px-2 py-1 text-ink-faint hover:text-ink disabled:opacity-30"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Move ${s.name} down`}
+                    disabled={busy || index === ordered.length - 1}
+                    onClick={() => move(s, 1)}
+                    className="px-2 py-1 text-ink-faint hover:text-ink disabled:opacity-30"
+                  >
+                    ↓
+                  </button>
+                  <Button variant="quiet" size="md" onClick={() => duplicate(s)}>
+                    Duplicate
+                  </Button>
+                  <Button
+                    variant="quiet"
+                    size="md"
+                    disabled={busy}
+                    onClick={() => setStatus(s, s.status === "hidden" ? "active" : "hidden")}
+                  >
+                    {s.status === "hidden" ? "List publicly" : "Make private"}
+                  </Button>
+                  {/* The public page a client lands on — a private package's
+                      still opens there by id, which is how the vendor can
+                      check it. */}
+                  <a
+                    href={`/app/service/?id=${s.service_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2 py-1 text-sm font-semibold text-ink-soft hover:text-ink"
+                  >
+                    Preview
+                  </a>
+                  <Button variant="quiet" size="md" className="ml-auto" onClick={() => setConfirmDelete(s.service_id)}>
+                    Delete
+                  </Button>
                 </div>
 
                 {/* Photos & videos */}
@@ -1476,7 +1597,11 @@ export function ServicesManager({
                     </div>
                   </div>
                 ) : null}
-              </Card>
+                </>
+                )}
+                </div>
+                ) : null}
+              </article>
             );
           })}
         </div>
