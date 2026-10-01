@@ -428,3 +428,31 @@ overtime terms; years of experience moved to the vendor.
 - `/service` shows hours included, inclusions and add-ons to clients.
 - Add-ons are shown to clients and stored, but not yet priced into a
   contract — that's Phase 2's line items.
+
+---
+
+## Decision: Vendor app sign-in lands vendors-to-be in onboarding (2026-10-01)
+
+Signing in on the vendor app with an account that has no vendor profile used
+to land on the client home (`/home`) — a rule from when one app served both
+sides. On jornaevents.com that read as "sign-in took me to the client view",
+and it was all a Google sign-in on staging (separate database, no vendor
+profile) could ever show.
+
+- `defaultLanding` (lib/role.ts): a vendor goes to the dashboard, anyone
+  else to `/vendor-onboarding`. A failed vendor check (network, 5xx) is
+  retried once and never cached, and lands on the dashboard, which shows
+  "Try again" instead of treating the failure as "not a vendor".
+- Sign-up here is always a vendor sign-up: the Host/Vendor picker is gone,
+  and a "Planning a celebration?" link (plus the marketing pages' client
+  "Get started" buttons) goes to book.jornaevents.com.
+- `/auth/callback` puts a 20s limit on each step and offers "Try again", so
+  a stalled request can't leave "Finishing sign-in…" up forever; the
+  Supabase session is dropped locally rather than with a network call.
+- `logout(to)` does a full page load to a plain `/login` (or `to`), so a
+  page's own "signed out → /login?next=<this page>" redirect can't send the
+  next person to sign in to the previous person's page.
+- Onboarding: choosing a category in the dropdown selects it, and a blank
+  travel radius is left out of the update instead of sent as null (which
+  the backend rejects).
+

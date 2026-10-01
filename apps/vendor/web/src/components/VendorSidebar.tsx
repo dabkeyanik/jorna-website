@@ -155,7 +155,7 @@ export function VendorSidebar({ children }: { children: React.ReactNode }) {
           </button>
           <button
             type="button"
-            onClick={logout}
+            onClick={() => logout()}
             style={{ color: RAIL_INK_SOFT }}
             className="text-xs font-medium underline-offset-2 hover:underline lg:hidden"
           >
@@ -221,7 +221,7 @@ export function VendorSidebar({ children }: { children: React.ReactNode }) {
           </div>
           <button
             type="button"
-            onClick={logout}
+            onClick={() => logout()}
             style={{ color: RAIL_INK_SOFT }}
             className="mt-3 text-xs font-medium underline-offset-2 hover:underline"
           >

@@ -103,6 +103,8 @@ function clock(raw?: string | null): string | null {
 /** Everything the page reads, fetched in one pass. */
 interface Snapshot {
   vendor: VendorDetail | null;
+  /** The vendor check itself failed (network, 5xx) — not the same as "no vendor". */
+  failed?: boolean;
   bookings?: VendorBooking[];
   earnings?: Earnings | null;
   stripe?: StripeStatus | null;
@@ -284,6 +286,11 @@ function VendorDashboardInner() {
 
   const [vendor, setVendor] = useState<VendorDetail | null>(null);
   const [notVendor, setNotVendor] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  // No vendor profile yet: setup is the only useful thing here.
+  useEffect(() => {
+    if (notVendor) router.replace("/vendor-onboarding");
+  }, [notVendor, router]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [bookings, setBookings] = useState<VendorBooking[]>([]);
   const [cash, setCash] = useState<VendorMoney | null>(null);
@@ -308,7 +315,12 @@ function VendorDashboardInner() {
    */
   const fetchAll = useCallback(async (): Promise<Snapshot | null> => {
     if (!user) return null;
-    const me = await getMyVendor().catch(() => null);
+    let me: VendorDetail | null;
+    try {
+      me = await getMyVendor();
+    } catch {
+      return { vendor: null, failed: true };
+    }
     if (!me) return { vendor: null };
 
     // Each of these is a section of the page; one failing should cost that
@@ -346,6 +358,12 @@ function VendorDashboardInner() {
 
   const apply = useCallback((snap: Snapshot | null) => {
     if (!snap) return;
+    if (snap.failed) {
+      setLoadFailed(true);
+      setLoading(false);
+      return;
+    }
+    setLoadFailed(false);
     if (!snap.vendor) {
       setNotVendor(true);
       setLoading(false);
@@ -474,18 +492,23 @@ function VendorDashboardInner() {
   }
 
   if (notVendor) {
+    return <p className="py-20 text-center text-ink-soft">Loading…</p>;
+  }
+
+  if (loadFailed) {
     return (
-      <div className="mx-auto w-[min(560px,100%-2rem)] py-20 text-center">
-        <h1 className="serif text-3xl text-maroon dark:text-gold">
-          This is the vendor dashboard
-        </h1>
-        <p className="mx-auto mt-3 max-w-[44ch] text-ink-soft">
-          You don&apos;t have a vendor profile yet. Set one up to list packages, take
-          bookings, and get paid.
-        </p>
-        <LinkButton href="/vendor-profile" className="mt-6">
-          Start selling
-        </LinkButton>
+      <div className="py-20 text-center">
+        <p className="text-ink-soft">Couldn&apos;t load your dashboard.</p>
+        <Button
+          variant="ghost"
+          className="mt-4"
+          onClick={() => {
+            setLoading(true);
+            void reload();
+          }}
+        >
+          Try again
+        </Button>
       </div>
     );
   }

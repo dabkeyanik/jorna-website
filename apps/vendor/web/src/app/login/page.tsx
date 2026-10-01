@@ -9,6 +9,7 @@ import { defaultLanding } from "@/lib/role";
 import { supabase, startGoogleSignIn } from "@/lib/supabase";
 import { Button, Card, Field } from "@jorna/shared/components/ui";
 import { CityCombobox, type Coords } from "@jorna/shared/components/CityCombobox";
+import { clientAppUrl } from "@/lib/clientApp";
 
 function GoogleMark() {
   // Google "G", inline so nothing is fetched over the network (the site's ethos).
@@ -21,18 +22,6 @@ function GoogleMark() {
     </svg>
   );
 }
-
-// Which side of the marketplace someone is joining. Deliberately *not* a
-// backend concept: /auth/register takes no role and the account created is
-// identical either way — "is a vendor" is derived from having a vendor profile.
-// The choice decides where we land them afterwards, and it puts selling in
-// front of vendors at the same moment iOS asks the same question.
-type Role = "host" | "vendor";
-
-const ROLES: { value: Role; label: string; hint: string }[] = [
-  { value: "host", label: "Host", hint: "Plan a celebration and book a team." },
-  { value: "vendor", label: "Vendor", hint: "List your packages and get booked." },
-];
 
 /**
  * Where a successful login is allowed to send someone.
@@ -73,15 +62,6 @@ function LoginInner() {
   // worked, in both directions, for as long as you stayed on the page.
   const mode: "login" | "register" =
     isGoogleSignup || params.get("mode") === "register" ? "register" : "login";
-  // No default beyond what the entry point already told us: a CTA like
-  // "Become a vendor" passes ?role=vendor so the choice this page would
-  // otherwise ask again is already made. Read once on mount, same as `next`
-  // below — unlike `mode`, this is also user-editable via the toggle, so it
-  // can't be re-derived from the URL on every render the way `mode` is.
-  const [role, setRole] = useState<Role | null>(() => {
-    const r = params.get("role");
-    return r === "vendor" || r === "host" ? r : null;
-  });
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -167,16 +147,10 @@ function LoginInner() {
         // The Jorna JWT is the session now; drop the Supabase one.
         if (isGoogleSignup) await supabase.auth.signOut();
       }
-      // A new vendor goes straight into guided setup — the web equivalent of
-      // iOS routing "I am a Vendor" into VendorInfoView, so the account and
-      // the storefront are one continuous flow.
-      // With no `next`, where to go depends on whether this account sells —
-      // see defaultLanding.
-      router.push(
-        mode === "register" && role === "vendor"
-          ? "/vendor-onboarding"
-          : (next ?? (await defaultLanding())),
-      );
+      // Sign-up on the vendor app is always a vendor sign-up: straight into
+      // guided setup, as iOS routes "I am a Vendor" into VendorInfoView. A
+      // sign-in goes where it was headed, else by role (defaultLanding).
+      router.push(mode === "register" ? "/vendor-onboarding" : (next ?? (await defaultLanding())));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -188,9 +162,9 @@ function LoginInner() {
     setError(null);
     setGoogleBusy(true);
     try {
-      // The role only means something for a sign-up; a returning user's account
-      // already knows what it is.
-      await startGoogleSignIn(next, mode === "register" ? role : null);
+      // A sign-up is a vendor sign-up (the callback then opens setup); a
+      // returning account already knows what it is.
+      await startGoogleSignIn(next, mode === "register" ? "vendor" : null);
     } catch {
       setGoogleBusy(false);
       setError("Couldn't start Google sign-in. Please try again.");
@@ -201,23 +175,14 @@ function LoginInner() {
     ? "Finish signing up"
     : mode === "login"
       ? "Welcome back"
-      : "Create your account";
+      : "List your business on Jorna";
 
-  // Doubles as the prompt for the role choice: until one is picked the submit
-  // button is disabled, so the subheading says what's missing rather than
-  // leaving a dead button to puzzle over.
   const subheading =
     mode === "login"
-      ? role === "vendor"
-        ? "Sign in to manage your listing."
-        : "Sign in to build and book your celebration."
-      : role === null
-        ? "First — how will you use Jorna?"
-        : isGoogleSignup
-          ? "A few details and your Google account is all set."
-          : role === "vendor"
-            ? "A few details and you're ready to list."
-            : "A few details and you're planning.";
+      ? "Sign in to manage your bookings and listing."
+      : isGoogleSignup
+        ? "A few details and your Google account is all set."
+        : "Create your vendor account — setup takes a few minutes.";
 
   const submitLabel = busy
     ? "One moment…"
@@ -225,9 +190,7 @@ function LoginInner() {
       ? "Complete sign-up"
       : mode === "login"
         ? "Sign in"
-        : role === "vendor"
-          ? "Create account & continue"
-          : "Create account";
+        : "Create account & continue";
 
   return (
     <div className="mx-auto w-[min(460px,100%-2rem)] py-14">
@@ -235,41 +198,6 @@ function LoginInner() {
       <p className="mt-2 text-center text-ink-soft">{subheading}</p>
 
       <Card className="mt-8 p-6">
-        {/* The role fork sits above Google, not inside the form: with one-tap
-            sign-up, that button *is* the whole registration, so the choice has to
-            be made before it's pressed. It rides across the OAuth round trip in
-            localStorage (see lib/supabase) since there's no form to carry it. */}
-        {mode === "register" ? (
-          <div className="mb-5">
-            <p className="mb-2.5 text-sm font-medium text-ink-soft">I&apos;m joining as</p>
-            <div className="grid grid-cols-2 gap-2.5">
-              {ROLES.map((r) => {
-                const active = role === r.value;
-                return (
-                  <button
-                    key={r.value}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setRole(r.value)}
-                    className={`rounded-xl border px-3 py-3 text-left transition ${
-                      active
-                        ? "border-gold bg-gold/12 ring-1 ring-gold/40"
-                        : "border-card-edge bg-ground-2 hover:border-gold/50"
-                    }`}
-                  >
-                    <span
-                      className={`block text-sm font-semibold ${active ? "text-maroon dark:text-gold" : "text-ink"}`}
-                    >
-                      {r.label}
-                    </span>
-                    <span className="mt-0.5 block text-[0.7rem] text-ink-faint">{r.hint}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
-
         {/* Google — offered on the normal login/register screens, not mid-completion. */}
         {!isGoogleSignup ? (
           <>
@@ -277,7 +205,7 @@ function LoginInner() {
               type="button"
               variant="ghost"
               size="lg"
-              disabled={googleBusy || (mode === "register" && role === null)}
+              disabled={googleBusy}
               onClick={google}
               className="w-full"
             >
@@ -286,9 +214,7 @@ function LoginInner() {
             </Button>
             {mode === "register" ? (
               <p className="mt-2 text-center text-xs text-ink-faint">
-                {role === null
-                  ? "Choose one above to continue."
-                  : "That's the whole sign-up — no form to fill in."}
+                That&apos;s the whole sign-up — no form to fill in.
               </p>
             ) : null}
             <div className="my-5 flex items-center gap-3 text-xs text-ink-faint">
@@ -411,9 +337,7 @@ function LoginInner() {
           <Button
             type="submit"
             size="lg"
-            disabled={
-              busy || (isGoogleSignup && !googleReady) || (mode === "register" && role === null)
-            }
+            disabled={busy || (isGoogleSignup && !googleReady)}
             className="mt-1"
           >
             {submitLabel}
@@ -431,6 +355,20 @@ function LoginInner() {
           >
             {mode === "login" ? "Create an account" : "Sign in"}
           </button>
+        </p>
+      ) : null}
+
+      {/* Couples plan and book on the client app; an account made here is set
+          up as a vendor. */}
+      {!isGoogleSignup ? (
+        <p className="mt-2 text-center text-sm text-ink-faint">
+          Planning a celebration?{" "}
+          <a
+            href={clientAppUrl(mode === "register" ? "/login?mode=register" : "/login")}
+            className="font-semibold text-gold underline-offset-2 hover:underline"
+          >
+            Go to book.jornaevents.com
+          </a>
         </p>
       ) : null}
     </div>

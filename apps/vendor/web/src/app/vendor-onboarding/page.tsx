@@ -211,7 +211,9 @@ export default function VendorOnboardingPage() {
     setError(null);
     try {
       const updated = await updateMyVendor({
-        travel_radius_miles: radius ? Number(radius) : null,
+        // Left out when blank: the backend rejects an explicit null (it
+        // validates any radius it's sent as 1–500), and blank means "not set".
+        ...(radius ? { travel_radius_miles: Number(radius) } : {}),
         open_to_long_distance: longDistance,
         open_to_price_negotiation: locationNegotiable,
         instagram_username: instagram.trim().replace(/^@/, "") || null,

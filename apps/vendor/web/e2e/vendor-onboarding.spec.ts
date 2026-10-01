@@ -31,8 +31,12 @@ test.describe("vendor onboarding", () => {
     await page.goto("vendor-onboarding/");
     await expect(page.getByRole("heading", { name: "What do you sell?" })).toBeVisible();
 
+    // Choosing the category picks it; the chip below shows it selected.
     await page.getByLabel("Add a category").selectOption({ label: "Photography" });
-    await page.getByRole("button", { name: "Photography", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Photography", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await page.getByLabel("About you").fill("Full-service wedding photography team.");
     await page.getByRole("button", { name: "Continue" }).click();
 
@@ -77,8 +81,12 @@ test.describe("vendor onboarding", () => {
     // Still not a vendor at this point — the top nav shows the no-vendor tabs.
     await expect(page.getByRole("link", { name: "Get started" })).toBeVisible();
 
+    // Choosing the category picks it; the chip below shows it selected.
     await page.getByLabel("Add a category").selectOption({ label: "Photography" });
-    await page.getByRole("button", { name: "Photography", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Photography", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await page.getByLabel("About you").fill("Full-service wedding photography team.");
     await page.getByRole("button", { name: "Continue" }).click();
 

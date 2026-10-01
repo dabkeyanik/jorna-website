@@ -75,7 +75,17 @@ export function VendorIdentityFields({
         </span>
         <select
           value={pickerCategory}
-          onChange={(e) => setPickerCategory(e.target.value)}
+          onChange={(e) => {
+            const category = e.target.value;
+            setPickerCategory(category);
+            // Choosing a category is choosing it: add it at the category level
+            // unless something in it is already picked. Before, the dropdown
+            // only revealed the chips below, and "Continue" then said nothing
+            // was picked.
+            if (!specializations.some((s) => s.category === category)) {
+              onSpecializationsChange([...specializations, { category, subcategory: null }]);
+            }
+          }}
           className="w-full rounded-xl border border-card-edge bg-ground-2 px-3.5 py-2.5 text-ink outline-none focus:border-gold"
         >
           <option value="" disabled>
