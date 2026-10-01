@@ -1,44 +1,57 @@
 "use client";
 
-// Which set of tabs you get: vendors see a seller's app, clients a planner's.
+// Which set of tabs you get: vendors see a seller's app, everyone else is
+// steered into becoming one (this is the vendor app — clients have
+// book.jornaevents.com).
 //
 // "Has a vendor profile" (getMyVendor != null) is the same signal iOS uses
-// (vendorID != nil). Cached because the navigation now renders twice — header
-// on desktop, tab bar on phones, both mounted — and without this each copy
-// would ask independently. Same shape as lib/attention's cache, for the same
-// reason.
+// (vendorID != nil). Cached because several components ask at once.
 
 import { getMyVendor } from "./jorna";
 
 const TTL_MS = 60_000;
 let cache: { at: number; isVendor: boolean } | null = null;
-let inflight: Promise<boolean> | null = null;
+let inflight: Promise<boolean | null> | null = null;
 
-export function loadIsVendor(): Promise<boolean> {
+/** true/false, or null when the backend couldn't say (network, 5xx). One retry;
+ *  a failure is never cached, so it can't pin a real vendor as "not a vendor". */
+function vendorStatus(): Promise<boolean | null> {
   if (cache && Date.now() - cache.at < TTL_MS) return Promise.resolve(cache.isVendor);
   if (inflight) return inflight;
   inflight = getMyVendor()
-    .then((v) => v != null)
-    .catch(() => false)
-    .then((isVendor) => {
-      cache = { at: Date.now(), isVendor };
-      return isVendor;
-    })
+    .catch(() => getMyVendor())
+    .then(
+      (v) => {
+        cache = { at: Date.now(), isVendor: v != null };
+        return v != null;
+      },
+      () => null,
+    )
     .finally(() => {
       inflight = null;
     });
   return inflight;
 }
 
+/** For chrome decisions (which nav to draw): an unknown answer reads as "not a vendor". */
+export async function loadIsVendor(): Promise<boolean> {
+  return (await vendorStatus()) ?? false;
+}
+
 /**
  * Where someone lands after signing in when nothing asked for a particular
- * page: a vendor's dashboard, or the client home for everyone else. The
- * dashboard used to be the default for every account, which dropped clients
- * into the vendor sidebar with a "This is the vendor dashboard" screen — it
- * looked like signing in had made them a vendor.
+ * page: a vendor's dashboard, or vendor onboarding for an account with no
+ * vendor profile yet. It used to be the client home, from when this app
+ * served both sides — which, on the vendor app, read as "signing in took me
+ * to the client view".
+ *
+ * When the check itself fails, the dashboard: it does its own check and
+ * offers setup when there's no profile, so a vendor on a bad connection
+ * isn't sent through onboarding.
  */
 export async function defaultLanding(): Promise<string> {
-  return (await loadIsVendor()) ? "/my-dashboard" : "/home";
+  const isVendor = await vendorStatus();
+  return isVendor === false ? "/vendor-onboarding" : "/my-dashboard";
 }
 
 /** Called when a session ends, so the next sign-in doesn't inherit this role. */

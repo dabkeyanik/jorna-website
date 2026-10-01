@@ -100,8 +100,7 @@ export default function AccountPage() {
       await changePassword(currentPw, newPw);
       // The backend invalidates the current session on a password change, so
       // sign out cleanly and send them to sign in with the new password.
-      logout();
-      router.replace("/login?next=/account");
+      logout("/login?next=/account");
     } catch (err) {
       setPwErr(err instanceof ApiError ? err.message : "Couldn't change your password.");
       setChangingPw(false);
@@ -203,7 +202,7 @@ export default function AccountPage() {
       </Card>
 
       <div className="mt-8">
-        <Button variant="quiet" onClick={logout}>
+        <Button variant="quiet" onClick={() => logout()}>
           Sign out
         </Button>
       </div>

@@ -47,7 +47,7 @@ export default function ForClientsPage() {
   const { user, loading } = useAuth();
   const primary = user
     ? { href: clientAppUrl("/plan"), label: "Build a bundle" }
-    : { href: "/login?mode=register", label: "Get started — it's free" };
+    : { href: clientAppUrl("/login?mode=register"), label: "Get started — it's free" };
 
   return (
     <div>

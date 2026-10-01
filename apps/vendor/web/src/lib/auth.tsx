@@ -76,7 +76,10 @@ interface AuthContextValue {
   register: (input: RegisterInput) => Promise<void>;
   /** Adopt a Jorna token pair obtained outside the password flow (Google). */
   adoptSession: (pair: TokenPair) => Promise<void>;
-  logout: () => void;
+  /** End the session and leave for `to` (default /login) with a full page
+   *  load, so no page's "signed out → /login?next=<this page>" redirect can
+   *  run first and hand the next person to sign in this one's page. */
+  logout: (to?: string) => void;
   /** Set the current user directly (e.g. after editing the profile). */
   setUser: (user: User) => void;
 }
@@ -193,9 +196,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [afterTokens],
   );
 
+  const logout = useCallback(
+    (to = "/login") => {
+      clear();
+      window.location.replace(`/app${to}`);
+    },
+    [clear],
+  );
+
   const value = useMemo(
-    () => ({ user, loading, login, register, adoptSession, logout: clear, setUser }),
-    [user, loading, login, register, adoptSession, clear],
+    () => ({ user, loading, login, register, adoptSession, logout, setUser }),
+    [user, loading, login, register, adoptSession, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

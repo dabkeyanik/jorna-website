@@ -20,7 +20,7 @@ test.describe("authentication", () => {
     expect(loginCalls[0].body).toMatchObject({ identifier: user.username });
   });
 
-  test("an account without a vendor profile lands on the client home, not the vendor dashboard", async ({
+  test("an account without a vendor profile lands in vendor onboarding", async ({
     page,
     api,
   }) => {
@@ -34,8 +34,21 @@ test.describe("authentication", () => {
     await page.getByLabel("Password").fill("correct-horse-battery-staple");
     await page.getByRole("button", { name: "Sign in" }).click();
 
-    await expect(page).toHaveURL(/\/app\/home\/?$/);
-    await expect(page.getByText("This is the vendor dashboard")).toHaveCount(0);
+    await expect(page).toHaveURL(/\/app\/vendor-onboarding\/?$/);
+  });
+
+  test("a failed vendor check isn't read as 'not a vendor'", async ({ page, api }) => {
+    const user = mockUser();
+    api.post("/auth/login", mockTokenPair());
+    api.get("/me", user);
+    api.error("GET", "/vendors/me", 503, "Service unavailable");
+
+    await page.goto("login/");
+    await page.getByLabel("Email or username").fill(user.username);
+    await page.getByLabel("Password").fill("correct-horse-battery-staple");
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await expect(page).toHaveURL(/\/app\/my-dashboard\/?$/);
   });
 
   test("an explicit next still wins over the role default", async ({ page, api }) => {
@@ -64,14 +77,35 @@ test.describe("authentication", () => {
     await expect(page).toHaveURL(/\/app\/login\/?$/);
   });
 
-  test("blocks registration until a role (host/vendor) is chosen", async ({ page }) => {
+  test("sign-up is a vendor sign-up, and points couples at the client app", async ({ page }) => {
     await page.goto("login/?mode=register");
 
-    const submit = page.getByRole("button", { name: "Create account" });
-    await expect(submit).toBeDisabled();
+    await expect(page.getByRole("heading", { name: "List your business on Jorna" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Create account & continue" })).toBeEnabled();
+    await expect(page.getByRole("button", { name: /^Host/ })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Go to book.jornaevents.com" })).toHaveAttribute(
+      "href",
+      /\/app\/login\/?\?mode=register$/,
+    );
+  });
 
-    await page.getByRole("button", { name: /^Host/ }).click();
-    await expect(submit).toBeEnabled();
+  test("signing out lands on a plain /login, not back on the page you left", async ({ page, api }) => {
+    const user = mockUser();
+    api.get("/me", user);
+    api.get("/vendors/me", mockVendorDetail({ user_id: user.user_id }));
+    await page.addInitScript((t) => {
+      if (!sessionStorage.getItem("seeded")) {
+        sessionStorage.setItem("seeded", "1");
+        localStorage.setItem("jorna_access", t.access_token);
+        localStorage.setItem("jorna_refresh", t.refresh_token);
+      }
+    }, mockTokenPair());
+
+    await page.goto("account/");
+    await page.getByRole("main").getByRole("button", { name: "Sign out" }).click();
+
+    await expect(page).toHaveURL(/\/app\/login\/?$/);
+    expect(await page.evaluate(() => localStorage.getItem("jorna_access"))).toBeNull();
   });
 
   test("redirects a signed-out visitor away from a protected page, preserving the return path", async ({

@@ -139,7 +139,7 @@ function HomeContent() {
   // sign-up they've already done.
   const primary = user
     ? { href: clientAppUrl("/plan"), label: "Build a bundle" }
-    : { href: "/login?mode=register", label: "Get started — it's free" };
+    : { href: clientAppUrl("/login?mode=register"), label: "Get started — it's free" };
 
   return (
     <div>

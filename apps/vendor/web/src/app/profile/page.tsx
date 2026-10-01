@@ -120,8 +120,7 @@ export default function ProfilePage() {
       // unregister, and after this there won't be one.
       await disableWebPushForThisDevice(user!.user_id);
       await deleteMe();
-      logout();
-      router.replace("/home");
+      logout("/home");
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Couldn't delete your account. Try again.",

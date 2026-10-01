@@ -15,6 +15,22 @@ import { googleRegister } from "@/lib/jorna";
 import { defaultLanding } from "@/lib/role";
 import { ApiError } from "@jorna/shared/lib/api";
 
+// Every step below is a network call, and none has a timeout of its own: one
+// that never answered used to leave "Finishing sign-in…" up forever with no
+// way out. Long enough for a cold staging backend.
+const STEP_TIMEOUT_MS = 20_000;
+
+class StepTimeout extends Error {}
+
+function within<T>(p: Promise<T>): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new StepTimeout()), STEP_TIMEOUT_MS),
+    ),
+  ]);
+}
+
 export default function AuthCallbackPage() {
   const router = useRouter();
   const { adoptSession } = useAuth();
@@ -35,9 +51,9 @@ export default function AuthCallbackPage() {
           setError(oauthError);
           return;
         }
-        let session = (await supabase.auth.getSession()).data.session;
+        let session = (await within(supabase.auth.getSession())).data.session;
         if (!session && code) {
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          const { data, error } = await within(supabase.auth.exchangeCodeForSession(code));
           if (error) throw error;
           session = data.session;
         }
@@ -53,23 +69,24 @@ export default function AuthCallbackPage() {
         const next = takeOAuthNext();
         const role = takeOAuthRole();
 
-        const session_ = await googleRegister(session.access_token);
+        const session_ = await within(googleRegister(session.access_token));
 
         if (session_.access_token && session_.refresh_token) {
-          await adoptSession({
+          await within(adoptSession({
             access_token: session_.access_token,
             refresh_token: session_.refresh_token,
             token_type: session_.token_type || "bearer",
-          });
+          }));
           // Jorna's JWT is the session now — the Supabase one isn't needed.
-          await supabase.auth.signOut();
-          // Anyone who chose "Vendor" goes straight into guided setup — not
-          // just a brand-new account. An existing client picking "Vendor" here
-          // is just as much a vendor-to-be, and the wizard already knows how
-          // to resume (and to refuse an account with live bookings), so it's
-          // safe to send any of them there.
+          // Local only: dropping it needs no round trip, and waiting on one
+          // here could only hold up a sign-in that has already succeeded.
+          void supabase.auth.signOut({ scope: "local" }).catch(() => {});
+          // A sign-up goes straight into guided setup — the wizard resumes,
+          // and sends an already-set-up vendor on to the dashboard. A sign-in
+          // lands where it was headed, else by role (defaultLanding: the
+          // dashboard, or onboarding for an account with no vendor profile).
           const landing =
-            role === "vendor" ? "/vendor-onboarding" : (next ?? (await defaultLanding()));
+            role === "vendor" ? "/vendor-onboarding" : (next ?? (await within(defaultLanding())));
           router.replace(landing);
           return;
         }
@@ -77,7 +94,13 @@ export default function AuthCallbackPage() {
         // No session came back, which shouldn't happen — fall back to the form.
         router.replace(next ? `/login?google=1&next=${encodeURIComponent(next)}` : "/login?google=1");
       } catch (e) {
-        setError(e instanceof ApiError ? e.message : "Google sign-in failed. Please try again.");
+        setError(
+          e instanceof StepTimeout
+            ? "Signing in is taking too long. Check your connection and try again."
+            : e instanceof ApiError
+              ? e.message
+              : "Google sign-in failed. Please try again.",
+        );
       }
     })();
   }, [adoptSession, router]);
@@ -92,7 +115,7 @@ export default function AuthCallbackPage() {
             href="/login"
             className="mt-5 inline-block text-sm font-semibold text-gold hover:underline"
           >
-            Back to sign in
+            Try again
           </Link>
         </>
       ) : (
