@@ -290,6 +290,22 @@ function LeadDrawer({
           {item.source === "request" ? (
             <>
               <LinkPrimary href={`/contracts/new?request=${item.booking_id}`}>Create contract</LinkPrimary>
+              {/* One click, with the vendor's usual terms — what Bookings'
+                  "Accept & send contract" did before requests moved here. */}
+              <Button
+                variant="ghost"
+                className={ghost}
+                disabled={busy != null}
+                onClick={() =>
+                  run(
+                    "accept",
+                    () => setBookingStatus(item.booking_id!, "approved"),
+                    "Sent — we've emailed them a contract built from your usual terms. The date is held until they sign.",
+                  )
+                }
+              >
+                Send with my usual terms
+              </Button>
               <Button variant="ghost" className={ghost} disabled={busy != null} onClick={() => setConfirm("decline")}>
                 Decline
               </Button>

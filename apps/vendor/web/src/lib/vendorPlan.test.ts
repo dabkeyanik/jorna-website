@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  bookingMoney,
+  bookingProgress,
   bookingTab,
+  paymentsToConfirm,
   contractNeedsVendor,
   contractStatus,
   countdownLabel,
@@ -404,6 +407,49 @@ describe("leadSummary", () => {
       ],
     );
     expect(summary).toEqual({ open: 5, needReply: 3 });
+  });
+});
+
+describe("bookingProgress", () => {
+  it("walks the five steps from real fields", () => {
+    expect(bookingProgress(booking({ contract_token: "t", contract_status: "draft", status: "approved" }))).toBe(0);
+    expect(bookingProgress(booking({ contract_token: "t", contract_status: "sent", sent_at: "x" }))).toBe(1);
+    expect(bookingProgress(signed({ deposit_percent: 30, deposit_amount_cents: 300 }))).toBe(2);
+    expect(bookingProgress(signed())).toBe(3);
+    expect(bookingProgress(signed({ date_iso: isoInDays(-2) }))).toBe(4);
+    expect(bookingProgress(signed({ date_iso: isoInDays(-2), payment_status: "confirmed_paid" }))).toBe(5);
+  });
+
+  it("counts an accepted marketplace booking as signed", () => {
+    expect(bookingProgress(booking({ status: "approved", date_iso: isoInDays(10) }))).toBe(3);
+  });
+});
+
+describe("bookingMoney and paymentsToConfirm", () => {
+  const inst = (id: string, amount: number, extra: Record<string, unknown> = {}) => ({
+    id, label: id, amount_cents: amount, due_type: "on_signing", due_date: null, due_days: null,
+    due_on: null, marked_paid_at: null, confirmed_at: null, ...extra,
+  });
+
+  it("reads a payment schedule", () => {
+    const b = signed({
+      amount_cents: 100000,
+      payment_schedule: [inst("dep", 30000, { confirmed_at: "x" }), inst("bal", 70000, { marked_paid_at: "y" })],
+    } as Partial<VendorBooking>);
+    expect(bookingMoney(b)).toMatchObject({ totalCents: 100000, depositCents: 30000, depositPaid: true, balanceCents: 70000 });
+    expect(paymentsToConfirm(b)).toEqual([{ kind: "installment", installmentId: "bal", label: "bal", amountCents: 70000 }]);
+  });
+
+  it("reads the legacy deposit and manual balance", () => {
+    const b = signed({
+      amount_cents: 100000,
+      deposit_percent: 30,
+      deposit_amount_cents: 30000,
+      deposit_marked_paid_at: "x",
+      payment_method: "manual",
+    });
+    expect(bookingMoney(b)).toMatchObject({ depositCents: 30000, depositPaid: false, balanceCents: 100000 });
+    expect(paymentsToConfirm(b)).toEqual([{ kind: "deposit", amountCents: 30000 }]);
   });
 });
 
