@@ -25,6 +25,7 @@ import type {
   Invitation,
   RsvpReply,
   Lead,
+  Pipeline,
   LeadCreateInput,
   LeadUpdateInput,
   Negotiation,
@@ -919,6 +920,30 @@ export function deleteLead(leadId: string): Promise<{ message: string }> {
 
 export function convertLead(leadId: string, input: ContractCreateInput): Promise<Contract> {
   return apiFetch<Contract>(`/leads/${leadId}/convert`, { method: "POST", body: input });
+}
+
+// ── Leads pipeline ───────────────────────────────────────────────────
+
+/** Everything before a signed contract, labelled inquiry/negotiation, with
+ *  why each needs the vendor — the server owns those rules (DECISIONS #20). */
+export function getPipeline(): Promise<Pipeline> {
+  return apiFetch<Pipeline>("/leads/pipeline");
+}
+
+/** Hide a request or unsigned contract from the active leads, or bring it
+ *  back. Declines, voids and notifies nothing. */
+export function archiveBooking(bookingId: string, archived = true): Promise<VendorBooking> {
+  return apiFetch<VendorBooking>(`/bookings/${bookingId}/archive`, { method: "POST", body: { archived } });
+}
+
+/** "Add to leads" from a Messages thread; returns the thread's open lead if it has one. */
+export function leadFromConversation(conversationId: string): Promise<Lead> {
+  return apiFetch<Lead>(`/conversations/${conversationId}/lead`, { method: "POST" });
+}
+
+/** Counts the thread as unread for you until you next open it. */
+export function markConversationUnread(conversationId: string): Promise<ConversationSummary> {
+  return apiFetch<ConversationSummary>(`/conversations/${conversationId}/unread`, { method: "POST" });
 }
 
 // ── Guest booking link (public, no login — see /booking-link) ─────────

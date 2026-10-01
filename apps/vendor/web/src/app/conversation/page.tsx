@@ -9,10 +9,13 @@ import {
   getConversation,
   getConversationMessages,
   sendConversationMessage,
+  leadFromConversation,
+  markConversationUnread,
 } from "@/lib/jorna";
 import { openConversationSocket } from "@/lib/chat";
 import type { ConversationSummary, GroupMessage } from "@/lib/types";
 import { ModerationMenu } from "@/components/ModerationMenu";
+import { useVendorShell } from "@/components/ChromeGate";
 import { clientAppUrl } from "@/lib/clientApp";
 
 function clockTime(iso: string): string {
@@ -111,6 +114,9 @@ function ConversationInner() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [live, setLive] = useState(false);
+  const isVendor = useVendorShell() === true;
+  const [leadId, setLeadId] = useState<string | null>(null);
+  const [vendorBusy, setVendorBusy] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
@@ -182,6 +188,36 @@ function ConversationInner() {
     if (atBottomRef.current) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  /** "Add to leads": an Inquiry for the couple in this thread (the server
+   *  hands back the existing one if it was already added). */
+  async function addToLeads() {
+    if (!conversationId) return;
+    setVendorBusy(true);
+    setError(null);
+    try {
+      const lead = await leadFromConversation(conversationId);
+      setLeadId(lead.lead_id);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't add them to your leads.");
+    } finally {
+      setVendorBusy(false);
+    }
+  }
+
+  /** Back to the inbox once marked: this page re-reads the thread every few
+   *  seconds, and reading it is what clears the mark. */
+  async function markUnread() {
+    if (!conversationId) return;
+    setVendorBusy(true);
+    try {
+      await markConversationUnread(conversationId);
+      router.push("/messages");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't mark it unread.");
+      setVendorBusy(false);
+    }
+  }
+
   async function send() {
     const content = draft.trim();
     if (!content || !conversationId) return;
@@ -234,7 +270,33 @@ function ConversationInner() {
                   : `${meta?.member_count ?? 0} people`}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          {isVendor && otherMember ? (
+            <>
+              {leadId ? (
+                <Link href={`/leads?open=lead:${leadId}`} className="text-xs font-semibold text-gold">
+                  In your leads →
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={addToLeads}
+                  disabled={vendorBusy}
+                  className="rounded-full border border-card-edge px-3 py-1 text-xs font-semibold text-ink hover:bg-ink/[0.04] disabled:opacity-50"
+                >
+                  Add to leads
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={markUnread}
+                disabled={vendorBusy}
+                className="text-xs font-semibold text-ink-soft hover:text-ink disabled:opacity-50"
+              >
+                Mark as unread
+              </button>
+            </>
+          ) : null}
           <span
             className={`text-xs ${live ? "text-green" : "text-ink-faint"}`}
             title={live ? "Live" : "Reconnecting…"}

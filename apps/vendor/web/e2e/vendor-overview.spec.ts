@@ -52,6 +52,15 @@ function mockOverview(api: import("./support/api-mock").ApiMock) {
     },
   ]);
   api.get("/conversations/unread-count", { unread_count: 2 });
+  const now = new Date().toISOString();
+  const hoursAgo = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
+  api.get("/leads/pipeline", {
+    items: [
+      { id: "booking:request", source: "request", booking_id: "request", lead_id: null, name: "Priya Shah", stage: "inquiry", attention: "needs_you", attention_reason: "new_request", archived: false, created_at: hoursAgo(5), updated_at: now },
+      { id: "lead:lead-1", source: "lead", booking_id: null, lead_id: "lead-1", name: "Anjali Rao", stage: "inquiry", attention: "needs_you", attention_reason: "new_lead", archived: false, created_at: "2026-08-01T00:00:00Z", updated_at: now },
+    ],
+    counts: { inquiries: 2, negotiations: 0, needs_you: 2, waiting: 0, archived: 0 },
+  });
   return vendor;
 }
 
@@ -67,6 +76,9 @@ test.describe("vendor overview (/overview)", () => {
 
     // The request and the informal lead are both open; both wait on a reply.
     await expect(page.getByText("2 need your reply")).toBeVisible();
+    // Only the request came in this week; the lead has waited longest.
+    await expect(page.getByText("+1 this week")).toBeVisible();
+    await expect(page.getByText(/Oldest has waited \d+d/)).toBeVisible();
 
     await expect(page.getByText("Next event")).toBeVisible();
     await expect(page.getByText("In 12 days")).toBeVisible();

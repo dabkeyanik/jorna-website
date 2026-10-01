@@ -12,7 +12,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { getMyVendor, listConversations, listLeads, listVendorBookings } from "@/lib/jorna";
+import { getMyVendor, getPipeline, listConversations, listLeads, listVendorBookings } from "@/lib/jorna";
 import {
   bookingTab,
   bookingsByDay,
@@ -24,7 +24,7 @@ import {
   upcomingBookings,
   type BookingTab,
 } from "@/lib/vendorPlan";
-import type { ConversationSummary, Lead, VendorBooking, VendorDetail } from "@/lib/types";
+import type { ConversationSummary, Lead, Pipeline, VendorBooking, VendorDetail } from "@/lib/types";
 import { Button, Card } from "@jorna/shared/components/ui";
 import { FilterTabs, PageHeader, PrimaryAction, StatusPill, type Tone } from "@/components/vendor/ui";
 import { Icon } from "@/components/vendor/Icon";
@@ -34,6 +34,44 @@ interface Snapshot {
   bookings: VendorBooking[];
   leads: Lead[];
   conversations: ConversationSummary[];
+  /** Null if it couldn't be read; the lead card then counts from bookings. */
+  pipeline: Pipeline | null;
+}
+
+interface LeadNumbers {
+  open: number;
+  needReply: number;
+  newThisWeek: number | null;
+  /** When the longest-waiting lead that needs a reply came in. */
+  oldestWaitingIso: string | null;
+}
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** The lead card's numbers from the pipeline — the same list and rules the
+ *  Leads page shows. Creation times exist only for leads and for bookings
+ *  made since backend 0066, so "new this week" can undercount old data, but
+ *  never overcounts. */
+function pipelineNumbers(p: Pipeline): LeadNumbers {
+  const active = p.items.filter((i) => !i.archived);
+  const since = Date.now() - WEEK_MS;
+  const waiting = active
+    .filter((i) => i.attention === "needs_you" && i.created_at)
+    .map((i) => i.created_at!)
+    .sort();
+  return {
+    open: p.counts.inquiries + p.counts.negotiations,
+    needReply: p.counts.needs_you,
+    newThisWeek: active.filter((i) => i.created_at && new Date(i.created_at).getTime() >= since).length,
+    oldestWaitingIso: waiting[0] ?? null,
+  };
+}
+
+function waitedFor(iso: string): string {
+  const mins = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (mins < 60) return `${mins}m`;
+  if (mins < 60 * 24) return `${Math.round(mins / 60)}h`;
+  return `${Math.round(mins / 1440)}d`;
 }
 
 const TAB_LABEL: Record<BookingTab, string> = {
@@ -192,11 +230,16 @@ function NextEventCard({
   );
 }
 
-function LeadsCard({ open, needReply }: { open: number; needReply: number }) {
+function LeadsCard({ open, needReply, newThisWeek, oldestWaitingIso }: LeadNumbers) {
   return (
     <Card className="flex min-h-[16.5rem] flex-col p-5">
-      <Kicker>Open leads</Kicker>
-      <p className="serif mt-1 text-[2.5rem] leading-none tracking-[-0.06em] text-ink">{open}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <Kicker>Open leads</Kicker>
+          <p className="serif mt-1 text-[2.5rem] leading-none tracking-[-0.06em] text-ink">{open}</p>
+        </div>
+        {newThisWeek ? <StatusPill tone="green">+{newThisWeek} this week</StatusPill> : null}
+      </div>
       <div className="mt-7 mb-5">
         {needReply > 0 ? (
           <StatusPill tone="red" dot>
@@ -205,7 +248,11 @@ function LeadsCard({ open, needReply }: { open: number; needReply: number }) {
         ) : (
           <p className="text-sm text-ink-faint">Nobody&apos;s waiting on you.</p>
         )}
-        <p className="mt-2 text-xs text-ink-faint">Requests, offers and contracts not signed yet.</p>
+        <p className="mt-2 text-xs text-ink-faint">
+          {needReply > 0 && oldestWaitingIso
+            ? `Oldest has waited ${waitedFor(oldestWaitingIso)}.`
+            : "Requests, offers and contracts not signed yet."}
+        </p>
       </div>
       <CardLink href="/leads">Review leads</CardLink>
     </Card>
@@ -496,7 +543,8 @@ function OverviewInner() {
         .catch(() => [] as Lead[]),
       listConversations().catch(() => [] as ConversationSummary[]),
     ]);
-    return { vendor, bookings, leads, conversations };
+    const pipeline = await getPipeline().catch(() => null);
+    return { vendor, bookings, leads, conversations, pipeline };
   }, []);
 
   useEffect(() => {
@@ -517,7 +565,11 @@ function OverviewInner() {
   }, [user, leadsView, load, router, attempt]);
 
   const upcoming = useMemo(() => (snap ? upcomingBookings(snap.bookings) : []), [snap]);
-  const leads = useMemo(() => (snap ? leadSummary(snap.bookings, snap.leads) : { open: 0, needReply: 0 }), [snap]);
+  const leads = useMemo<LeadNumbers>(() => {
+    if (snap?.pipeline) return pipelineNumbers(snap.pipeline);
+    const fallback = snap ? leadSummary(snap.bookings, snap.leads) : { open: 0, needReply: 0 };
+    return { ...fallback, newThisWeek: null, oldestWaitingIso: null };
+  }, [snap]);
 
   if (failed) {
     return (
@@ -561,7 +613,7 @@ function OverviewInner() {
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-2 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,0.8fr)_minmax(0,1.05fr)]">
         <NextEventCard upcoming={upcoming} index={index} onStep={step} />
-        <LeadsCard open={leads.open} needReply={leads.needReply} />
+        <LeadsCard {...leads} />
         <MiniCalendar
           bookings={snap.bookings}
           month={calMonth}

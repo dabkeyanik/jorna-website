@@ -111,7 +111,9 @@ always "none, verify manually" until a test runner is added.
   ARCHITECTURE "Design tokens"), a hamburger menu below `lg`, and shared
   pieces in `components/vendor/` (`ui.tsx`, `Icon.tsx`). `/clients` is gone
   (301 to `/leads`); `/my-dashboard` 301s to `/overview` (step 1), and
-  `?view=leads` there forwards to `/leads`. Settings
+  `?view=leads` there forwards to `/leads`. Leads (step 2) draws the backend's
+  `GET /leads/pipeline` with a per-stage drawer; conversation threads have
+  "Add to leads" and "Mark as unread" for vendors. Settings
   holds account (`AccountSettings`, shared with `/account`), Venmo/Zelle,
   tentative-hold length, Google Calendar (`GoogleCalendarCard`, also on the
   calendar page), notifications and theme. See `docs/DECISIONS.md`.
@@ -122,7 +124,7 @@ always "none, verify manually" until a test runner is added.
   `(vendor)/overview/`, `(vendor)/contracts/`, `(vendor)/leads/`,
   `(vendor)/settings/`,
   `web/src/components/ServicesManager.tsx`, `VendorCard.tsx`,
-  `VendorSidebar.tsx`, `components/vendor/`, `LeadsPanel.tsx`.
+  `VendorSidebar.tsx`, `components/vendor/`, `lib/contractTimeline.ts`.
 - **Contracts (2026-09, proposals since Phase 2b):**
   - `(vendor)/contracts/page.tsx` — every contract, filterable by whose move
     it is. No list endpoint: it filters `listVendorBookings` to rows with a
