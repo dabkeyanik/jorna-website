@@ -606,3 +606,13 @@ name, category · city, "Preview public profile"), the package list, then
 - Contract defaults, saved templates, availability and reviews stay below,
   restyled; Contracts (step 7) is where contract defaults may move.
 
+---
+
+## Decision: Vendor redesign, step 6 — Calendar and Earnings restyled, no new behaviour (2026-10-01)
+
+Both pages take the shell's page header and the design's tile style; the
+calendar's Month/Year switch is the shared filter tabs. Nothing they do
+changed, as planned. One fix rode along: Earnings' "Payment details → Edit"
+pointed at Vendor Profile, but Venmo/Zelle have been on Settings since
+step 0.
+

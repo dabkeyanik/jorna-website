@@ -20,6 +20,7 @@ import {
 } from "@/lib/types";
 import { paymentsSetup, vendorMoney } from "@/lib/vendorPlan";
 import { Button, Card, Field, LinkButton } from "@jorna/shared/components/ui";
+import { PageHeader } from "@/components/vendor/ui";
 
 function money(cents: number) {
   return `$${Math.round(cents / 100).toLocaleString()}`;
@@ -38,12 +39,13 @@ function Stat({
 }) {
   const colour =
     tone === "green" ? "text-green" : tone === "gold" ? "text-gold" : "text-ink";
+  // The design's summary tile: small label, large figure, quiet note.
   return (
-    <Card className="p-4">
-      <p className="text-xs uppercase tracking-wide text-ink-faint">{label}</p>
-      <p className={`serif mt-1 text-2xl ${colour}`}>{value}</p>
-      {hint ? <p className="mt-1 text-xs text-ink-faint">{hint}</p> : null}
-    </Card>
+    <div className="flex min-h-[6.5rem] flex-col justify-center rounded-[15px] border border-card-edge bg-card px-5 py-4 shadow-[var(--shadow-card)]">
+      <p className="text-xs font-semibold text-ink-faint">{label}</p>
+      <p className={`serif mt-1 text-[1.6rem] leading-none ${colour}`}>{value}</p>
+      {hint ? <p className="mt-1.5 text-xs text-ink-faint">{hint}</p> : null}
+    </div>
   );
 }
 
@@ -174,12 +176,11 @@ function EarningsInner() {
 
   return (
     <div>
-      <header>
-        <span className="eyebrow">Selling</span>
-        <h1 className="serif mt-3 text-4xl text-maroon dark:text-gold sm:text-5xl">
-          Earnings
-        </h1>
-      </header>
+      <PageHeader
+        eyebrow="Money"
+        title="Earnings"
+        subtitle="What you've been paid, what's on its way, and how couples pay you."
+      />
 
       {error ? (
         <p className="mt-6 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
@@ -275,7 +276,7 @@ function EarningsInner() {
           with a link, since /vendor-profile is the one place that edits it. */}
       {!ESCROW_ENABLED ? (
         <>
-          <h2 className="serif mt-10 text-2xl text-ink">Payment details</h2>
+          <h2 className="serif mt-9 text-xl text-ink">Payment details</h2>
           <Card className="mt-5 flex flex-wrap items-center justify-between gap-3 p-6">
             <p className="text-sm text-ink-soft">
               {vendor.venmo_handle || vendor.zelle_contact
@@ -287,7 +288,8 @@ function EarningsInner() {
                     .join(" or ")}.`
                 : "No Venmo or Zelle on file yet — clients won't know how to pay you."}
             </p>
-            <LinkButton href="/vendor-profile" variant="ghost" size="md">
+            {/* Venmo/Zelle live in Settings since the redesign's step 0. */}
+            <LinkButton href="/settings" variant="ghost" size="md">
               Edit
             </LinkButton>
           </Card>
@@ -328,7 +330,7 @@ function EarningsInner() {
         <>
           {ESCROW_ENABLED ? (
             <>
-              <div className="mt-7 grid gap-3 sm:grid-cols-3">
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
                 <Stat
                   label="Paid out"
                   value={money(earnings.total_released_cents)}
@@ -409,7 +411,7 @@ function EarningsInner() {
 
           <section className="mt-9">
             <div className="flex flex-wrap items-baseline justify-between gap-3">
-              <h2 className="serif text-2xl text-ink">History</h2>
+              <h2 className="serif text-xl text-ink">History</h2>
               {/* Gross, fee, net — the decomposition was on the dashboard, in a
                   card that repeated this list six rows at a time. It belongs on
                   the ledger, and most marketplaces don't show it at all. */}

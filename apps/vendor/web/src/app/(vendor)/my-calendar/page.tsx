@@ -37,6 +37,7 @@ import {
 } from "@/lib/vendorPlan";
 import { WEEKDAYS, type AvailabilitySlot, type VendorBooking } from "@/lib/types";
 import { Button, Card, LinkButton } from "@jorna/shared/components/ui";
+import { FilterTabs, PageHeader } from "@/components/vendor/ui";
 import { GoogleCalendarCard } from "@/components/GoogleCalendarCard";
 
 const MONTHS = [
@@ -128,7 +129,7 @@ function DayCell({
       <span
         className={`relative flex size-9 items-center justify-center rounded-full text-sm tabular-nums transition ${
           selected
-            ? "bg-maroon font-semibold text-ground dark:bg-gold dark:text-[#2A0C19]"
+            ? "bg-maroon font-semibold text-white dark:bg-gold dark:text-[#2A0C19]"
             : `${day.googleBusy ? "bg-ink-faint/15" : TINT[day.status]} text-ink hover:bg-gold/10`
         } ${day.isToday && !selected ? "font-bold ring-2 ring-inset ring-gold" : ""}`}
       >
@@ -375,34 +376,28 @@ export default function VendorCalendarPage() {
 
   return (
     <div>
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <span className="eyebrow">Vendor</span>
-          <h1 className="serif mt-1 text-4xl text-maroon dark:text-gold">Calendar</h1>
-        </div>
-        {/* iOS toggles the same two modes. */}
-        <div className="flex gap-1 rounded-full border border-card-edge p-1">
-          {(["month", "year"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setView(v)}
-              className={`rounded-full px-3.5 py-1 text-sm font-semibold capitalize transition ${
-                view === v
-                  ? "bg-maroon text-ground dark:bg-gold dark:text-[#2A0C19]"
-                  : "text-ink-soft hover:text-ink"
-              }`}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
-      </header>
+      <PageHeader
+        eyebrow="Schedule"
+        title="Calendar"
+        subtitle="Booked days, tentative holds and your Google busy times, in one place."
+        action={
+          // iOS toggles the same two modes.
+          <FilterTabs<"month" | "year">
+            label="Calendar view"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: "month", label: "Month" },
+              { value: "year", label: "Year" },
+            ]}
+          />
+        }
+      />
 
       {/* Calendar and what's ahead, side by side where there's room. The list
           used to sit below the fold under the Google card and the weekly-hours
           card, which is a long way from the grid it refers to. */}
-      <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
       {/* The anchor is the wrapper, not the Card — Card takes className and
           children only, and widening a shared component for one scroll target
           is the wrong end to change. */}
