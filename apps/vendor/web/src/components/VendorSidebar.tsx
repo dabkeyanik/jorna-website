@@ -15,7 +15,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { getMyVendor, getUnreadCount } from "@/lib/jorna";
+import { getMyVendor, getPipeline, getUnreadCount } from "@/lib/jorna";
 import { loadAttention } from "@/lib/attention";
 import { categoryLabel, type VendorDetail } from "@/lib/types";
 import { dmSans, manrope } from "@/lib/vendorFonts";
@@ -135,14 +135,17 @@ export function VendorSidebar({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Re-checked on navigation so the badge follows you as you act on things.
-    // Still lib/attention's whole "needs you" count (requests to answer,
-    // payments to confirm) until Leads gets its own attention rules in plan
-    // step 2.
+    // Re-checked on navigation so the badge follows you as you act on things:
+    // the pipeline's "needs your attention", the same count the Leads page
+    // shows. lib/attention's count stands in if the pipeline can't be read.
     let cancelled = false;
-    loadAttention()
-      .then((items) => !cancelled && setLeadsBadge(items.length))
-      .catch(() => {});
+    getPipeline()
+      .then((p) => !cancelled && setLeadsBadge(p.counts.needs_you))
+      .catch(() =>
+        loadAttention()
+          .then((items) => !cancelled && setLeadsBadge(items.length))
+          .catch(() => {}),
+      );
     getUnreadCount()
       .then((r) => !cancelled && setMessagesBadge(r.unread_count))
       .catch(() => {});

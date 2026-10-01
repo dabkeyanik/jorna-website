@@ -75,7 +75,7 @@ test.describe("vendor shell on a phone", () => {
   test("the hamburger opens the nav and a link closes it", async ({ page, api }) => {
     await loginAs(page, api);
     api.get("/vendors/me", mockVendorDetail());
-    api.get("/leads", { items: [], total: 0 });
+    api.get("/leads/pipeline", { items: [], counts: { inquiries: 0, negotiations: 0, needs_you: 0, waiting: 0, archived: 0 } });
 
     await page.goto("leads/");
     await expect(page.getByRole("navigation", { name: "Vendor" })).toBeHidden();

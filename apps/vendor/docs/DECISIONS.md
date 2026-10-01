@@ -508,3 +508,29 @@ Bookings, which rows link to.
 - `dark:` utilities now follow `data-theme` (shared `globals.css`
   `@custom-variant`), so the Settings theme choice applies to them too.
 
+---
+
+## Decision: Vendor redesign, step 2 — Leads from one pipeline (2026-10-01)
+
+Leads is drawn from the backend's `GET /leads/pipeline` (backend DECISIONS
+#20), which decides each item's stage — Inquiry until the contract link is
+sent, Negotiation until it's signed — and whether it needs the vendor and
+why. The page doesn't re-derive any of it, so web and iOS can't disagree.
+
+- A lead opens in a drawer with that stage's actions: a request → Create
+  contract (`/contracts/new?request=`) or Decline; a lead → Create contract,
+  Mark as contacted, Not going ahead; a draft → Edit, Send by email, Copy
+  link; sent/viewed/expired → View, Copy link, Resend, Edit, Void; a
+  counter-offer → the negotiation panel. Archive/Unarchive on everything.
+- **Copying a draft's link sends it** (the existing send endpoint, no
+  email), so it becomes a Negotiation and the date is held — the plan's
+  rule. Copying an already-sent link doesn't resend.
+- "New lead" opens the contract editor. The old informal lead form
+  (`LeadsPanel`) is gone; informal leads now come from marketplace requests
+  and "Add to leads" on a Messages thread. Existing ones still show.
+- Overview's lead card and the sidebar's Leads badge read the same
+  pipeline, which is what made "+N this week" and "oldest waited" possible
+  (bookings carry `created_at` from backend 0066).
+- "Mark as unread" on a thread returns to the inbox: the thread re-reads its
+  messages every few seconds, and reading is what clears the mark.
+

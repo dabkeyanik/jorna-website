@@ -1080,6 +1080,12 @@ export interface VendorBooking {
   declined_at?: string | null;
   decline_reason?: string | null;
   payment_schedule?: Installment[] | null;
+  /** When it was made — null for a booking from before backend 0066. */
+  created_at?: string | null;
+  /** The most recent time the contract link was sent. */
+  sent_at?: string | null;
+  /** Hidden from the vendor's active leads; still live for the couple. */
+  vendor_archived_at?: string | null;
 }
 
 // ── Contracts (vendor-authored, no-login guest bookings) ──────────────
@@ -1325,6 +1331,10 @@ export interface Lead {
   converted_booking_id: string | null;
   created_at: string;
   updated_at: string;
+  archived_at?: string | null;
+  /** Set when the lead came from a Messages thread ("Add to leads"). */
+  user_id?: string | null;
+  conversation_id?: string | null;
 }
 
 export interface LeadCreateInput {
@@ -1342,6 +1352,57 @@ export interface LeadUpdateInput {
   event_date_iso?: string | null;
   note?: string | null;
   status?: LeadStatus;
+  /** Hide from (true) or return to (false) the active leads. */
+  archived?: boolean;
+}
+
+// ── Leads pipeline (GET /leads/pipeline, backend DECISIONS #20) ───────
+
+export type PipelineStage = "inquiry" | "negotiation";
+export type PipelineSource = "request" | "contract" | "lead";
+export type PipelineAttention = "needs_you" | "waiting";
+
+export interface PipelineItem {
+  /** "booking:<id>" or "lead:<id>". */
+  id: string;
+  source: PipelineSource;
+  stage: PipelineStage;
+  booking_id: string | null;
+  lead_id: string | null;
+  conversation_id: string | null;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  event_name: string | null;
+  /** ISO for a booking; free text ("fall 2027") for a lead. */
+  event_date: string | null;
+  event_date_end: string | null;
+  location: string | null;
+  service_name: string | null;
+  estimated_value_cents: number | null;
+  contract_status: string | null;
+  hold_expires_at: string | null;
+  attention: PipelineAttention | null;
+  /** new_request, new_lead, draft, counter_offer, declined, expired — or,
+   *  while waiting: sent, viewed, counter_sent, contacted, quoted. */
+  attention_reason: string | null;
+  archived: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+  /** Leads only. */
+  note?: string | null;
+  lead_status?: LeadStatus;
+}
+
+export interface Pipeline {
+  items: PipelineItem[];
+  counts: {
+    inquiries: number;
+    negotiations: number;
+    needs_you: number;
+    waiting: number;
+    archived: number;
+  };
 }
 
 // ── Vendor payments ──────────────────────────────────────────────────
