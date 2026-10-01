@@ -28,6 +28,7 @@ import { describeDue } from "@/lib/contractDraft";
 import { Button, Card, Field } from "@jorna/shared/components/ui";
 import type { GuestBooking, Installment } from "@/lib/types";
 import { DocumentView } from "./DocumentView";
+import { guestContractPdfUrl } from "@/lib/download";
 
 function money(cents: number): string {
   return `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -389,8 +390,17 @@ function BookingLinkInner() {
           )}
         </div>
         )}
+        <div className="mt-6 text-center">
+          <a
+            href={guestContractPdfUrl(token)}
+            download
+            className="inline-flex items-center rounded-full border border-card-edge px-4 py-2 text-sm font-semibold text-ink transition hover:border-gold"
+          >
+            Download your signed copy (PDF)
+          </a>
+        </div>
         {booking.signed_snapshot_sha256 ? (
-          <p className="mt-6 break-all text-center text-xs text-ink-faint">
+          <p className="mt-4 break-all text-center text-xs text-ink-faint">
             Your signed copy&apos;s fingerprint (SHA-256): {booking.signed_snapshot_sha256}
           </p>
         ) : null}
@@ -450,6 +460,13 @@ function BookingLinkInner() {
           <strong className="text-ink">You&apos;ll pay {vendorName} directly</strong> — Jorna
           doesn&apos;t handle the money. This is your written agreement.
         </p>
+        <a
+          href={guestContractPdfUrl(token)}
+          download
+          className="mt-3 inline-block text-sm font-semibold text-gold underline-offset-4 hover:underline"
+        >
+          Download as PDF to read later
+        </a>
       </Card>
 
       <form onSubmit={submit} className="mt-6 grid gap-6">

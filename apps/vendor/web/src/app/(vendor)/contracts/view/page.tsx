@@ -22,6 +22,7 @@ import {
   voidDocument,
 } from "@/lib/jorna";
 import { KIND_LABEL, documentStatus } from "@/lib/attachedDocuments";
+import { downloadContractPdf, downloadDocumentPdf } from "@/lib/download";
 import { describeDue, describeWhen, money } from "@/lib/contractDraft";
 import {
   guestBookingLink,
@@ -229,6 +230,13 @@ function ContractViewInner() {
             </a>
           </>
         ) : null}
+        <Button
+          variant="ghost"
+          disabled={busy !== null}
+          onClick={() => act("pdf", () => downloadContractPdf(c.booking_id))}
+        >
+          {busy === "pdf" ? "Preparing…" : c.signed_at ? "Download signed PDF" : "Download PDF"}
+        </Button>
         {unsigned ? (
           <>
             <LinkButton href={`/contracts/new?edit=${c.booking_id}`} variant="ghost">
@@ -423,6 +431,14 @@ function ContractViewInner() {
                             </a>
                           </>
                         ) : null}
+                        <button
+                          type="button"
+                          disabled={busy !== null}
+                          onClick={() => act(`doc-pdf-${d.document_id}`, () => downloadDocumentPdf(d.document_id))}
+                          className="px-2 py-1 text-xs font-semibold text-ink-soft hover:text-ink disabled:opacity-50"
+                        >
+                          PDF
+                        </button>
                         {open ? (
                           <>
                             <Link

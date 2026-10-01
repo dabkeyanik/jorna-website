@@ -661,3 +661,21 @@ no written way to change or end a booking once it was signed.
 - Templates carry a `kind`. The contract editor lists only `agreement`
   templates, and the document editor lists only its own kind.
 
+## Decision: Contract and document PDFs come from the backend (2026-10-01)
+
+**Context.** Vendors and couples want a file of the agreement to keep.
+
+**Decision.**
+
+- The backend draws the PDFs (its DECISIONS #22): from the signed snapshot
+  once signed, with the fingerprint.
+- **The vendor's downloads go through `apiDownload`** in
+  `packages/shared/lib/api.ts`. It does the same refresh-once as `apiFetch`,
+  and the file is saved from a blob under the server's filename. The backend
+  exposes `Content-Disposition` over CORS for this; without it, every file
+  would save as "contract.pdf".
+- **The couple's are plain links** (`lib/download.ts`). Their token in the
+  URL is already the whole credential, as it is for the page.
+- Buttons are on the contract view (the contract and each attached document)
+  and on both signing pages, before and after signing.
+

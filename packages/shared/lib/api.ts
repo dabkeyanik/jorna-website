@@ -150,6 +150,34 @@ export async function apiUpload<T>(
   return (await res.json()) as T;
 }
 
+/**
+ * A file the backend sends as an attachment (a contract PDF), with the same
+ * auth + one-retry refresh. The filename is the server's, from
+ * Content-Disposition, so every copy of a file is named the same way.
+ */
+export async function apiDownload(
+  path: string,
+  opts: { auth?: boolean; retry?: boolean } = {},
+): Promise<{ blob: Blob; filename: string | null }> {
+  const { auth = true, retry = true } = opts;
+  const headers: Record<string, string> = {};
+  const access = auth ? tokens.getAccess() : null;
+  if (access) headers.Authorization = `Bearer ${access}`;
+  const sentWith = tokens.getRefresh();
+
+  const res = await fetch(`${API_BASE}${path}`, { headers });
+
+  if (res.status === 401 && auth && retry && tokens.getRefresh()) {
+    const refreshed = await tryRefresh(sentWith);
+    if (refreshed) return apiDownload(path, { ...opts, retry: false });
+    tokens.onAuthLost();
+  }
+
+  if (!res.ok) throw new ApiError(res.status, await parseError(res));
+  const match = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "");
+  return { blob: await res.blob(), filename: match?.[1] ?? null };
+}
+
 // One refresh at a time. The backend rotates the refresh token on every
 // use and treats a second use of the old one as theft — it wipes every
 // session the user has. So parallel 401s (a page loading several things as
