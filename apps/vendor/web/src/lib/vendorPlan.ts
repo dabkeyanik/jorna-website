@@ -1131,3 +1131,100 @@ export function leadSummary(
     needReply: replyTasks + openLeads.filter((l) => l.status === "new").length,
   };
 }
+
+// ── Bookings page ────────────────────────────────────────────────────
+
+/** The design's five steps, in order. */
+export const BOOKING_STEPS = [
+  "Contract sent",
+  "Contract signed",
+  "Deposit paid",
+  "Event over",
+  "Payment received",
+] as const;
+
+/**
+ * How many of BOOKING_STEPS are done (0–5), from real data. A marketplace
+ * booking accepted before contracts existed has no contract, so its first
+ * two steps count as done the moment it's agreed. A booking with no deposit
+ * passes that step once signed.
+ */
+export function bookingProgress(b: VendorBooking): number {
+  const agreed = b.contract_token ? Boolean(b.signed_at) : b.status === "approved" || b.status === "payment_confirmed";
+  const sent = agreed || Boolean(b.sent_at) || (b.contract_token != null && b.contract_status !== "draft");
+  if (!sent) return 0;
+  if (!agreed) return 1;
+  const status = contractStatus(b);
+  const depositDone = status !== "deposit_due" && status !== "confirm_deposit";
+  if (!depositDone) return 2;
+  const left = daysUntil(b.date_end || b.date_iso);
+  const over = left != null && left < 0;
+  if (pipelineStage(b) === "done") return 5;
+  return over ? 4 : 3;
+}
+
+export interface BookingMoney {
+  totalCents: number | null;
+  depositCents: number | null;
+  depositPaid: boolean;
+  /** Confirmed received so far, across installments or the legacy pair. */
+  receivedCents: number;
+  balanceCents: number | null;
+  paidInFull: boolean;
+}
+
+/** Total, deposit and what's left, read from the payment schedule when the
+ *  contract has one, else the single deposit fields. */
+export function bookingMoney(b: VendorBooking): BookingMoney {
+  const totalCents = b.amount_cents ?? (b.price_pending_quantity ? null : Math.round((b.price ?? 0) * 100));
+  const paidInFull = pipelineStage(b) === "done";
+  const schedule = b.payment_schedule ?? [];
+  if (schedule.length) {
+    const received = schedule.filter((i) => i.confirmed_at).reduce((n, i) => n + i.amount_cents, 0);
+    const deposit = schedule.length > 1 ? schedule[0] : null;
+    return {
+      totalCents,
+      depositCents: deposit?.amount_cents ?? null,
+      depositPaid: Boolean(deposit?.confirmed_at),
+      receivedCents: received,
+      balanceCents: totalCents != null ? Math.max(0, totalCents - received) : null,
+      paidInFull,
+    };
+  }
+  const depositPaid = Boolean(b.deposit_confirmed_received_at);
+  const received = paidInFull ? (totalCents ?? 0) : depositPaid ? (b.deposit_amount_cents ?? 0) : 0;
+  return {
+    totalCents,
+    depositCents: b.deposit_percent != null ? (b.deposit_amount_cents ?? null) : null,
+    depositPaid,
+    receivedCents: received,
+    balanceCents: totalCents != null ? Math.max(0, totalCents - received) : null,
+    paidInFull,
+  };
+}
+
+export type PaymentToConfirm =
+  | { kind: "installment"; installmentId: string; label: string; amountCents: number }
+  | { kind: "deposit"; amountCents: number | null }
+  | { kind: "balance"; amountCents: number | null };
+
+/** Payments the couple says they've sent that the vendor hasn't confirmed —
+ *  each its own button, same calls the contract page and the old Bookings
+ *  page make. */
+export function paymentsToConfirm(b: VendorBooking): PaymentToConfirm[] {
+  if (isDeadVendorBooking(b)) return [];
+  const schedule = b.payment_schedule ?? [];
+  if (schedule.length) {
+    return schedule
+      .filter((i) => i.marked_paid_at && !i.confirmed_at)
+      .map((i) => ({ kind: "installment" as const, installmentId: i.id, label: i.label, amountCents: i.amount_cents }));
+  }
+  const out: PaymentToConfirm[] = [];
+  if (b.deposit_marked_paid_at && !b.deposit_confirmed_received_at) {
+    out.push({ kind: "deposit", amountCents: b.deposit_amount_cents ?? null });
+  }
+  if (b.payment_method === "manual" && b.payment_status === "marked_paid") {
+    out.push({ kind: "balance", amountCents: bookingMoney(b).balanceCents });
+  }
+  return out;
+}

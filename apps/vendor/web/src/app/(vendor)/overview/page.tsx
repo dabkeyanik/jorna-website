@@ -209,7 +209,7 @@ function NextEventCard({
             ) : null}
           </div>
           <div className="my-4 h-px bg-white/15" />
-          <Link href="/my-bookings" className="flex items-center gap-2.5">
+          <Link href={`/my-bookings?id=${b.booking_id}`} className="flex items-center gap-2.5">
             <span className="grid size-[30px] shrink-0 place-items-center rounded-[9px] bg-white/12 text-[0.65rem] font-bold text-[#efd69a]">
               {initials(b.service_name)}
             </span>
@@ -411,7 +411,7 @@ function BookingsCard({ bookings }: { bookings: VendorBooking[] }) {
           {shown.map(({ b, tab }) => (
             <li key={b.booking_id}>
               <Link
-                href="/my-bookings"
+                href={`/my-bookings?id=${b.booking_id}`}
                 className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 border-t border-line-soft px-1.5 py-3 text-ink-soft transition hover:bg-panel/50 sm:grid-cols-[auto_minmax(0,1fr)_7rem_6.5rem_auto]"
               >
                 <span className="grid size-9 place-items-center rounded-full bg-maroon/10 text-[0.7rem] font-bold text-maroon dark:bg-gold/15 dark:text-gold">

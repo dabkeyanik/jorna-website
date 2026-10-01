@@ -126,6 +126,7 @@ test.describe("vendor leads (/leads)", () => {
       "href",
       /\/contracts\/new\/?\?request=b1/,
     );
+    await expect(drawer.getByRole("button", { name: "Send with my usual terms" })).toBeVisible();
 
     await drawer.getByRole("button", { name: "Decline", exact: true }).click();
     expect(api.requestsTo("PUT", "/bookings/b1/status")).toHaveLength(0);

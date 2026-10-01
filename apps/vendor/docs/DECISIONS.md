@@ -534,3 +534,28 @@ why. The page doesn't re-derive any of it, so web and iOS can't disagree.
 - "Mark as unread" on a thread returns to the inbox: the thread re-reads its
   messages every few seconds, and reading is what clears the mark.
 
+---
+
+## Decision: Vendor redesign, step 3 — Bookings are agreed bookings only (2026-10-01)
+
+Bookings lists what's been agreed — a contract signed, or a marketplace
+request accepted before contracts — in the tabs Overview uses
+(`bookingTab`: Deposit due / Confirmed / Over). Requests and unsigned
+offers are Leads now.
+
+- A row expands to the design's five steps (`bookingProgress`: contract
+  sent → signed → deposit paid → event over → payment received), the
+  event's details, and its money (`bookingMoney`, from the payment schedule
+  when there is one).
+- The vendor's move is highlighted and sorts first: payments the couple
+  says they've sent (`paymentsToConfirm` — per installment, or the legacy
+  deposit/balance pair), a date change to answer, and the escrow check-in or
+  confirm. Cancelling keeps its confirmation and the server's guard.
+- "Signed contract" opens the contract page; there's no PDF endpoint, and
+  the browser's print-to-PDF covers it. "Message couple" replaces the
+  design's "View client details" (no per-client history in v1).
+- The one-click "Accept & send contract" for a marketplace request moved
+  with requests to the Leads drawer ("Send with my usual terms").
+- The shared primary Button's text is white: in dark mode the ground colour
+  it used was near-black on maroon.
+

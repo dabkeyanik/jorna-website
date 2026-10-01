@@ -13,7 +13,9 @@ const sizes = { md: "px-5 py-2.5 text-[0.95rem]", lg: "px-7 py-3.5 text-base" };
 
 const variants: Record<Variant, string> = {
   primary:
-    "bg-maroon text-ground shadow-[0_10px_24px_-12px_rgba(107,18,38,0.7)] hover:brightness-110",
+    // White, not the ground colour: in dark mode the ground is near-black,
+    // which on maroon was barely legible.
+    "bg-maroon text-white shadow-[0_10px_24px_-12px_rgba(107,18,38,0.7)] hover:brightness-110",
   ghost:
     "border border-card-edge text-ink hover:bg-black/[0.04] dark:hover:bg-white/[0.06]",
   quiet: "text-ink-soft hover:text-ink",
