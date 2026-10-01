@@ -184,7 +184,7 @@ export default function MessagesPage() {
                 <LinkButton href="/vendor-profile" variant="ghost">
                   Edit your packages
                 </LinkButton>
-                <LinkButton href="/my-dashboard" variant="ghost">
+                <LinkButton href="/overview" variant="ghost">
                   Dashboard
                 </LinkButton>
               </div>

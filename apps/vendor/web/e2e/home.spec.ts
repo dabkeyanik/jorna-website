@@ -72,7 +72,7 @@ test.describe("home (marketing) page", () => {
 
     await page.goto("");
 
-    await expect(page).toHaveURL(/\/my-dashboard\/?$/);
+    await expect(page).toHaveURL(/\/overview\/?$/);
     await expect(page.getByText("Your entire celebration team")).not.toBeVisible();
   });
 
@@ -84,6 +84,6 @@ test.describe("home (marketing) page", () => {
     await page.goto("");
 
     await expect(page.getByText("Your entire celebration team")).toBeVisible();
-    await expect(page).not.toHaveURL(/my-dashboard/);
+    await expect(page).not.toHaveURL(/overview/);
   });
 });

@@ -88,7 +88,7 @@ always "none, verify manually" until a test runner is added.
 - **Code:** `web/src/lib/planning.ts` (task rules — single source of truth,
   see `docs/ARCHITECTURE.md`), `web/src/app/bundle/`, `bundles/`, `plan/`,
   `web/src/components/BundleResults.tsx`, `PlanProgress.tsx`,
-  `DraftDetails.tsx`. (`my-dashboard/` is the *vendor* dashboard, not this
+  `DraftDetails.tsx`. (`overview/` is the *vendor* home, not this
   flow's — see "Vendor flow" below.)
 - **Depends on:** `lib/jorna.ts`, `lib/types.ts`, `lib/address.ts`
   (`isCompleteLocation`).
@@ -104,13 +104,14 @@ always "none, verify manually" until a test runner is added.
 - **Sidebar shell:** `web/src/app/(vendor)/layout.tsx` +
   `web/src/components/VendorSidebar.tsx` wrap every seller route under the
   `(vendor)/` route group (route groups add no path segment) —
-  `my-dashboard/` (Overview), `my-bookings/`, `contracts/`, `my-calendar/`,
+  `overview/`, `my-bookings/`, `contracts/`, `my-calendar/`,
   `leads/`, `vendor-profile/`, `my-earnings/`, `settings/` — and Messages for
   vendors (`VendorShellIfVendor`). Since the 2026-10 redesign the shell
   carries the Figma design's palette and fonts (`app/vendor-shell.css`, see
   ARCHITECTURE "Design tokens"), a hamburger menu below `lg`, and shared
   pieces in `components/vendor/` (`ui.tsx`, `Icon.tsx`). `/clients` is gone
-  (301 to `/leads`); `/my-dashboard?view=leads` forwards to `/leads`. Settings
+  (301 to `/leads`); `/my-dashboard` 301s to `/overview` (step 1), and
+  `?view=leads` there forwards to `/leads`. Settings
   holds account (`AccountSettings`, shared with `/account`), Venmo/Zelle,
   tentative-hold length, Google Calendar (`GoogleCalendarCard`, also on the
   calendar page), notifications and theme. See `docs/DECISIONS.md`.
@@ -118,7 +119,7 @@ always "none, verify manually" until a test runner is added.
   `pipelineStats`), `web/src/app/vendor/`, `(vendor)/vendor-profile/`,
   `my-availability/`, `(vendor)/my-bookings/`, `(vendor)/my-calendar/`,
   `(vendor)/my-earnings/`,
-  `(vendor)/my-dashboard/`, `(vendor)/contracts/`, `(vendor)/leads/`,
+  `(vendor)/overview/`, `(vendor)/contracts/`, `(vendor)/leads/`,
   `(vendor)/settings/`,
   `web/src/components/ServicesManager.tsx`, `VendorCard.tsx`,
   `VendorSidebar.tsx`, `components/vendor/`, `LeadsPanel.tsx`.

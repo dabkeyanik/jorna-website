@@ -47,7 +47,7 @@ function CalendarConnectedInner() {
           <LinkButton href="/my-calendar">
             {ok ? "See your calendar" : "Back to your calendar"}
           </LinkButton>
-          <LinkButton href="/my-dashboard" variant="ghost">
+          <LinkButton href="/overview" variant="ghost">
             Dashboard
           </LinkButton>
         </div>

@@ -65,7 +65,7 @@ ever disagree after a future change.
 
 Signed-in **vendors** don't see Home at all: `components/VendorHomeRedirect.tsx`
 (wrapped around Home in `home/page.tsx`, so it covers `/`, `/app/` and
-`/app/home/` alike) sends them to `/my-dashboard`. It deliberately never
+`/app/home/` alike) sends them to `/overview`. It deliberately never
 blanks the page for signed-out visitors, so the static export of `/` keeps
 its real marketing copy for search engines.
 

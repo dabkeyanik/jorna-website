@@ -483,3 +483,28 @@ Vendor Dashboard" design (plan: the "Vendor Dashboard Redesign Plan" doc,
   theme toggle left the sidebar, and a stored theme is now applied before
   first paint (`lib/themeBoot.ts`) — before, a reload dropped it.
 
+---
+
+## Decision: Vendor redesign, step 1 — Overview replaces the dashboard (2026-10-01)
+
+`/my-dashboard` became `/overview` (301, query string kept), built from the
+Figma design: a greeting, the next event (stepping through what's coming,
+with the mini calendar following it), open leads and how many need a reply,
+bookings by tab with deposits owed and money received this month, and the
+latest messages. It's a summary only — every action the old dashboard
+offered (answering requests, offers, check-in, confirming payments) is on
+Bookings, which rows link to.
+
+- The numbers are reducers in `lib/vendorPlan.ts` (`bookingTab`,
+  `leadSummary`, `depositsOwedCents`, `receivedThisMonthCents`,
+  `upcomingBookings`), with unit tests. `bookingTab` (Deposit due /
+  Confirmed / Over) is what the Bookings page will use in step 3.
+- "+N this week" and "oldest waited" from the plan aren't shown: bookings
+  have no creation timestamp in the backend. That arrives with step 2's
+  leads backend work.
+- "Received this month" counts installments (and, for older contracts,
+  deposits) by confirmation date; a balance confirmed on a contract with no
+  payment schedule has no date in the payload and isn't counted.
+- `dark:` utilities now follow `data-theme` (shared `globals.css`
+  `@custom-variant`), so the Settings theme choice applies to them too.
+

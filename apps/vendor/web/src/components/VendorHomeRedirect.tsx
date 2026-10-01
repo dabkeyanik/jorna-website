@@ -39,7 +39,7 @@ export function VendorHomeRedirect({ children }: { children: React.ReactNode }) 
   }, [loading, user]);
 
   useEffect(() => {
-    if (isVendor === true) router.replace("/my-dashboard");
+    if (isVendor === true) router.replace("/overview");
   }, [isVendor, router]);
 
   const deciding = user ? isVendor !== false : loading && storedSession;

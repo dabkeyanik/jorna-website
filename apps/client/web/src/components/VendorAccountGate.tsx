@@ -52,7 +52,7 @@ export function VendorAccountGate({ children }: { children: React.ReactNode }) {
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <a
-            href={vendorSiteUrl("/my-dashboard")}
+            href={vendorSiteUrl("/overview")}
             className="inline-flex items-center rounded-full bg-maroon px-5 py-2.5 font-semibold text-ground hover:brightness-110"
           >
             Go to jornaevents.com

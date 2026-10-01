@@ -18,7 +18,7 @@ import { useAuth } from "@/lib/auth";
 import { loadIsVendor } from "@/lib/role";
 
 const VENDOR_SHELL_PREFIXES = [
-  "/my-dashboard",
+  "/overview",
   "/my-bookings",
   "/my-calendar",
   "/my-earnings",

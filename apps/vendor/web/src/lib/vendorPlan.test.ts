@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  bookingTab,
   contractNeedsVendor,
   contractStatus,
+  countdownLabel,
+  depositsOwedCents,
+  leadSummary,
+  receivedThisMonthCents,
+  upcomingBookings,
   pipelineStage,
   pipelineStats,
   vendorTasks,
@@ -305,3 +311,99 @@ describe("contractStatus", () => {
     ).toBe("cancelled");
   });
 });
+
+function isoInDays(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+const signed = (overrides: Partial<VendorBooking> = {}) =>
+  booking({ contract_token: "t", signed_at: "2026-09-01T00:00:00Z", date_iso: isoInDays(30), ...overrides });
+
+describe("bookingTab", () => {
+  it("leaves anything not yet agreed to Leads", () => {
+    expect(bookingTab(booking({ status: "pending" }))).toBeNull();
+    expect(bookingTab(booking({ contract_token: "t", signed_at: null }))).toBeNull();
+  });
+
+  it("is Deposit due while a signed contract's deposit is unconfirmed", () => {
+    expect(bookingTab(signed({ deposit_percent: 30, deposit_amount_cents: 30000 }))).toBe("deposit_due");
+    expect(
+      bookingTab(signed({ deposit_percent: 30, deposit_confirmed_received_at: "2026-09-02T00:00:00Z" })),
+    ).toBe("confirmed");
+  });
+
+  it("treats an accepted marketplace booking with no deposit as Confirmed", () => {
+    expect(bookingTab(booking({ status: "approved", date_iso: isoInDays(10) }))).toBe("confirmed");
+  });
+
+  it("holds a past event in Over until it's paid, then drops it", () => {
+    expect(bookingTab(signed({ date_iso: isoInDays(-3) }))).toBe("over");
+    expect(bookingTab(signed({ date_iso: isoInDays(-3), payment_status: "confirmed_paid" }))).toBeNull();
+  });
+
+  it("ignores dead bookings", () => {
+    expect(bookingTab(signed({ status: "cancelled" }))).toBeNull();
+  });
+});
+
+describe("Overview money", () => {
+  const now = new Date("2026-10-15T12:00:00Z");
+
+  it("counts installments confirmed this month, and legacy deposits", () => {
+    const withSchedule = signed({
+      payment_schedule: [
+        { id: "i1", label: "Deposit", amount_cents: 50000, due_type: "on_signing", due_date: null, due_days: null, due_on: null, marked_paid_at: null, confirmed_at: "2026-10-03T10:00:00Z" },
+        { id: "i2", label: "Balance", amount_cents: 70000, due_type: "on_signing", due_date: null, due_days: null, due_on: null, marked_paid_at: null, confirmed_at: "2026-09-20T10:00:00Z" },
+      ],
+    } as Partial<VendorBooking>);
+    const legacy = signed({ deposit_amount_cents: 20000, deposit_confirmed_received_at: "2026-10-01T09:00:00Z" });
+    expect(receivedThisMonthCents([withSchedule, legacy], now)).toBe(70000);
+  });
+
+  it("sums deposits still owed on agreed bookings", () => {
+    const owed = signed({ deposit_percent: 30, deposit_amount_cents: 30000 });
+    const paid = signed({ deposit_percent: 30, deposit_amount_cents: 30000, deposit_confirmed_received_at: "2026-09-02T00:00:00Z" });
+    const unsigned = booking({ contract_token: "t", deposit_percent: 30, deposit_amount_cents: 99900 });
+    expect(depositsOwedCents([owed, paid, unsigned])).toBe(30000);
+  });
+});
+
+describe("upcomingBookings and countdownLabel", () => {
+  it("lists agreed, dated, future bookings soonest first", () => {
+    const later = signed({ booking_id: "later", date_iso: isoInDays(40) });
+    const sooner = signed({ booking_id: "sooner", date_iso: isoInDays(5) });
+    const past = signed({ booking_id: "past", date_iso: isoInDays(-5) });
+    const lead = booking({ booking_id: "lead", status: "pending", date_iso: isoInDays(2) });
+    expect(upcomingBookings([later, past, lead, sooner]).map((b) => b.booking_id)).toEqual(["sooner", "later"]);
+  });
+
+  it("reads like a person would say it", () => {
+    expect(countdownLabel(isoInDays(0))).toBe("Today");
+    expect(countdownLabel(isoInDays(1))).toBe("Tomorrow");
+    expect(countdownLabel(isoInDays(4))).toBe("In 4 days");
+    expect(countdownLabel(isoInDays(28))).toBe("In 4 weeks");
+    expect(countdownLabel(isoInDays(-1))).toBeNull();
+  });
+});
+
+describe("leadSummary", () => {
+  it("counts unagreed bookings and open informal leads, and who's waiting on the vendor", () => {
+    const summary = leadSummary(
+      [
+        booking({ booking_id: "req", status: "pending" }),
+        booking({ booking_id: "offer", status: "negotiation_ongoing", negotiation_awaiting_role: "vendor" }),
+        booking({ booking_id: "sent", contract_token: "t", signed_at: null }),
+        signed({ booking_id: "booked" }),
+      ],
+      [
+        { status: "new", converted_booking_id: null },
+        { status: "contacted", converted_booking_id: null },
+        { status: "won", converted_booking_id: "booked" },
+      ],
+    );
+    expect(summary).toEqual({ open: 5, needReply: 3 });
+  });
+});
+

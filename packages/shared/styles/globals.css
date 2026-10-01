@@ -67,6 +67,23 @@
   color-scheme: light dark;
 }
 
+/* `dark:` utilities follow the same switch as the palette above: an explicit
+   data-theme="dark", or the system's preference when no theme is set. Left
+   at Tailwind's default they followed the system only, so a vendor who chose
+   Dark in Settings on a light machine got dark surfaces with light-mode
+   accents. An app that never sets data-theme (the client app today) sees no
+   change. */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme]), :root:not([data-theme]) *) {
+      @slot;
+    }
+  }
+}
+
 [data-theme="dark"] {
   --color-ground: #1c0610;
   --color-ground-2: #250a16;

@@ -7,7 +7,7 @@
 
 const VENDOR_APP_ORIGIN = process.env.NEXT_PUBLIC_VENDOR_APP_URL ?? "https://jornaevents.com";
 
-/** An app path on the vendor site, e.g. "/my-dashboard". */
+/** An app path on the vendor site, e.g. "/overview". */
 export function vendorSiteUrl(path: string): string {
   return `${VENDOR_APP_ORIGIN}/app${path.startsWith("/") ? path : `/${path}`}`;
 }

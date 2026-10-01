@@ -36,8 +36,7 @@ const prefix = (...paths: string[]) => (pathname: string) =>
   paths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
 const ITEMS: SidebarItem[] = [
-  // Overview keeps /my-dashboard's URL until its own rebuild (plan step 1).
-  { href: "/my-dashboard", label: "Overview", icon: "overview", match: prefix("/my-dashboard") },
+  { href: "/overview", label: "Overview", icon: "overview", match: prefix("/overview") },
   { href: "/my-bookings", label: "Bookings", icon: "bookings", match: prefix("/my-bookings") },
   { href: "/contracts", label: "Contracts", icon: "contract", match: prefix("/contracts") },
   { href: "/my-calendar", label: "Calendar", icon: "calendar", match: prefix("/my-calendar") },
@@ -102,7 +101,7 @@ function NavLink({
 
 function Brand() {
   return (
-    <Link href="/my-dashboard" className="flex items-center gap-3 text-white">
+    <Link href="/overview" className="flex items-center gap-3 text-white">
       <span
         style={{ background: "var(--rail-gold)", color: "var(--rail-bg)" }}
         className="grid size-[35px] place-items-center rounded-[11px]"

@@ -30,8 +30,8 @@
 # /my-leads and /my-clients targets below changed from pointing at
 # /my-pipeline's view tabs to /my-dashboard's and the new standalone /clients
 # page respectively — and since 2026-10 both point at /leads.
-/app/my-pipeline        /app/my-dashboard               301
-/app/my-pipeline/       /app/my-dashboard               301
+/app/my-pipeline        /app/overview                   301
+/app/my-pipeline/       /app/overview                   301
 /app/my-leads           /app/leads                      301
 /app/my-leads/          /app/leads                      301
 /app/my-clients         /app/leads                      301
@@ -45,3 +45,10 @@
 # that one to /leads itself.
 /app/clients            /app/leads                      301
 /app/clients/           /app/leads                      301
+
+# /my-dashboard became Overview in the vendor redesign's step 1 (2026-10).
+# Pages keeps the query string on a redirect, so an old ?view=leads link
+# arrives at /overview, which forwards it on to /leads.
+/app/my-dashboard       /app/overview                   301
+/app/my-dashboard/      /app/overview                   301
+
