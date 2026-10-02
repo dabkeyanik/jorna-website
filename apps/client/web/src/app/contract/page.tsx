@@ -13,7 +13,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ApiError } from "@jorna/shared/lib/api";
 import { getContract, markInstallmentSent } from "@/lib/jorna";
-import { centsMoney, contractSignUrl, paymentRows } from "@/lib/contract";
+import { bookingStage, centsMoney, contractSignUrl, paymentRows, STAGE_LABELS } from "@/lib/contract";
 import { parseServerTime, type Contract, type Installment } from "@/lib/types";
 import { PaymentSchedule } from "@/components/PaymentSchedule";
 import { Button, Card } from "@jorna/shared/components/ui";
@@ -57,12 +57,17 @@ function signedOn(ts?: string | null): string | null {
 }
 
 /** Where it stands, in the words the plan uses for it. */
-function standing(c: Contract): { text: string; tone: string } {
-  if (c.signed_at) return { text: "Signed", tone: "text-green" };
+function standing(c: Contract, token: string): { text: string; tone: string } {
+  // Read by its link, so the payload has no token of its own; the link's is it.
+  const stage = bookingStage({ ...c, contract_token: token });
+  if (stage === "completed") return { text: STAGE_LABELS.completed, tone: "text-ink-soft" };
+  if (stage === "confirmed") return { text: STAGE_LABELS.confirmed, tone: "text-green" };
+  if (stage === "deposit_due" || stage === "contract_to_review") {
+    return { text: STAGE_LABELS[stage], tone: "text-gold" };
+  }
+  // Signed but off the lifecycle — a booking cancelled after signing.
+  if (c.signed_at) return { text: "Signed", tone: "text-ink-soft" };
   switch (c.contract_status) {
-    case "sent":
-    case "viewed":
-      return { text: "Awaiting your signature", tone: "text-gold" };
     case "expired":
       return { text: "Expired unsigned", tone: "text-maroon dark:text-gold" };
     case "declined":
@@ -200,7 +205,7 @@ function ContractInner() {
 
   const c = contract;
   const vendor = c.vendor_display_name || "Your vendor";
-  const status = standing(c);
+  const status = standing(c, token);
   const rows = paymentRows(c);
   const awaitingSignature = !c.signed_at && (c.contract_status === "sent" || c.contract_status === "viewed");
   const signed = signedOn(c.signed_at);

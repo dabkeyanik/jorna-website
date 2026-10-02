@@ -84,7 +84,15 @@ import { AddressFields } from "@jorna/shared/components/AddressFields";
 import { DraftDetails } from "@/components/DraftDetails";
 import { PlanProgress } from "@/components/PlanProgress";
 import { addressPin } from "@jorna/shared/lib/geocode";
-import { contractSignUrl, contractStep, contractViewPath, paymentRows } from "@/lib/contract";
+import {
+  bookingStage,
+  contractSignUrl,
+  contractStep,
+  contractViewPath,
+  paymentRows,
+  STAGE_LABELS,
+  type BookingStage,
+} from "@/lib/contract";
 import { PaymentSchedule } from "@/components/PaymentSchedule";
 import { ESCROW_ENABLED } from "@jorna/shared/lib/flags";
 import { Avatar, Button, Card, Field, LinkButton } from "@jorna/shared/components/ui";
@@ -364,6 +372,14 @@ function isAwaitingVendor(b: BundleBooking, draft: boolean): boolean {
   return b.status === "pending" || b.status === "negotiation_ongoing";
 }
 
+const STAGE_TONE: Record<BookingStage, string> = {
+  requested: "text-gold",
+  contract_to_review: "text-gold",
+  deposit_due: "text-gold",
+  confirmed: "text-green",
+  completed: "text-ink-soft",
+};
+
 /**
  * Escrow-aware status line for one booking.
  *
@@ -381,6 +397,13 @@ function statusLine(b: BundleBooking, draft: boolean): { text: string; tone: str
   if (pay === "processing") {
     return { text: "Payment processing", tone: "text-gold" };
   }
+  // A contract's booking reads the lifecycle stage both apps share (lib/
+  // contract's bookingStage), whatever its manual payment_status says — the
+  // payment rows underneath already say what's been sent and received.
+  const stage = draft ? null : bookingStage(b);
+  if (stage) {
+    return { text: STAGE_LABELS[stage], tone: STAGE_TONE[stage] };
+  }
   if (pay !== "unpaid") {
     const tone =
       pay === "released"
@@ -393,20 +416,8 @@ function statusLine(b: BundleBooking, draft: boolean): { text: string; tone: str
   if (draft && (b.status === "pending" || b.status === "negotiation_ongoing")) {
     return { text: "Not sent yet", tone: "text-ink-faint" };
   }
-  // Said in full on this page: "Awaiting vendor" is what the shared label calls
-  // it, which reads fine in a vendor's own list and leaves a host wondering
-  // whether the request went anywhere. Spelling out what's being waited for
-  // answers that without them having to ask.
-  if (b.status === "pending") {
-    return { text: "Awaiting vendor approval", tone: "text-gold" };
-  }
-  // Accepted, but it's a contract to sign before it's booked (backend
-  // DECISIONS.md #17) — "Approved" read as done when it wasn't.
-  if (b.status === "approved") {
-    const step = contractStep(b);
-    if (step === "sign") return { text: "Accepted — awaiting your signature", tone: "text-gold" };
-    if (step === "expired") return { text: "Contract expired", tone: "text-maroon dark:text-gold" };
-    if (b.contract_token && b.signed_at) return { text: "Booked", tone: "text-green" };
+  if (b.status === "approved" && contractStep(b) === "expired") {
+    return { text: "Contract expired", tone: "text-maroon dark:text-gold" };
   }
   return {
     // Rejected used to share the faintest tone with routine, already-settled

@@ -220,7 +220,7 @@ test.describe("bundle detail (/bundle)", () => {
 
     await page.goto("bundle/?id=bundle-1");
     await expect(page.getByText(/accepted — review and sign the contract/)).toBeVisible();
-    await expect(page.getByText("Accepted — awaiting your signature")).toBeVisible();
+    await expect(page.getByText("Contract to review")).toBeVisible();
     await expect(page.getByRole("link", { name: "Review & sign" })).toHaveAttribute(
       "href",
       "https://jornaevents.com/app/booking-link?t=tok-1",
@@ -325,6 +325,51 @@ test.describe("bundle detail (/bundle)", () => {
     await expect(page.getByText("Priya Mehta")).toBeVisible();
     await expect(page.getByText("ab12cd34")).toBeVisible();
     await expect(page.getByRole("button", { name: "I sent this" })).toHaveCount(1);
+    // Deposit confirmed, event ahead: the same stage the vendor's Bookings shows.
+    await expect(page.getByText("Confirmed", { exact: true })).toBeVisible();
+  });
+
+  test("each booking card names its stage, the way the vendor's app does", async ({ page, api }) => {
+    await loginAs(page, api);
+    const unconfirmed = schedule.map((i) => ({ ...i, marked_paid_at: null, confirmed_at: null }));
+    api.get(
+      "/bundles/:id",
+      mockBundleDetail({
+        bookings: [
+          mockBundleBooking({ booking_id: "b-req", service_name: "Mehndi", status: "pending" }),
+          mockBundleBooking({
+            booking_id: "b-dep",
+            service_name: "Live Dhol",
+            payment_method: "manual",
+            contract_token: "tok-dep",
+            contract_status: "signed",
+            signed_at: "2030-03-01T09:00:00+00:00",
+            date_iso: "2099-05-01",
+            payment_schedule: unconfirmed,
+          }),
+          mockBundleBooking({
+            booking_id: "b-done",
+            service_name: "Catering",
+            payment_method: "manual",
+            contract_token: "tok-done",
+            contract_status: "signed",
+            signed_at: "2020-03-01T09:00:00+00:00",
+            date_iso: "2020-05-01",
+            payment_schedule: unconfirmed,
+          }),
+        ],
+      }),
+    );
+    api.get("/bundles", []);
+    api.get("/events", []);
+    api.get("/conversations", []);
+    api.get("/payments/card", null);
+
+    await page.goto("bundle/?id=bundle-1");
+    await expect(page.getByText("Requested — awaiting the vendor")).toBeVisible();
+    await expect(page.getByText("Signed · deposit due")).toBeVisible();
+    // A past event is Completed whatever is still owed on it.
+    await expect(page.getByText("Completed", { exact: true })).toBeVisible();
   });
 
   test("cancelling a manual-track booking shows no refund math", async ({ page, api }) => {

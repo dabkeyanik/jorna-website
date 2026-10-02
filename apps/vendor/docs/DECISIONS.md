@@ -691,3 +691,23 @@ the marketplace lives. `/browse` stays as a redirect for old bookmarks. The
 signed-out header still doesn't advertise browsing; that earlier decision
 stands.
 
+
+## Decision: Over keeps every past booking; both apps name the same stages (2026-10-02)
+
+**Context.** The lifecycle is Inquiry → Negotiation → Deposit due →
+Confirmed → Over. `vendorPlan.bookingTab` held a past event in Over only
+until its money was all confirmed, then returned null. So a fully paid
+booking disappeared from every tab, at exactly the point a vendor might
+want to look back at it. The client app used its own words ("Accepted —
+awaiting your signature", "Booked") for the same states.
+
+**Decision.**
+- **Over is every agreed booking whose event has passed, paid or not.**
+  Each Over row says Paid or Balance due (`overPill`). The Over tile
+  counts balances due instead of saying "Waiting on final payment".
+- **The client app names the same stages** with `lib/contract.ts`
+  `bookingStage`: Requested, Contract to review, Signed · deposit due,
+  Confirmed and Completed. Deposit due reads the payment schedule, as the
+  vendor side does. The bundle payload has no legacy deposit fields, so a
+  booking without a schedule goes straight to Confirmed once signed.
+  Bookings from before contracts keep their old escrow-era labels.

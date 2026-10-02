@@ -32,6 +32,7 @@ import {
   bookingProgress,
   bookingTab,
   centsToMoney,
+  overPill,
   paymentsToConfirm,
   type BookingTab,
   type PaymentToConfirm,
@@ -423,6 +424,7 @@ function BookingsInner() {
   }
 
   const count = (t: BookingTab) => rows.filter((r) => r.tab === t).length;
+  const balancesDue = rows.filter((r) => r.tab === "over" && !overPill(r.b).paid).length;
   const shown = filter === "all" ? rows : rows.filter((r) => r.tab === filter);
 
   return (
@@ -437,7 +439,13 @@ function BookingsInner() {
       <div className="grid gap-4 sm:grid-cols-3">
         <StatTile icon="clock" tone="amber" label="Deposit due" value={count("deposit_due")} note="Signed, deposit not in" />
         <StatTile icon="bookings" tone="green" label="Confirmed" value={count("confirmed")} note="Upcoming events" />
-        <StatTile icon="sparkles" tone="grey" label="Over" value={count("over")} note="Waiting on final payment" />
+        <StatTile
+          icon="sparkles"
+          tone="grey"
+          label="Over"
+          value={count("over")}
+          note={balancesDue ? `${balancesDue} with a balance due` : "Past events"}
+        />
       </div>
 
       {notice ? <p className="mt-4 rounded-lg bg-green/10 px-3 py-2 text-sm text-green">{notice}</p> : null}
@@ -506,6 +514,8 @@ function BookingsInner() {
                       <StatusPill tone="red" dot>
                         Your move
                       </StatusPill>
+                    ) : tab === "over" ? (
+                      <StatusPill tone={overPill(b).paid ? "green" : "amber"}>{overPill(b).label}</StatusPill>
                     ) : (
                       <StatusPill tone={TAB[tab].tone}>{TAB[tab].label}</StatusPill>
                     )}
