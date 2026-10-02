@@ -65,7 +65,10 @@ function installmentState(i: Installment): { text: string; tone: string } {
 function ContractViewInner() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const id = useSearchParams().get("id") ?? "";
+  const params = useSearchParams();
+  const id = params.get("id") ?? "";
+  // What the negotiation workspace just did, when it sends the vendor here.
+  const notice = params.get("notice");
 
   const [c, setC] = useState<Contract | null>(null);
   const [docs, setDocs] = useState<AttachedDocument[]>([]);
@@ -184,6 +187,12 @@ function ContractViewInner() {
         ) : null
       ) : null}
 
+      {notice ? (
+        <p role="status" className="mt-4 rounded-lg bg-ground-2 px-3 py-2 text-sm text-ink-soft">
+          ✓ {notice}
+        </p>
+      ) : null}
+
       {unsigned && c.proposal_status === "open" ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/40 bg-gold/10 px-4 py-3">
           <p className="text-sm text-ink">
@@ -194,6 +203,13 @@ function ContractViewInner() {
             Review changes
           </LinkButton>
         </div>
+      ) : unsigned && c.contract_status !== "draft" ? (
+        <p className="mt-4 text-sm text-ink-soft">
+          Want to change something before they sign?{" "}
+          <Link href={`/contracts/changes?id=${c.booking_id}`} className="font-semibold text-gold hover:underline">
+            Open the negotiation
+          </Link>
+        </p>
       ) : null}
 
       {error ? (

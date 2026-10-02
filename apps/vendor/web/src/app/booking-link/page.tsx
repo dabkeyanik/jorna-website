@@ -32,7 +32,7 @@ import { Button, Card, Field } from "@jorna/shared/components/ui";
 import { ContractCompare } from "@/components/ContractCompare";
 import type { GuestBooking, Installment, ProposalHistory } from "@/lib/types";
 import { DocumentView } from "./DocumentView";
-import { ProposeChanges } from "./ProposeChanges";
+import { ClientNegotiation } from "@/components/negotiation/ClientNegotiation";
 import { guestContractPdfUrl } from "@/lib/download";
 
 function money(cents: number): string {
@@ -133,14 +133,16 @@ function ProposalStatus({
   vendorName,
   busy,
   onWithdraw,
+  onOpen,
 }: {
   booking: GuestBooking;
   history: ProposalHistory;
   vendorName: string;
   busy: boolean;
   onWithdraw: (id: string) => void;
+  /** The negotiation workspace, where their proposal and the vendor's answers live. */
+  onOpen: () => void;
 }) {
-  const [showOpen, setShowOpen] = useState(false);
   const latest = history.proposals[0];
   if (!latest) return null;
   const current = termsOf(booking);
@@ -159,10 +161,10 @@ function ProposalStatus({
         <div className="mt-3 flex flex-wrap gap-3">
           <button
             type="button"
-            onClick={() => setShowOpen((v) => !v)}
+            onClick={onOpen}
             className="text-sm font-semibold text-gold underline-offset-4 hover:underline"
           >
-            {showOpen ? "Hide your proposal" : "See your proposal"}
+            See your proposal
           </button>
           <button
             type="button"
@@ -173,11 +175,6 @@ function ProposalStatus({
             Withdraw it
           </button>
         </div>
-        {showOpen ? (
-          <div className="mt-4 border-t border-line-soft pt-4">
-            <ContractCompare before={current} after={latest.proposed} beforeLabel="Current" afterLabel="Your proposal" />
-          </div>
-        ) : null}
       </Card>
       </section>
     );
@@ -208,6 +205,13 @@ function ProposalStatus({
         <div className="mt-4 border-t border-line-soft pt-4">
           <p className="mb-2 text-sm font-medium text-ink-soft">What changed</p>
           <ContractCompare before={before} after={current} beforeLabel="Before" afterLabel="Now" />
+          <button
+            type="button"
+            onClick={onOpen}
+            className="mt-3 text-sm font-semibold text-gold underline-offset-4 hover:underline"
+          >
+            See it in the contract
+          </button>
         </div>
       ) : null}
       {!answered ? (
@@ -558,22 +562,23 @@ function BookingLinkInner() {
         ) : null}
       </div>
 
-      {proposing ? (
-        <div className="mt-8">
-          <ProposeChanges
+      {proposing && history ? (
+        <div className="fixed inset-0 z-40 flex flex-col bg-ground">
+          <ClientNegotiation
             token={token}
             booking={booking}
-            onCancel={() => setProposing(false)}
-            onSent={(h) => {
+            history={history}
+            onClose={() => setProposing(false)}
+            onHistory={(h, message) => {
               setHistory(h);
               setProposing(false);
-              setProposalNotice(`Sent. We'll email you when ${vendorName} replies.`);
+              setProposalNotice(message);
               getGuestBooking(token, true).then(setBooking).catch(() => undefined);
               window.scrollTo({ top: 0 });
             }}
           />
         </div>
-      ) : (
+      ) : null}
       <>
       {proposalNotice ? (
         <p role="status" className="mt-6 rounded-lg bg-ground-2 px-3 py-2 text-center text-sm text-ink-soft">
@@ -581,7 +586,17 @@ function BookingLinkInner() {
         </p>
       ) : null}
       {history ? (
-        <ProposalStatus booking={booking} history={history} vendorName={vendorName} busy={busy} onWithdraw={withdraw} />
+        <ProposalStatus
+          booking={booking}
+          history={history}
+          vendorName={vendorName}
+          busy={busy}
+          onWithdraw={withdraw}
+          onOpen={() => {
+            setProposalNotice(null);
+            setProposing(true);
+          }}
+        />
       ) : null}
 
       <Card className="mt-8 p-5">
@@ -763,7 +778,6 @@ function BookingLinkInner() {
         )}
       </div>
       </>
-      )}
     </div>
   );
 }
