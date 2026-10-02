@@ -93,7 +93,7 @@ export default function ActivityPage() {
                 <LinkButton href={clientAppUrl("/plan")} size="md">
                   Plan an event
                 </LinkButton>
-                <LinkButton href="/browse" variant="ghost" size="md">
+                <LinkButton href={clientAppUrl("/marketplace")} variant="ghost" size="md">
                   Browse vendors
                 </LinkButton>
               </>

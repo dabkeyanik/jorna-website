@@ -20,6 +20,12 @@ test.describe("home (marketing) page", () => {
     await expect(page.getByText("Anjali Kapoor")).toBeVisible();
     await expect(page.getByText("Full Day Wedding Photography")).toBeVisible();
 
+    // Home's own way to browse goes to the client app's marketplace.
+    await expect(page.getByRole("link", { name: /See all vendors/ })).toHaveAttribute(
+      "href",
+      /^https:\/\/[^/]+\/app\/marketplace$/,
+    );
+
     // "Browse vendors" is a signed-in-client nav item now (NO_VENDOR_TABS),
     // not something advertised to a stranger who hasn't signed up — see
     // docs/DECISIONS.md. Home's own in-page buttons still say "Browse
@@ -44,7 +50,8 @@ test.describe("home (marketing) page", () => {
       name: "Browse vendors",
     });
     await expect(link).toBeVisible();
-    await expect(link).toHaveAttribute("href", "/app/browse/");
+    // The marketplace lives in the client app; /browse here only redirects Home.
+    await expect(link).toHaveAttribute("href", /^https:\/\/[^/]+\/app\/marketplace$/);
   });
 
   test("still renders the marketing content if the vendor showcase fails to load", async ({

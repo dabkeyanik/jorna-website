@@ -474,7 +474,7 @@ function ServiceInner() {
     return (
       <div className="py-20 text-center">
         <p className="text-ink-soft">{error ?? "Package not found."}</p>
-        <Link href="/browse" className="mt-4 inline-block text-sm text-gold hover:underline">
+        <Link href={clientAppUrl("/marketplace")} className="mt-4 inline-block text-sm text-gold hover:underline">
           Back to marketplace
         </Link>
       </div>
@@ -489,7 +489,7 @@ function ServiceInner() {
 
   return (
     <div className="mx-auto w-[min(var(--container-wide),100%-2rem)] py-8">
-      <Link href="/browse" className="text-sm text-ink-soft hover:text-ink">
+      <Link href={clientAppUrl("/marketplace")} className="text-sm text-ink-soft hover:text-ink">
         ← Back to marketplace
       </Link>
 

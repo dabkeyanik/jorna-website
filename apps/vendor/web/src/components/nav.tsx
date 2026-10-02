@@ -24,6 +24,7 @@ import { useAuth } from "@/lib/auth";
 import { loadAttention } from "@/lib/attention";
 import { getUnreadCount } from "@/lib/jorna";
 import { loadIsVendor } from "@/lib/role";
+import { clientAppUrl } from "@/lib/clientApp";
 
 export interface NavItem {
   href: string;
@@ -104,8 +105,10 @@ export const NO_VENDOR_TABS: NavItem[] = [
   // sees "How it works"/"For clients" on Home instead (SiteHeader's
   // signed-out nav). The marketplace is for someone already planning a
   // celebration, not a general storefront advertised to a stranger.
+  // It lives in the client app (book.jornaevents.com); /browse here only
+  // redirects to Home.
   {
-    href: "/browse",
+    href: clientAppUrl("/marketplace"),
     label: "Browse vendors",
     icon: icon(I.marketplace),
     match: ["/browse"],

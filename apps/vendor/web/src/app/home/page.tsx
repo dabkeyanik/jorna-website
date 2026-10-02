@@ -163,7 +163,7 @@ function HomeContent() {
                   <LinkButton href={primary.href} size="lg">
                     {primary.label}
                   </LinkButton>
-                  <LinkButton href="/browse" variant="ghost" size="lg">
+                  <LinkButton href={clientAppUrl("/marketplace")} variant="ghost" size="lg">
                     Browse vendors
                   </LinkButton>
                 </>
@@ -221,7 +221,7 @@ function HomeContent() {
                 </h2>
               </div>
               <Link
-                href="/browse"
+                href={clientAppUrl("/marketplace")}
                 className="inline-flex items-center gap-2 text-sm font-medium text-maroon transition hover:text-gold dark:text-gold"
               >
                 See all vendors {IconArrow}
@@ -335,7 +335,7 @@ function HomeContent() {
                   <LinkButton href={user ? clientAppUrl("/plan") : primary.href} size="lg">
                     Start planning
                   </LinkButton>
-                  <LinkButton href="/browse" variant="ghost" size="lg">
+                  <LinkButton href={clientAppUrl("/marketplace")} variant="ghost" size="lg">
                     Browse vendors
                   </LinkButton>
                 </>
