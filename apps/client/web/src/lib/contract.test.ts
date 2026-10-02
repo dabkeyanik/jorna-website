@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bookingStage,
   centsMoney,
   contractSignUrl,
   contractStep,
@@ -103,5 +104,57 @@ describe("utcToday", () => {
 describe("contractSignUrl", () => {
   it("points at the vendor site's signing page", () => {
     expect(contractSignUrl("a b")).toBe("https://jornaevents.com/app/booking-link?t=a%20b");
+  });
+});
+
+describe("bookingStage", () => {
+  const future = "2099-06-01";
+  const past = "2020-06-01";
+  const inst = (over: Partial<Installment> = {}) =>
+    ({ id: "i", label: "Deposit", amount_cents: 1000, confirmed_at: null, ...over }) as Installment;
+
+  it("is Requested until the vendor answers", () => {
+    expect(bookingStage(booking({ status: "pending", contract_token: null, contract_status: null }))).toBe(
+      "requested",
+    );
+  });
+
+  it("is Contract to review while a sent contract is unsigned", () => {
+    expect(bookingStage(booking())).toBe("contract_to_review");
+    expect(bookingStage(booking({ contract_status: "viewed" }))).toBe("contract_to_review");
+    expect(bookingStage(booking({ contract_status: "expired" }))).toBeNull();
+    expect(bookingStage(booking({ contract_status: "voided" }))).toBeNull();
+  });
+
+  it("is Deposit due on a signed contract until the first payment is confirmed", () => {
+    const signed = { signed_at: "2030-01-01T00:00:00", contract_status: "signed" as const, date_iso: future };
+    expect(bookingStage(booking({ ...signed, payment_schedule: [inst(), inst({ id: "j" })] }))).toBe(
+      "deposit_due",
+    );
+    expect(
+      bookingStage(
+        booking({
+          ...signed,
+          payment_schedule: [inst({ confirmed_at: "2030-01-02T00:00:00" }), inst({ id: "j" })],
+        }),
+      ),
+    ).toBe("confirmed");
+  });
+
+  it("has no deposit step for a single payment", () => {
+    expect(
+      bookingStage(booking({ signed_at: "2030-01-01T00:00:00", date_iso: future, payment_schedule: [inst()] })),
+    ).toBe("confirmed");
+  });
+
+  it("is Completed once the event has passed, paid or not", () => {
+    expect(
+      bookingStage(booking({ signed_at: "2019-01-01T00:00:00", date_iso: past, payment_schedule: [inst(), inst()] })),
+    ).toBe("completed");
+  });
+
+  it("leaves declined requests and pre-contract bookings to the caller", () => {
+    expect(bookingStage(booking({ status: "rejected", contract_token: null }))).toBeNull();
+    expect(bookingStage(booking({ status: "approved", contract_token: null, contract_status: null }))).toBeNull();
   });
 });

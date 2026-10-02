@@ -1024,10 +1024,12 @@ export function calendarMonth(
  * A booking's tab on the Overview card (and, from plan step 3, the Bookings
  * page): Deposit due, Confirmed, or Over. A booking exists once it's agreed —
  * a contract signed, or a marketplace request accepted — so anything before
- * that (a lead) is null, as is anything dead or fully settled after the event.
+ * that (a lead) is null, as is anything dead.
  *
- * "Over" holds an event that has happened until its money is all confirmed,
- * same accuracy-over-tidiness reasoning as pipelineStage's "done".
+ * "Over" is every event that has happened, paid or not (2026-10 lifecycle
+ * plan). It used to hold one only until its money was confirmed and then
+ * drop it, so a fully paid past booking vanished from every tab. Each Over
+ * row says Paid or Balance due instead — see overPill.
  */
 export type BookingTab = "deposit_due" | "confirmed" | "over";
 
@@ -1035,11 +1037,16 @@ export function bookingTab(b: VendorBooking): BookingTab | null {
   if (isDeadVendorBooking(b)) return null;
   const agreed = b.contract_token ? Boolean(b.signed_at) : b.status === "approved" || b.status === "payment_confirmed";
   if (!agreed) return null;
-  const settled = pipelineStage(b) === "done";
   const left = daysUntil(b.date_end || b.date_iso);
-  if (left != null && left < 0) return settled ? null : "over";
+  if (left != null && left < 0) return "over";
   const status = contractStatus(b);
   return status === "deposit_due" || status === "confirm_deposit" ? "deposit_due" : "confirmed";
+}
+
+/** What an Over row's pill says: whether the money is all in. */
+export function overPill(b: VendorBooking): { label: "Paid" | "Balance due"; paid: boolean } {
+  const paid = pipelineStage(b) === "done";
+  return { label: paid ? "Paid" : "Balance due", paid };
 }
 
 /**

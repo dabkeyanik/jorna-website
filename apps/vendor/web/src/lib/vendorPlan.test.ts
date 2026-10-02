@@ -3,6 +3,7 @@ import {
   bookingMoney,
   bookingProgress,
   bookingTab,
+  overPill,
   canAttachDocument,
   paymentsToConfirm,
   contractNeedsVendor,
@@ -342,9 +343,22 @@ describe("bookingTab", () => {
     expect(bookingTab(booking({ status: "approved", date_iso: isoInDays(10) }))).toBe("confirmed");
   });
 
-  it("holds a past event in Over until it's paid, then drops it", () => {
+  it("puts every past event in Over, paid or not", () => {
     expect(bookingTab(signed({ date_iso: isoInDays(-3) }))).toBe("over");
-    expect(bookingTab(signed({ date_iso: isoInDays(-3), payment_status: "confirmed_paid" }))).toBeNull();
+    expect(bookingTab(signed({ date_iso: isoInDays(-3), payment_status: "confirmed_paid" }))).toBe("over");
+    expect(bookingTab(booking({ status: "payment_confirmed", date_iso: isoInDays(-40) }))).toBe("over");
+  });
+
+  it("goes by the last day of a multi-day event", () => {
+    expect(bookingTab(signed({ date_iso: isoInDays(-2), date_end: isoInDays(1) }))).toBe("confirmed");
+  });
+
+  it("labels an Over row Paid or Balance due", () => {
+    expect(overPill(signed({ date_iso: isoInDays(-3) }))).toEqual({ label: "Balance due", paid: false });
+    expect(overPill(signed({ date_iso: isoInDays(-3), payment_status: "confirmed_paid" }))).toEqual({
+      label: "Paid",
+      paid: true,
+    });
   });
 
   it("ignores dead bookings", () => {

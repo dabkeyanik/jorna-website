@@ -69,6 +69,46 @@ test.describe("vendor bookings (/my-bookings)", () => {
     await expect(list.getByText("Meera & Arjun")).toHaveCount(0);
   });
 
+  test("Over keeps every past event, paid or not, and says which", async ({ page, api }) => {
+    await loginAs(page, api);
+    const vendor = mockVendorDetail();
+    api.get("/vendors/me", vendor);
+    const past = {
+      status: "approved",
+      signed_at: "2026-06-01T00:00:00Z",
+      amount_cents: 200000,
+      payment_method: "manual",
+      date_iso: isoInDays(-10),
+    };
+    api.get(`/bookings/vendor/${vendor.vendor_id}`, {
+      items: [
+        mockVendorBooking({ ...past, booking_id: "owed", event_name: "Asha & Dev", contract_token: "t1" }),
+        mockVendorBooking({
+          ...past,
+          booking_id: "paid",
+          event_name: "Nisha & Rahul",
+          contract_token: "t2",
+          payment_status: "confirmed_paid",
+        }),
+      ],
+      total: 2,
+      limit: 100,
+      offset: 0,
+    });
+
+    await page.goto("my-bookings/");
+
+    await expect(page.getByRole("tab", { name: /Over/ })).toContainText("2");
+    await expect(page.getByText("1 with a balance due")).toBeVisible();
+    await page.getByRole("tab", { name: /Over/ }).click();
+    const list = page.getByRole("region", { name: "Booking list" });
+    const owed = list.getByRole("button", { name: /Asha & Dev/ });
+    const paid = list.getByRole("button", { name: /Nisha & Rahul/ });
+    await expect(owed).toContainText("Balance due");
+    // Fully paid used to drop out of every tab.
+    await expect(paid).toContainText("Paid");
+  });
+
   test("expanding shows progress and money, and confirms a deposit the couple sent", async ({ page, api }) => {
     await loginAs(page, api);
     mockBookings(api);

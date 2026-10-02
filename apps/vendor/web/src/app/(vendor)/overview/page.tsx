@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/auth";
 import { getMyVendor, getPipeline, listConversations, listLeads, listVendorBookings } from "@/lib/jorna";
 import {
   bookingTab,
+  overPill,
   bookingsByDay,
   centsToMoney,
   countdownLabel,
@@ -423,7 +424,11 @@ function BookingsCard({ bookings }: { bookings: VendorBooking[] }) {
                 </span>
                 <span className="hidden text-xs text-ink-faint sm:block">{prettyDate(b.date_iso) ?? "Date TBD"}</span>
                 <span>
-                  <StatusPill tone={TAB_TONE[tab]}>{TAB_LABEL[tab]}</StatusPill>
+                  {tab === "over" ? (
+                    <StatusPill tone={overPill(b).paid ? "green" : "amber"}>{overPill(b).label}</StatusPill>
+                  ) : (
+                    <StatusPill tone={TAB_TONE[tab]}>{TAB_LABEL[tab]}</StatusPill>
+                  )}
                 </span>
                 <Icon name="chevron" size={16} className="hidden text-ink-faint sm:block" />
               </Link>

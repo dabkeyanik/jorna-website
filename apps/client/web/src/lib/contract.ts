@@ -7,7 +7,7 @@
 // NEXT_PUBLIC_VENDOR_APP_URL overrides the default, the same
 // env-with-fallback pattern as lib/api.ts.
 
-import type { BundleBooking, Installment } from "./types";
+import { eventIsOver, type BundleBooking, type Installment } from "./types";
 
 const VENDOR_APP_ORIGIN = process.env.NEXT_PUBLIC_VENDOR_APP_URL ?? "https://jornaevents.com";
 
@@ -29,6 +29,49 @@ export function contractStep(b: BundleBooking): "sign" | "expired" | null {
   if (b.contract_status === "expired") return "expired";
   return null;
 }
+
+/**
+ * Where a booking is in its lifecycle, named the way the vendor's app names
+ * it (2026-10 lifecycle plan): Requested → Contract to review → Signed ·
+ * deposit due → Confirmed → Completed. Null for anything off that path —
+ * declined, voided, expired, a draft — and for a booking from before
+ * contracts, whose escrow-era states the caller still describes itself.
+ *
+ * "Deposit due" mirrors the vendor's bookingTab: a schedule of more than one
+ * payment whose first isn't confirmed received yet. A single-payment
+ * contract has no deposit step and goes straight to Confirmed.
+ */
+export type BookingStage = "requested" | "contract_to_review" | "deposit_due" | "confirmed" | "completed";
+
+export function bookingStage(
+  b: Partial<
+    Pick<
+      BundleBooking,
+      "status" | "contract_token" | "contract_status" | "signed_at" | "payment_schedule" | "date_iso" | "date_end"
+    >
+  > & { timezone?: string | null },
+): BookingStage | null {
+  if (b.status === "rejected" || b.status === "cancelled") return null;
+  if (b.contract_token && b.signed_at) {
+    if (eventIsOver(b)) return "completed";
+    const schedule = b.payment_schedule ?? [];
+    return schedule.length > 1 && !schedule[0].confirmed_at ? "deposit_due" : "confirmed";
+  }
+  if (b.contract_token) {
+    return b.contract_status === "sent" || b.contract_status === "viewed" ? "contract_to_review" : null;
+  }
+  return b.status === "pending" ? "requested" : null;
+}
+
+/** Requested is said in full: "Awaiting vendor" alone left a host wondering
+ *  whether the request went anywhere. */
+export const STAGE_LABELS: Record<BookingStage, string> = {
+  requested: "Requested — awaiting the vendor",
+  contract_to_review: "Contract to review",
+  deposit_due: "Signed · deposit due",
+  confirmed: "Confirmed",
+  completed: "Completed",
+};
 
 /** "received" and "sent" are settled from the client's side; the other three
  *  are still theirs to pay, by when. */
