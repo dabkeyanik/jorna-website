@@ -12,7 +12,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { apiFetch, configureTokens } from "@jorna/shared/lib/api";
@@ -34,6 +33,40 @@ function stored(key: string, fallback: string | null): string | null {
     return fallback;
   }
 }
+
+/** This tab's copy of the tokens — stored()'s fallback when storage can't be
+ *  read. */
+const memory: { access: string | null; refresh: string | null } = { access: null, refresh: null };
+
+function persistTokens(pair: TokenPair | null) {
+  memory.access = pair?.access_token ?? null;
+  memory.refresh = pair?.refresh_token ?? null;
+  if (typeof window === "undefined") return;
+  if (pair) {
+    localStorage.setItem(ACCESS_KEY, pair.access_token);
+    localStorage.setItem(REFRESH_KEY, pair.refresh_token);
+  } else {
+    localStorage.removeItem(ACCESS_KEY);
+    localStorage.removeItem(REFRESH_KEY);
+  }
+}
+
+/** What losing the session does; AuthProvider swaps in its full clear-out. */
+let onAuthLost: () => void = () => persistTokens(null);
+
+// Wire the api client to token storage when this module loads, not in
+// AuthProvider's effect. Children's effects run before their provider's, so
+// on a hard page load the first requests went out with no token — a vendor
+// reloading /leads got "Not authenticated".
+configureTokens({
+  // Read from storage, not this tab's copy: another tab that refreshed
+  // rotated the refresh token, and replaying the old one signs the
+  // user out everywhere (the backend treats it as a stolen token).
+  getAccess: () => stored(ACCESS_KEY, memory.access),
+  getRefresh: () => stored(REFRESH_KEY, memory.refresh),
+  onRefreshed: (pair) => persistTokens(pair),
+  onAuthLost: () => onAuthLost(),
+});
 
 /**
  * Whether this browser holds a session token, read synchronously — before
@@ -90,23 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Tokens live in refs so the api client reads the latest value without
-  // re-registering on every render.
-  const access = useRef<string | null>(null);
-  const refresh = useRef<string | null>(null);
-
-  const persist = useCallback((pair: TokenPair | null) => {
-    access.current = pair?.access_token ?? null;
-    refresh.current = pair?.refresh_token ?? null;
-    if (typeof window === "undefined") return;
-    if (pair) {
-      localStorage.setItem(ACCESS_KEY, pair.access_token);
-      localStorage.setItem(REFRESH_KEY, pair.refresh_token);
-    } else {
-      localStorage.removeItem(ACCESS_KEY);
-      localStorage.removeItem(REFRESH_KEY);
-    }
-  }, []);
+  const persist = useCallback((pair: TokenPair | null) => persistTokens(pair), []);
 
   const clear = useCallback(() => {
     persist(null);
@@ -119,25 +136,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearRoleCache();
   }, [persist]);
 
-  // Wire the api client to our token storage (once).
+  // Losing the session clears everything derived from it, not just tokens.
   useEffect(() => {
-    configureTokens({
-      // Read from storage, not this tab's copy: another tab that refreshed
-      // rotated the refresh token, and replaying the old one signs the
-      // user out everywhere (the backend treats it as a stolen token).
-      getAccess: () => stored(ACCESS_KEY, access.current),
-      getRefresh: () => stored(REFRESH_KEY, refresh.current),
-      onRefreshed: (pair) => persist(pair),
-      onAuthLost: () => clear(),
-    });
-  }, [persist, clear]);
+    onAuthLost = clear;
+    return () => {
+      onAuthLost = () => persistTokens(null);
+    };
+  }, [clear]);
 
   // Hydrate from storage on first load: if we have a token, fetch the profile.
   useEffect(() => {
     const a = typeof window !== "undefined" ? localStorage.getItem(ACCESS_KEY) : null;
     const r = typeof window !== "undefined" ? localStorage.getItem(REFRESH_KEY) : null;
-    access.current = a;
-    refresh.current = r;
+    memory.access = a;
+    memory.refresh = r;
     if (!a) {
       setLoading(false);
       return;

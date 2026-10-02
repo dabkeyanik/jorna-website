@@ -203,6 +203,25 @@ test.describe("vendor leads (/leads)", () => {
     await expect(drawer.getByRole("link", { name: "View contract" })).toBeVisible();
   });
 
+  test("a hard load sends the token with the page's first requests", async ({ page, api }) => {
+    // The api client used to be wired in AuthProvider's effect, which runs
+    // after its children's: a reload of /leads sent the pipeline request with
+    // no token and showed "Not authenticated".
+    await loginAs(page, api);
+    mockLeads(api);
+    api.get("/leads/pipeline", async ({ route }: HandlerArgs) => {
+      if (!route.request().headers().authorization) {
+        await route.fulfill({ status: 401, contentType: "application/json", body: '{"detail":"Not authenticated"}' });
+        return;
+      }
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(PIPELINE) });
+    });
+
+    await page.goto("leads/");
+    await expect(page.getByRole("region", { name: "Pipeline" }).getByText("Meera Shah")).toBeVisible();
+    await expect(page.getByText("Not authenticated")).toHaveCount(0);
+  });
+
   test("archiving a request hides it without declining", async ({ page, api }) => {
     await loginAs(page, api);
     mockLeads(api);
