@@ -13,7 +13,14 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ApiError } from "@jorna/shared/lib/api";
 import { getContract, markInstallmentSent } from "@/lib/jorna";
-import { bookingStage, centsMoney, contractSignUrl, paymentRows, STAGE_LABELS } from "@/lib/contract";
+import {
+  bookingStage,
+  centsMoney,
+  contractProposeUrl,
+  contractSignUrl,
+  paymentRows,
+  STAGE_LABELS,
+} from "@/lib/contract";
 import { parseServerTime, type Contract, type Installment } from "@/lib/types";
 import { PaymentSchedule } from "@/components/PaymentSchedule";
 import { Button, Card } from "@jorna/shared/components/ui";
@@ -62,9 +69,10 @@ function standing(c: Contract, token: string): { text: string; tone: string } {
   const stage = bookingStage({ ...c, contract_token: token });
   if (stage === "completed") return { text: STAGE_LABELS.completed, tone: "text-ink-soft" };
   if (stage === "confirmed") return { text: STAGE_LABELS.confirmed, tone: "text-green" };
-  if (stage === "deposit_due" || stage === "contract_to_review") {
+  if (stage === "deposit_due" || stage === "contract_to_review" || stage === "new_version") {
     return { text: STAGE_LABELS[stage], tone: "text-gold" };
   }
+  if (stage === "changes_proposed") return { text: STAGE_LABELS[stage], tone: "text-ink-soft" };
   // Signed but off the lifecycle — a booking cancelled after signing.
   if (c.signed_at) return { text: "Signed", tone: "text-ink-soft" };
   switch (c.contract_status) {
@@ -259,17 +267,31 @@ function ContractInner() {
         {awaitingSignature ? (
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/50 bg-gold/[0.07] p-4 print:hidden">
             <p className="text-sm text-ink-soft">
-              Nothing is booked until you sign — and nothing is owed before then.
+              {c.proposal_status === "open"
+                ? "Your proposed changes are with your vendor. You can still sign it as it is."
+                : "Nothing is booked until you sign — and nothing is owed before then."}
             </p>
             {/* The signing page is on the vendor site; see the note at the top. */}
-            <a
-              href={contractSignUrl(token)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center rounded-full bg-maroon px-4 py-2 text-sm font-semibold text-ground hover:brightness-110"
-            >
-              Review &amp; sign
-            </a>
+            <div className="flex flex-wrap items-center gap-2">
+              {c.proposal_status !== "open" ? (
+                <a
+                  href={contractProposeUrl(token)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center rounded-full border border-card-edge px-4 py-2 text-sm font-semibold text-ink hover:border-gold"
+                >
+                  Propose changes
+                </a>
+              ) : null}
+              <a
+                href={contractSignUrl(token)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center rounded-full bg-maroon px-4 py-2 text-sm font-semibold text-ground hover:brightness-110"
+              >
+                Review &amp; sign
+              </a>
+            </div>
           </div>
         ) : null}
 

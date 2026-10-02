@@ -13,19 +13,26 @@ import type {
   Contract,
   ContractCreateInput,
   DueType,
+  Installment,
   InstallmentInput,
   LineItemInput,
   LayoutBlock,
   LayoutBlockInput,
+  LineItem,
   LineItemKind,
   LineUnit,
   ServiceItem,
+  TermsChanges,
+  TermsVersion,
   VendorBooking,
   VendorDetail,
 } from "./types";
 
 export interface LineDraft {
   key: string;
+  /** The saved line's id, kept across edits so two versions can be compared
+   *  line by line (lib/contractDiff). Absent on a line added here. */
+  id?: string;
   kind: LineItemKind;
   serviceId: string | null;
   addonId: string | null;
@@ -34,10 +41,14 @@ export interface LineDraft {
   /** Dollars, as typed. */
   price: string;
   quantity: string;
+  /** Carried through from the saved line; the editor doesn't show it. */
+  description?: string | null;
 }
 
 export interface InstallmentDraft {
   key: string;
+  /** The saved payment's id — see LineDraft.id. */
+  id?: string;
   label: string;
   /** Dollars, as typed. */
   amount: string;
@@ -421,6 +432,8 @@ export function describeDue(i: {
  *  exactly what a create would. */
 export function toDocument(draft: Draft) {
   const lines: LineItemInput[] = draft.lines.map((l) => ({
+    ...(l.id ? { id: l.id } : {}),
+    ...(l.description ? { description: l.description } : {}),
     kind: l.kind,
     service_id: l.serviceId,
     addon_id: l.addonId,
@@ -430,6 +443,7 @@ export function toDocument(draft: Draft) {
     quantity: Number(l.quantity),
   }));
   const schedule: InstallmentInput[] = draft.schedule.map((i) => ({
+    ...(i.id ? { id: i.id } : {}),
     label: i.label.trim(),
     amount_cents: toCents(i.amount),
     due_type: i.dueType,
@@ -470,12 +484,26 @@ export function toDocument(draft: Draft) {
   } satisfies ContractCreateInput;
 }
 
+/** What fromContract reads: a vendor's Contract, the client's
+ *  GuestBooking, or either with a proposal's terms laid over it. */
+export type ContractTermsSource = Pick<
+  Contract,
+  | "date_iso" | "date_end" | "time_start" | "time_end" | "location" | "guest_count" | "amount_cents"
+  | "deposit_percent" | "cancellation_window_hours" | "overtime_rate_cents" | "contract_terms"
+  | "guest_name" | "guest_email" | "guest_phone"
+> &
+  Partial<Pick<Contract, "line_items" | "discount_cents" | "terms_clauses" | "document_title" | "document_layout">> & {
+    payment_schedule?: (Omit<Installment, "due_on" | "marked_paid_at" | "confirmed_at"> & Partial<Installment>)[] | null;
+  };
+
 /** An existing contract back into the builder, for editing. A contract made
  *  before schedules has no payment_schedule — its single deposit becomes a
  *  two-payment schedule the vendor can adjust. */
-export function fromContract(c: Contract): Draft {
+export function fromContract(c: ContractTermsSource): Draft {
   const lines: LineDraft[] = (c.line_items ?? []).map((l) => ({
     key: newKey(),
+    id: l.id,
+    description: l.description,
     kind: l.kind,
     serviceId: l.service_id,
     addonId: l.addon_id,
@@ -487,6 +515,7 @@ export function fromContract(c: Contract): Draft {
   const schedule: InstallmentDraft[] = c.payment_schedule?.length
     ? c.payment_schedule.map((i) => ({
         key: newKey(),
+        id: i.id,
         label: i.label,
         amount: toDollars(i.amount_cents),
         dueType: i.due_type,
@@ -662,4 +691,81 @@ export function applyTemplate(draft: Draft, body: TemplateBody, services: Servic
     next.schedule = balanceLastPayment(next);
   }
   return next;
+}
+
+// ── Change proposals (backend DECISIONS #23) ─────────────────────────
+
+/** The terms a draft says, in the shape a revision or proposal has — what
+ *  the comparison shows before anything is sent. Lines and payments a
+ *  client added here get their draft key as an id, so they line up with
+ *  themselves; the server gives them their own. */
+export function draftTerms(draft: Draft): TermsVersion {
+  const doc = toDocument(draft);
+  return {
+    date_iso: doc.date_iso,
+    date_end: doc.date_end,
+    time_start: doc.time_start,
+    time_end: doc.time_end,
+    location: doc.location || "TBD",
+    guest_count: doc.guest_count,
+    line_items: draft.lines.map((l, i) => {
+      const input = doc.line_items[i];
+      return {
+        id: l.id ?? l.key,
+        kind: input.kind,
+        service_id: input.service_id ?? null,
+        addon_id: input.addon_id ?? null,
+        name: input.name ?? "",
+        description: l.description ?? null,
+        unit: input.unit ?? "event",
+        unit_price_cents: input.unit_price_cents,
+        quantity: input.quantity,
+        total_cents: lineTotalCents(l),
+      };
+    }),
+    discount_cents: doc.discount_cents || null,
+    amount_cents: totalCents(draft),
+    payment_schedule: doc.payment_schedule.length
+      ? doc.payment_schedule.map((p, i) => ({
+          id: draft.schedule[i].id ?? draft.schedule[i].key,
+          label: p.label,
+          amount_cents: p.amount_cents,
+          due_type: p.due_type,
+          due_date: p.due_date ?? null,
+          due_days: p.due_days ?? null,
+        }))
+      : null,
+    terms_clauses: doc.terms_clauses.length ? doc.terms_clauses : null,
+    cancellation_window_hours: doc.cancellation_window_hours,
+    overtime_rate_cents: doc.overtime_rate_cents,
+  };
+}
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/** What a client's proposal sends: only the parts of the draft that differ
+ *  from the version they were shown, so an untouched section can't change
+ *  by being round-tripped through the form. */
+export function proposalChanges(draft: Draft, base: TermsVersion): TermsChanges {
+  const next = draftTerms(draft);
+  const doc = toDocument(draft);
+  const out: TermsChanges = {};
+  const scalar = [
+    "date_iso", "date_end", "time_start", "time_end", "location", "guest_count",
+    "discount_cents", "terms_clauses", "cancellation_window_hours", "overtime_rate_cents",
+  ] as const;
+  for (const f of scalar) {
+    if (!same(next[f], base[f])) (out as Record<string, unknown>)[f] = next[f];
+  }
+  const lineKey = (l: LineItem) => [l.id, l.kind, l.service_id, l.addon_id, l.name, l.unit, l.unit_price_cents, l.quantity];
+  if (!same((next.line_items ?? []).map(lineKey), (base.line_items ?? []).map(lineKey))) {
+    out.line_items = doc.line_items;
+  }
+  if (!same(next.payment_schedule, base.payment_schedule)) out.payment_schedule = doc.payment_schedule;
+  // A total that moved needs the schedule sent with it, even if the client
+  // only touched the lines and the plan followed on its own.
+  if ((out.line_items || "discount_cents" in out) && doc.payment_schedule.length) {
+    out.payment_schedule = doc.payment_schedule;
+  }
+  return out;
 }

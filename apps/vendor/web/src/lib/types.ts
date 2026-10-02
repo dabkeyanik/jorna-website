@@ -1043,6 +1043,8 @@ export interface VendorBooking {
    * there isn't one. "vendor" means it's this account's turn to answer.
    */
   negotiation_awaiting_role?: "client" | "vendor" | null;
+  /** The latest change proposal on an unsigned contract (backend DECISIONS #23). */
+  proposal_status?: ProposalStatus | null;
   status: string;
   payment_status?: string | null;
   /** "stripe" (protected) or "manual" (paid directly, Venmo/Zelle) — see
@@ -1157,6 +1159,9 @@ export interface Contract {
   voided_at: string | null;
   contract_token: string;
   vendor_display_name: string | null;
+  /** The latest change proposal's status on an unsigned contract — "open"
+   *  while the client waits on an answer. Null when there's none. */
+  proposal_status?: ProposalStatus | null;
 }
 
 // ── What a contract says (backend 0065, its DECISIONS.md #16) ─────────
@@ -1287,7 +1292,10 @@ export interface ContractCreateInput {
   location?: string | null;
 }
 
-export type ContractUpdateInput = Partial<ContractCreateInput>;
+export type ContractUpdateInput = Partial<ContractCreateInput> & {
+  /** Revise: this edit answers the client's open change proposal. */
+  proposal_id?: string;
+};
 
 // ── Documents attached to a booking (backend 0067, DECISIONS #21) ─────
 
@@ -1367,6 +1375,8 @@ export interface GuestBooking {
   signed_snapshot_sha256?: string | null;
   deposit_marked_paid_at: string | null;
   deposit_confirmed_received_at: string | null;
+  /** The latest change proposal's status (backend DECISIONS #23). */
+  proposal_status?: ProposalStatus | null;
 }
 
 export interface GuestBookingDetailsInput {
@@ -1418,6 +1428,71 @@ export interface LeadUpdateInput {
   archived?: boolean;
 }
 
+// ── Change proposals (backend 0068, its DECISIONS.md #23) ────────────
+
+export type ProposalStatus = "open" | "accepted" | "declined" | "revised" | "superseded" | "withdrawn";
+
+/** A payment as agreed: no payment marks. */
+export interface InstallmentTerms {
+  id: string;
+  label: string;
+  amount_cents: number;
+  due_type: DueType;
+  due_date: string | null;
+  due_days: number | null;
+}
+
+/** One version of a contract's terms — a revision, or a client's proposal.
+ *  What a change proposal can change, and what the comparison compares. */
+export interface TermsVersion {
+  date_iso: string;
+  date_end: string | null;
+  time_start: string;
+  time_end: string;
+  location: string;
+  guest_count: number | null;
+  line_items: LineItem[] | null;
+  discount_cents: number | null;
+  amount_cents: number;
+  payment_schedule: InstallmentTerms[] | null;
+  terms_clauses: Clause[] | null;
+  cancellation_window_hours: number | null;
+  overtime_rate_cents: number | null;
+}
+
+export interface ChangeProposal {
+  proposal_id: string;
+  base_revision: number;
+  status: ProposalStatus;
+  message: string | null;
+  response_note: string | null;
+  /** The revision an Accept or Revise produced. */
+  result_revision: number | null;
+  created_at: string;
+  responded_at: string | null;
+  proposed: TermsVersion;
+}
+
+export interface ContractRevisionRow {
+  revision: number;
+  created_at: string;
+  terms: TermsVersion;
+}
+
+/** GET …/proposals, on either side. Newest first. */
+export interface ProposalHistory {
+  current_revision: number | null;
+  open_proposal: ChangeProposal | null;
+  proposals: ChangeProposal[];
+  revisions: ContractRevisionRow[];
+}
+
+/** What a client sends: any terms, minus the derived total. */
+export type TermsChanges = Partial<Omit<TermsVersion, "amount_cents" | "line_items" | "payment_schedule">> & {
+  line_items?: LineItemInput[];
+  payment_schedule?: InstallmentInput[];
+};
+
 // ── Leads pipeline (GET /leads/pipeline, backend DECISIONS #20) ───────
 
 export type PipelineStage = "inquiry" | "negotiation";
@@ -1445,9 +1520,11 @@ export interface PipelineItem {
   contract_status: string | null;
   hold_expires_at: string | null;
   attention: PipelineAttention | null;
-  /** new_request, new_lead, draft, counter_offer, declined, expired — or,
-   *  while waiting: sent, viewed, counter_sent, contacted, quoted. */
+  /** changes_proposed, new_request, new_lead, draft, counter_offer,
+   *  declined, expired — or, while waiting: sent, viewed, revised,
+   *  counter_sent, contacted, quoted. */
   attention_reason: string | null;
+  proposal_status?: ProposalStatus | null;
   archived: boolean;
   created_at: string | null;
   updated_at: string | null;

@@ -86,6 +86,7 @@ import { PlanProgress } from "@/components/PlanProgress";
 import { addressPin } from "@jorna/shared/lib/geocode";
 import {
   bookingStage,
+  contractProposeUrl,
   contractSignUrl,
   contractStep,
   contractViewPath,
@@ -375,6 +376,8 @@ function isAwaitingVendor(b: BundleBooking, draft: boolean): boolean {
 const STAGE_TONE: Record<BookingStage, string> = {
   requested: "text-gold",
   contract_to_review: "text-gold",
+  changes_proposed: "text-ink-soft",
+  new_version: "text-gold",
   deposit_due: "text-gold",
   confirmed: "text-green",
   completed: "text-ink-soft",
@@ -472,7 +475,6 @@ function BookingRow({
   onUpdated: () => void;
 }) {
   const [reason, setReason] = useState("");
-  const [showNeg, setShowNeg] = useState(false);
   const pay = booking.payment_status ?? "unpaid";
   const price = priceLine(booking);
   const status = statusLine(booking, draft);
@@ -485,11 +487,9 @@ function BookingRow({
   // to keep hidden behind an unclicked button. Narrow to just "no offer
   // exists yet" for that one gate.
   const awaitingFirstOffer = awaiting && booking.status !== "negotiation_ongoing";
-  // Forces the panel open the instant a negotiation is live, without
-  // changing showNeg's separate job of letting a client voluntarily start a
-  // *fresh* negotiation on a merely-approved, open_to_price_negotiation
-  // booking.
-  const negotiationOpen = showNeg || booking.status === "negotiation_ongoing";
+  // A counter that's live. Starting a fresh one is retired (backend
+  // DECISIONS #23) — the contract is where terms are negotiated now.
+  const negotiationOpen = booking.status === "negotiation_ongoing";
   const busy = busyId === booking.booking_id;
   const openPanel = panel?.bookingId === booking.booking_id ? panel.kind : null;
 
@@ -622,28 +622,25 @@ function BookingRow({
           and actionable, not something to keep waiting on — that gap is what
           made a vendor's counter-offer invisible here while /my-bookings
           showed it immediately. */}
+      {/* Price-only counters are retired (backend DECISIONS #23): the
+          contract is where terms get negotiated now, price included. A
+          counter that was already open when that changed can still be
+          answered here, so the panel stays for that case only. */}
       {booking.open_to_price_negotiation &&
       !signed &&
       !isBeyondActionable(booking) &&
       !isDeadBooking(booking) &&
       !awaitingFirstOffer &&
-      !draft ? (
-        negotiationOpen ? (
-          <div className="mt-3">
-            <NegotiationPanel
-              bookingId={booking.booking_id}
-              listedPrice={booking.price}
-              counterpartyName={booking.vendor_name}
-              onSettled={onNegotiated}
-            />
-          </div>
-        ) : (
-          <div className="mt-3 flex justify-end">
-            <Button variant="ghost" size="md" onClick={() => setShowNeg(true)}>
-              Negotiate price
-            </Button>
-          </div>
-        )
+      !draft &&
+      negotiationOpen ? (
+        <div className="mt-3">
+          <NegotiationPanel
+            bookingId={booking.booking_id}
+            listedPrice={booking.price}
+            counterpartyName={booking.vendor_name}
+            onSettled={onNegotiated}
+          />
+        </div>
       ) : null}
 
       {/* Composition — only while no money has moved. Once the request is out,
@@ -842,20 +839,36 @@ function BookingRow({
       {signStep === "sign" && booking.contract_token ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line-soft pt-3">
           <p className="text-sm text-ink-soft">
-            {booking.vendor_name || "Your vendor"} accepted — review and sign the contract to confirm.
+            {booking.proposal_status === "open"
+              ? `Your changes are with ${booking.vendor_name || "your vendor"} — you can still sign the contract as it is.`
+              : booking.proposal_status === "accepted" || booking.proposal_status === "revised"
+                ? `${booking.vendor_name || "Your vendor"} sent a new version — see what changed, then sign.`
+                : `${booking.vendor_name || "Your vendor"} accepted — review and sign the contract to confirm.`}
             {booking.hold_expires_at
               ? ` They're holding the date until ${new Date(booking.hold_expires_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}.`
               : ""}
           </p>
-          {/* A plain anchor: it's a different site, opened in a new tab. */}
-          <a
-            href={contractSignUrl(booking.contract_token)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center rounded-full bg-maroon px-4 py-2 text-sm font-semibold text-ground hover:brightness-110"
-          >
-            Review &amp; sign
-          </a>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Plain anchors: it's a different site, opened in a new tab. */}
+            {booking.proposal_status !== "open" ? (
+              <a
+                href={contractProposeUrl(booking.contract_token)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center rounded-full border border-card-edge px-4 py-2 text-sm font-semibold text-ink hover:border-gold"
+              >
+                Propose changes
+              </a>
+            ) : null}
+            <a
+              href={contractSignUrl(booking.contract_token)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center rounded-full bg-maroon px-4 py-2 text-sm font-semibold text-ground hover:brightness-110"
+            >
+              Review &amp; sign
+            </a>
+          </div>
         </div>
       ) : signStep === "expired" ? (
         <p className="mt-3 border-t border-line-soft pt-3 text-sm text-ink-soft">

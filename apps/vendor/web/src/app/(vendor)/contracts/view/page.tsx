@@ -184,6 +184,18 @@ function ContractViewInner() {
         ) : null
       ) : null}
 
+      {unsigned && c.proposal_status === "open" ? (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/40 bg-gold/10 px-4 py-3">
+          <p className="text-sm text-ink">
+            <strong>{c.guest_name || "Your client"} proposed changes.</strong>{" "}
+            <span className="text-ink-soft">Accept them, keep your version, or send a new one.</span>
+          </p>
+          <LinkButton href={`/contracts/changes?id=${c.booking_id}`} size="md">
+            Review changes
+          </LinkButton>
+        </div>
+      ) : null}
+
       {error ? (
         <p role="alert" className="mt-4 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
           {error}

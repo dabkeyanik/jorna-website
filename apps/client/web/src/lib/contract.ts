@@ -15,6 +15,12 @@ export function contractSignUrl(token: string): string {
   return `${VENDOR_APP_ORIGIN}/app/booking-link?t=${encodeURIComponent(token)}`;
 }
 
+/** The same page, opened straight into "Propose changes" (backend
+ *  DECISIONS #23). */
+export function contractProposeUrl(token: string): string {
+  return `${contractSignUrl(token)}&propose=1`;
+}
+
 /** This app's own read-only page for a contract. */
 export function contractViewPath(token: string): string {
   return `/contract?t=${encodeURIComponent(token)}`;
@@ -32,8 +38,9 @@ export function contractStep(b: BundleBooking): "sign" | "expired" | null {
 
 /**
  * Where a booking is in its lifecycle, named the way the vendor's app names
- * it (2026-10 lifecycle plan): Requested → Contract to review → Signed ·
- * deposit due → Confirmed → Completed. Null for anything off that path —
+ * it (2026-10 lifecycle plan): Requested → Contract to review (or, while
+ * negotiating, Changes proposed / New version to review) → Signed · deposit
+ * due → Confirmed → Completed. Null for anything off that path —
  * declined, voided, expired, a draft — and for a booking from before
  * contracts, whose escrow-era states the caller still describes itself.
  *
@@ -41,13 +48,21 @@ export function contractStep(b: BundleBooking): "sign" | "expired" | null {
  * payment whose first isn't confirmed received yet. A single-payment
  * contract has no deposit step and goes straight to Confirmed.
  */
-export type BookingStage = "requested" | "contract_to_review" | "deposit_due" | "confirmed" | "completed";
+export type BookingStage =
+  | "requested"
+  | "contract_to_review"
+  | "changes_proposed"
+  | "new_version"
+  | "deposit_due"
+  | "confirmed"
+  | "completed";
 
 export function bookingStage(
   b: Partial<
     Pick<
       BundleBooking,
-      "status" | "contract_token" | "contract_status" | "signed_at" | "payment_schedule" | "date_iso" | "date_end"
+      | "status" | "contract_token" | "contract_status" | "signed_at" | "payment_schedule" | "date_iso" | "date_end"
+      | "proposal_status"
     >
   > & { timezone?: string | null },
 ): BookingStage | null {
@@ -58,7 +73,12 @@ export function bookingStage(
     return schedule.length > 1 && !schedule[0].confirmed_at ? "deposit_due" : "confirmed";
   }
   if (b.contract_token) {
-    return b.contract_status === "sent" || b.contract_status === "viewed" ? "contract_to_review" : null;
+    if (b.contract_status !== "sent" && b.contract_status !== "viewed") return null;
+    // Negotiation (DECISIONS #23): the client's proposal is with the vendor,
+    // or the vendor has answered it with a version to read.
+    if (b.proposal_status === "open") return "changes_proposed";
+    if (b.proposal_status === "accepted" || b.proposal_status === "revised") return "new_version";
+    return "contract_to_review";
   }
   return b.status === "pending" ? "requested" : null;
 }
@@ -68,6 +88,8 @@ export function bookingStage(
 export const STAGE_LABELS: Record<BookingStage, string> = {
   requested: "Requested — awaiting the vendor",
   contract_to_review: "Contract to review",
+  changes_proposed: "Changes proposed",
+  new_version: "New version to review",
   deposit_due: "Signed · deposit due",
   confirmed: "Confirmed",
   completed: "Completed",

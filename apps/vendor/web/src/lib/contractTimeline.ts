@@ -60,6 +60,21 @@ export function describeEvent(e: ContractEvent, c: { signer_name?: string | null
     }
     case "expired":
       return "The hold ended — the date opened up again";
+    // Change proposals (backend 0068, DECISIONS #23).
+    case "proposal_sent": {
+      const n = Array.isArray(d.fields) ? d.fields.length : 0;
+      return `Your client proposed changes${n ? ` (${n} part${n === 1 ? "" : "s"} of the contract)` : ""}`;
+    }
+    case "proposal_accepted":
+      return `You accepted their changes${typeof d.revision === "number" ? ` (version ${d.revision})` : ""}`;
+    case "proposal_declined":
+      return `You kept your version${typeof d.note === "string" && d.note ? ` — “${d.note}”` : ""}`;
+    case "proposal_revised":
+      return `You answered with a new version${typeof d.revision === "number" ? ` (version ${d.revision})` : ""}`;
+    case "proposal_superseded":
+      return e.actor === "client" ? "Your client replaced their proposal" : "Their proposal was overtaken by your edit";
+    case "proposal_withdrawn":
+      return "Your client withdrew their proposal";
     // Addenda and cancellation agreements attached to it (backend 0067).
     // Only some events carry the document's title.
     case "document_created":

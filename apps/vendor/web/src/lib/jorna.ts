@@ -51,6 +51,8 @@ import type {
   VendorSearchItem,
   VendorSearchParams,
   VendorAvailability,
+  ProposalHistory,
+  TermsChanges,
 } from "./types";
 
 /** Generate the three comparison bundles (Budget / Balanced / Top Rated). */
@@ -846,6 +848,50 @@ export function getContract(bookingId: string): Promise<Contract> {
 
 export function updateContract(bookingId: string, updates: ContractUpdateInput): Promise<Contract> {
   return apiFetch<Contract>(`/contracts/${bookingId}`, { method: "PATCH", body: updates });
+}
+
+// ── Change proposals (backend DECISIONS #23) ──────────────────────────
+
+export function getContractProposals(bookingId: string): Promise<ProposalHistory> {
+  return apiFetch<ProposalHistory>(`/contracts/${bookingId}/proposals`);
+}
+
+/** The client's terms become the next version, resent to sign. 409s when a
+ *  changed date clashes, or the proposal was already answered. */
+export function acceptProposal(bookingId: string, proposalId: string, note?: string | null): Promise<Contract> {
+  return apiFetch<Contract>(`/contracts/${bookingId}/proposals/${proposalId}/accept`, {
+    method: "POST",
+    body: { note: note || null },
+  });
+}
+
+export function declineProposal(bookingId: string, proposalId: string, note?: string | null): Promise<Contract> {
+  return apiFetch<Contract>(`/contracts/${bookingId}/proposals/${proposalId}/decline`, {
+    method: "POST",
+    body: { note: note || null },
+  });
+}
+
+export function getGuestProposals(token: string): Promise<ProposalHistory> {
+  return apiFetch<ProposalHistory>(`/guest-bookings/${token}/proposals`);
+}
+
+/** Client: suggest changes to the version they're reading. 409s if the
+ *  vendor has edited since. */
+export function proposeGuestChanges(
+  token: string,
+  baseRevision: number,
+  changes: TermsChanges,
+  message: string | null,
+): Promise<ProposalHistory> {
+  return apiFetch<ProposalHistory>(`/guest-bookings/${token}/proposals`, {
+    method: "POST",
+    body: { base_revision: baseRevision, changes, message },
+  });
+}
+
+export function withdrawGuestProposal(token: string, proposalId: string): Promise<ProposalHistory> {
+  return apiFetch<ProposalHistory>(`/guest-bookings/${token}/proposals/${proposalId}/withdraw`, { method: "POST" });
 }
 
 /** Send a draft, or resend an expired offer — restarts the date hold. 409s

@@ -329,6 +329,39 @@ test.describe("bundle detail (/bundle)", () => {
     await expect(page.getByText("Confirmed", { exact: true })).toBeVisible();
   });
 
+  test("a negotiation shows on the card, with Propose changes beside Review & sign", async ({ page, api }) => {
+    await loginAs(page, api);
+    const unsigned = {
+      payment_method: "manual",
+      contract_status: "viewed",
+      signed_at: null,
+      date_iso: "2099-05-01",
+    };
+    api.get(
+      "/bundles/:id",
+      mockBundleDetail({
+        bookings: [
+          mockBundleBooking({ ...unsigned, booking_id: "b-open", service_name: "Mehndi", contract_token: "tok-open", proposal_status: "open" }),
+          mockBundleBooking({ ...unsigned, booking_id: "b-new", service_name: "Live Dhol", contract_token: "tok-new", proposal_status: "revised" }),
+        ],
+      }),
+    );
+    api.get("/bundles", []);
+    api.get("/events", []);
+    api.get("/conversations", []);
+    api.get("/payments/card", null);
+
+    await page.goto("bundle/?id=bundle-1");
+    await expect(page.getByText("Changes proposed", { exact: true })).toBeVisible();
+    await expect(page.getByText("New version to review", { exact: true })).toBeVisible();
+    await expect(page.getByText(/sent a new version — see what changed, then sign/)).toBeVisible();
+    // One "Propose changes": not on the card whose proposal is still open.
+    const propose = page.getByRole("link", { name: "Propose changes" });
+    await expect(propose).toHaveCount(1);
+    await expect(propose).toHaveAttribute("href", "https://jornaevents.com/app/booking-link?t=tok-new&propose=1");
+    await expect(page.getByRole("link", { name: "Review & sign" })).toHaveCount(2);
+  });
+
   test("each booking card names its stage, the way the vendor's app does", async ({ page, api }) => {
     await loginAs(page, api);
     const unconfirmed = schedule.map((i) => ({ ...i, marked_paid_at: null, confirmed_at: null }));

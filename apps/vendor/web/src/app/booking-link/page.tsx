@@ -19,15 +19,20 @@ import {
   declineGuestBooking,
   fillGuestBookingDetails,
   getGuestBooking,
+  getGuestProposals,
   guestMarkDepositPaid,
   guestMarkFullPaid,
   guestMarkInstallmentPaid,
   signGuestBooking,
+  withdrawGuestProposal,
 } from "@/lib/jorna";
 import { describeDue } from "@/lib/contractDraft";
+import { termsOf } from "@/lib/contractDiff";
 import { Button, Card, Field } from "@jorna/shared/components/ui";
-import type { GuestBooking, Installment } from "@/lib/types";
+import { ContractCompare } from "@/components/ContractCompare";
+import type { GuestBooking, Installment, ProposalHistory } from "@/lib/types";
 import { DocumentView } from "./DocumentView";
+import { ProposeChanges } from "./ProposeChanges";
 import { guestContractPdfUrl } from "@/lib/download";
 
 function money(cents: number): string {
@@ -112,6 +117,109 @@ function Schedule({
   );
 }
 
+function shortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+/**
+ * Where the client's change proposal stands (backend DECISIONS #23): waiting
+ * on the vendor, or answered. After an Accept or a Revise it shows what
+ * changed between the version they were reading and the one now on the
+ * table, so they can see it before signing.
+ */
+function ProposalStatus({
+  booking,
+  history,
+  vendorName,
+  busy,
+  onWithdraw,
+}: {
+  booking: GuestBooking;
+  history: ProposalHistory;
+  vendorName: string;
+  busy: boolean;
+  onWithdraw: (id: string) => void;
+}) {
+  const [showOpen, setShowOpen] = useState(false);
+  const latest = history.proposals[0];
+  if (!latest) return null;
+  const current = termsOf(booking);
+  const versionOf = (revision: number) => history.revisions.find((r) => r.revision === revision)?.terms ?? null;
+
+  if (latest.status === "open") {
+    return (
+      <section aria-label="Your proposal">
+      <Card className="mt-6 p-5">
+        <p className="eyebrow">Changes proposed</p>
+        <p className="mt-1 text-ink">Waiting for {vendorName}</p>
+        <p className="mt-1 text-sm text-ink-soft">
+          You sent your changes on {shortDate(latest.created_at)}. We&apos;ll email you when they reply. You can
+          still sign the contract as it is — that withdraws your proposal.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => setShowOpen((v) => !v)}
+            className="text-sm font-semibold text-gold underline-offset-4 hover:underline"
+          >
+            {showOpen ? "Hide your proposal" : "See your proposal"}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onWithdraw(latest.proposal_id)}
+            className="text-sm text-ink-faint underline-offset-4 hover:text-ink hover:underline"
+          >
+            Withdraw it
+          </button>
+        </div>
+        {showOpen ? (
+          <div className="mt-4 border-t border-line-soft pt-4">
+            <ContractCompare before={current} after={latest.proposed} beforeLabel="Current" afterLabel="Your proposal" />
+          </div>
+        ) : null}
+      </Card>
+      </section>
+    );
+  }
+
+  // An answer only matters while the version it produced is still the one
+  // on the table; a later edit has its own story.
+  const answered = latest.status === "accepted" || latest.status === "revised";
+  if (answered && latest.result_revision !== booking.revision) return null;
+  if (!answered && latest.status !== "declined") return null;
+  const before = versionOf(latest.base_revision);
+
+  return (
+    <section aria-label="Their reply">
+    <Card className="mt-6 p-5">
+      <p className="eyebrow">{answered ? "New version to review" : "Your proposal"}</p>
+      <p className="mt-1 text-ink">
+        {latest.status === "accepted"
+          ? `${vendorName} accepted your changes`
+          : latest.status === "revised"
+            ? `${vendorName} sent a new version`
+            : `${vendorName} kept their version`}
+      </p>
+      {latest.response_note ? (
+        <p className="mt-1 text-sm text-ink-soft">They said: “{latest.response_note}”</p>
+      ) : null}
+      {answered && before ? (
+        <div className="mt-4 border-t border-line-soft pt-4">
+          <p className="mb-2 text-sm font-medium text-ink-soft">What changed</p>
+          <ContractCompare before={before} after={current} beforeLabel="Before" afterLabel="Now" />
+        </div>
+      ) : null}
+      {!answered ? (
+        <p className="mt-1 text-sm text-ink-soft">
+          The contract below is unchanged. You can sign it, or propose something else.
+        </p>
+      ) : null}
+    </Card>
+    </section>
+  );
+}
+
 function Shell({ children }: { children: React.ReactNode }) {
   return <div className="mx-auto w-[min(560px,100%-2rem)] py-20 text-center">{children}</div>;
 }
@@ -140,10 +248,19 @@ function BookingLinkInner() {
   const [paymentNotice, setPaymentNotice] = useState<string | null>(null);
   const [declining, setDeclining] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
+  // Change proposals (backend DECISIONS #23). ?propose=1 — the client app's
+  // "Propose changes" — opens straight into the form.
+  const [history, setHistory] = useState<ProposalHistory | null>(null);
+  const [proposing, setProposing] = useState(params.get("propose") === "1" && !preview);
+  const [proposalNotice, setProposalNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
+    // An older backend has no proposals; the page reads fine without them.
+    getGuestProposals(token)
+      .then((h) => !cancelled && setHistory(h))
+      .catch(() => undefined);
     getGuestBooking(token, preview)
       .then((b) => {
         if (cancelled) return;
@@ -188,10 +305,25 @@ function BookingLinkInner() {
       // keep what the client typed, and say why they're signing again.
       if (err instanceof ApiError && err.status === 409) {
         getGuestBooking(token, preview).then(setBooking).catch(() => undefined);
+        getGuestProposals(token).then(setHistory).catch(() => undefined);
       }
       setError(
         err instanceof ApiError ? err.message : "Couldn't send your reply. Check your connection and try again.",
       );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function withdraw(id: string) {
+    setBusy(true);
+    setProposalNotice(null);
+    try {
+      setHistory(await withdrawGuestProposal(token, id));
+      setProposalNotice("Withdrawn. The contract is as it was.");
+    } catch (err) {
+      setProposalNotice(err instanceof ApiError ? err.message : "Couldn't withdraw that.");
+      getGuestProposals(token).then(setHistory).catch(() => undefined);
     } finally {
       setBusy(false);
     }
@@ -426,6 +558,32 @@ function BookingLinkInner() {
         ) : null}
       </div>
 
+      {proposing ? (
+        <div className="mt-8">
+          <ProposeChanges
+            token={token}
+            booking={booking}
+            onCancel={() => setProposing(false)}
+            onSent={(h) => {
+              setHistory(h);
+              setProposing(false);
+              setProposalNotice(`Sent. We'll email you when ${vendorName} replies.`);
+              getGuestBooking(token, true).then(setBooking).catch(() => undefined);
+              window.scrollTo({ top: 0 });
+            }}
+          />
+        </div>
+      ) : (
+      <>
+      {proposalNotice ? (
+        <p role="status" className="mt-6 rounded-lg bg-ground-2 px-3 py-2 text-center text-sm text-ink-soft">
+          {proposalNotice}
+        </p>
+      ) : null}
+      {history ? (
+        <ProposalStatus booking={booking} history={history} vendorName={vendorName} busy={busy} onWithdraw={withdraw} />
+      ) : null}
+
       <Card className="mt-8 p-5">
         <h2 className="serif text-lg text-ink">{booking.service_name ?? "Service"}</h2>
         <p className="mt-1 text-sm text-ink-soft">
@@ -468,6 +626,23 @@ function BookingLinkInner() {
           Download as PDF to read later
         </a>
       </Card>
+
+      {!preview && history ? (
+        <div className="mt-4 rounded-xl border border-dashed border-card-edge px-4 py-3 text-center text-sm text-ink-soft">
+          Want something different?{" "}
+          <button
+            type="button"
+            onClick={() => {
+              setProposalNotice(null);
+              setProposing(true);
+              window.scrollTo({ top: 0 });
+            }}
+            className="font-semibold text-gold underline-offset-4 hover:underline"
+          >
+            {history.open_proposal ? "Change your proposal" : "Propose changes"}
+          </button>
+        </div>
+      ) : null}
 
       <form onSubmit={submit} className="mt-6 grid gap-6">
         <Card className="p-5">
@@ -587,6 +762,8 @@ function BookingLinkInner() {
           </button>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

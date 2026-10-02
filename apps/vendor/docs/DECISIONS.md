@@ -711,3 +711,22 @@ awaiting your signature", "Booked") for the same states.
   vendor side does. The bundle payload has no legacy deposit fields, so a
   booking without a schedule goes straight to Confirmed once signed.
   Bookings from before contracts keep their old escrow-era labels.
+
+## Decision: the client proposes changes to the contract; one comparison view for both sides (2026-10-02)
+
+**Context.** Negotiation used to be price counters on a request. The user wanted one place to negotiate, the contract itself: the client proposes changes to any term, and the vendor accepts, declines or revises (backend DECISIONS #23).
+
+**Decision.**
+- **One comparison.** `lib/contractDiff` compares two versions of the terms section by section:
+  - event details
+  - line items, matched by id and then by name
+  - payment schedule
+  - terms, with word-level differences
+  - policies
+
+  `components/ContractCompare` draws it. Wide screens get columns; on a phone each change stacks, with the old value struck through and the new one highlighted. Unchanged sections fold behind "Show unchanged". The couple's signing page and the vendor's `/contracts/changes` both use it.
+- **The couple proposes on the signing page** (`booking-link/ProposeChanges`; `?propose=1` opens it straight away). Their working copy is the editor's own model (`contractDraft.fromContract`). `proposalChanges` sends only the sections that differ, plus the schedule whenever the total moves. Signing stays available the whole time.
+- **Ids survive editing.** `contractDraft` used to drop line and payment ids on save, so every version had new ones. They're kept now, so versions compare line by line.
+- **Revise is the editor**, opened with the proposal laid over the contract (`/contracts/new?edit=…&proposal=…`). Saving sends `proposal_id`.
+- **Price counters:** the panel shows only for a counter that's already open, on both sides. Starting a new one is retired.
+- **The client app** names the two negotiation stages "Changes proposed" and "New version to review", and links "Propose changes" next to "Review & sign".
