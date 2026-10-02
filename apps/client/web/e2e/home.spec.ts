@@ -18,6 +18,11 @@ test.describe("home (marketing) page", () => {
     // actually rendered.
     await expect(page.getByText("Anjali Kapoor")).toBeVisible();
     await expect(page.getByText("Full Day Wedding Photography")).toBeVisible();
+
+    // Escrow is off: clients pay vendors directly, and Home mustn't promise
+    // otherwise.
+    await expect(page.getByText("How paying works")).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(/escrow/i);
   });
 
   test("still renders the marketing content if the vendor showcase fails to load", async ({
