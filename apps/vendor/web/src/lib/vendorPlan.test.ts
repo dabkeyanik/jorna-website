@@ -466,6 +466,32 @@ describe("bookingMoney and paymentsToConfirm", () => {
     expect(bookingMoney(b)).toMatchObject({ depositCents: 30000, depositPaid: false, balanceCents: 100000 });
     expect(paymentsToConfirm(b)).toEqual([{ kind: "deposit", amountCents: 30000 }]);
   });
+  it("says when the rest is due from the contract's schedule, not a guess", () => {
+    const bal = inst("Final balance", 90000, { due_type: "before_event", due_days: 14, due_on: "2030-05-31" });
+    const b = signed({
+      amount_cents: 170000,
+      payment_schedule: [inst("Deposit", 80000, { confirmed_at: "x" }), bal],
+    } as Partial<VendorBooking>);
+    const m = bookingMoney(b);
+    expect(m.balanceDue).toMatch(/^Due .*2030 \(14 days before the event\)$/);
+    expect(m.balanceDue).not.toMatch(/after the event/);
+
+    // Two still to come: names the next one and counts the rest.
+    const early = signed({ amount_cents: 170000, payment_schedule: [inst("Deposit", 80000), bal] } as Partial<VendorBooking>);
+    expect(bookingMoney(early).balanceDue).toBe("Deposit Due when signed, then 1 more");
+
+    // Every payment confirmed: paid in full, whatever stage the booking is at.
+    const done = signed({
+      amount_cents: 170000,
+      payment_schedule: [inst("Deposit", 80000, { confirmed_at: "x" }), { ...bal, confirmed_at: "y" }],
+    } as Partial<VendorBooking>);
+    expect(bookingMoney(done)).toMatchObject({ paidInFull: true, balanceDue: null, balanceCents: 0 });
+  });
+
+  it("has no due date to give without a schedule", () => {
+    const b = signed({ amount_cents: 100000, deposit_percent: 30, deposit_amount_cents: 30000 });
+    expect(bookingMoney(b).balanceDue).toBeNull();
+  });
 });
 
 

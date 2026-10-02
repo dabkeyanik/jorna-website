@@ -25,7 +25,7 @@ import {
   type Draft,
   type LineDraft,
 } from "./contractDraft";
-import type { TermsVersion } from "./types";
+import type { ProposalHistory, TermsVersion } from "./types";
 
 export type ValueKind = "text" | "date" | "time" | "count" | "money" | "days" | "longtext";
 
@@ -204,19 +204,30 @@ export interface Toggle<T> {
   item: T;
   /** In your version now. */
   included: boolean;
-  /** Which of the other two versions have it — "Added by …" / "Removed by …". */
+  /** Which of the other versions have it — "Added by …" / "Removed by …". */
   inOriginal: boolean;
   inProposed: boolean;
+  /** Whether what you last asked for had it; null when there's no ask to compare. */
+  inAsk: boolean | null;
 }
 
 /** Lines that some version has and another doesn't — the only ones worth a checkbox. */
-export function lineToggles(original: Draft, proposed: Draft, yours: Draft): Toggle<LineDraft>[] {
+export function lineToggles(original: Draft, proposed: Draft, yours: Draft, ask?: Draft | null): Toggle<LineDraft>[] {
   const all = new Map<string, LineDraft>();
-  for (const d of [yours, proposed, original]) for (const l of d.lines) if (!all.has(lineId(l))) all.set(lineId(l), l);
+  for (const d of [yours, proposed, original, ...(ask ? [ask] : [])]) {
+    for (const l of d.lines) if (!all.has(lineId(l))) all.set(lineId(l), l);
+  }
   const has = (d: Draft, id: string) => d.lines.some((l) => lineId(l) === id);
   return [...all.entries()]
-    .map(([id, item]) => ({ id, item, included: has(yours, id), inOriginal: has(original, id), inProposed: has(proposed, id) }))
-    .filter((t) => !(t.included && t.inOriginal && t.inProposed));
+    .map(([id, item]) => ({
+      id,
+      item,
+      included: has(yours, id),
+      inOriginal: has(original, id),
+      inProposed: has(proposed, id),
+      inAsk: ask ? has(ask, id) : null,
+    }))
+    .filter((t) => !(t.included && t.inOriginal && t.inProposed && t.inAsk !== false));
 }
 
 /** Every clause any version has, plus the vendor's library — the design's
@@ -227,9 +238,12 @@ export function clauseToggles(
   proposed: Draft,
   yours: Draft,
   library: Omit<ClauseDraft, "key">[] = [],
+  ask?: Draft | null,
 ): Toggle<ClauseDraft>[] {
   const all = new Map<string, ClauseDraft>();
-  for (const d of [yours, proposed, original]) for (const c of d.clauses) if (!all.has(c.key)) all.set(c.key, c);
+  for (const d of [yours, proposed, original, ...(ask ? [ask] : [])]) {
+    for (const c of d.clauses) if (!all.has(c.key)) all.set(c.key, c);
+  }
   const titles = new Set([...all.values()].map((c) => c.title.trim().toLowerCase()));
   for (const c of library) {
     const t = c.title.trim().toLowerCase();
@@ -245,6 +259,7 @@ export function clauseToggles(
     included: has(yours, id),
     inOriginal: has(original, id),
     inProposed: has(proposed, id),
+    inAsk: ask ? has(ask, id) : null,
   }));
 }
 
@@ -313,4 +328,48 @@ export function proposalProblems(d: Draft): string[] {
   }
   if (!d.dateIso) out.push("The event needs a date.");
   return Array.from(new Set(out));
+}
+
+// ── Rounds ───────────────────────────────────────────────────────────
+
+/** Which turn of the back-and-forth this is: 1 when the vendor has sent
+ *  the contract, +1 for each proposal the couple sent, +1 for each answer
+ *  the vendor gave one (accepted, revised or declined). A proposal the
+ *  couple withdrew or replaced still took a turn; it just got no answer. */
+export function roundOf(history: Pick<ProposalHistory, "proposals">): number {
+  const answered = history.proposals.filter((p) => ANSWERS.has(p.status)).length;
+  return 1 + history.proposals.length + answered;
+}
+
+const ANSWERS = new Set(["accepted", "revised", "declined"]);
+
+// ── Who asked for what ───────────────────────────────────────────────
+
+/**
+ * Why a value differs between the version before and the one on the table,
+ * given what this side last asked for (their proposal). Without an ask,
+ * every difference is the other side's.
+ *
+ * - "accepted": you asked for it and it's what's on the table now;
+ * - "countered": you asked for something, they put a different value;
+ * - "kept": you asked for something, they kept the original;
+ * - "theirs": they changed it without you asking;
+ * - null: nothing happened to it.
+ */
+export type Attribution = "accepted" | "countered" | "kept" | "theirs" | null;
+
+export function attribute(v: NegotiableValue, original: Draft, proposed: Draft, ask?: Draft | null): Attribution {
+  const moved = differs(v, original, proposed);
+  const asked = ask != null && differs(v, original, ask);
+  if (!asked) return moved ? "theirs" : null;
+  if (!moved) return "kept";
+  return differs(v, ask, proposed) ? "countered" : "accepted";
+}
+
+/** Whether a row (line or clause) your ask added or removed made it into the version on the table. */
+export function rowAttribution(inOriginal: boolean, inProposed: boolean, inAsk: boolean | null): Attribution {
+  const moved = inOriginal !== inProposed;
+  const asked = inAsk != null && inAsk !== inOriginal;
+  if (!asked) return moved ? "theirs" : null;
+  return moved ? "accepted" : "kept";
 }

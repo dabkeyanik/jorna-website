@@ -7,6 +7,7 @@
 // both the dashboard and lib/attention's badge read them, so the two can't tell
 // a vendor different things. Every rule mirrors a backend guard.
 
+import { describeDue } from "./contractDraft";
 import {
   eventIsOver,
   type AvailabilitySlot,
@@ -1188,6 +1189,10 @@ export interface BookingMoney {
   receivedCents: number;
   balanceCents: number | null;
   paidInFull: boolean;
+  /** When what's left is due, in the contract's own terms ("Due May 31,
+   *  2030 (14 days before the event)") — from the next unpaid payment on the
+   *  schedule. Null without a schedule, where nothing says. */
+  balanceDue: string | null;
 }
 
 /** Total, deposit and what's left, read from the payment schedule when the
@@ -1197,15 +1202,24 @@ export function bookingMoney(b: VendorBooking): BookingMoney {
   const paidInFull = pipelineStage(b) === "done";
   const schedule = b.payment_schedule ?? [];
   if (schedule.length) {
+    // The signed contract is the source of truth: what's been received, and
+    // when the rest is due, come from its payment schedule.
     const received = schedule.filter((i) => i.confirmed_at).reduce((n, i) => n + i.amount_cents, 0);
     const deposit = schedule.length > 1 ? schedule[0] : null;
+    const unpaid = schedule.filter((i) => !i.confirmed_at);
+    const next = unpaid[0] ?? null;
     return {
       totalCents,
       depositCents: deposit?.amount_cents ?? null,
       depositPaid: Boolean(deposit?.confirmed_at),
       receivedCents: received,
       balanceCents: totalCents != null ? Math.max(0, totalCents - received) : null,
-      paidInFull,
+      paidInFull: paidInFull || unpaid.length === 0,
+      balanceDue: next
+        ? `${unpaid.length > 1 ? `${next.label} ` : ""}${describeDue(next)}${
+            unpaid.length > 1 ? `, then ${unpaid.length - 1} more` : ""
+          }`
+        : null,
     };
   }
   const depositPaid = Boolean(b.deposit_confirmed_received_at);
@@ -1217,6 +1231,7 @@ export function bookingMoney(b: VendorBooking): BookingMoney {
     receivedCents: received,
     balanceCents: totalCents != null ? Math.max(0, totalCents - received) : null,
     paidInFull,
+    balanceDue: null,
   };
 }
 

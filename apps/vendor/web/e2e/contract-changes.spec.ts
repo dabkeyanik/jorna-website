@@ -275,9 +275,14 @@ test.describe("contract change proposals", () => {
     await reply.getByRole("button", { name: "See it in the contract" }).click();
 
     const ws = workspace(page, "Arjun Kapoor");
-    await expect(ws.getByText("Round 1").first()).toBeVisible();
+    // Sent, proposed, revised: the third turn.
+    await expect(ws.getByText("Round 3").first()).toBeVisible();
     await expect(ws.getByText(/40 miles is the most I can do/).first()).toBeVisible();
-    await expect(ws.getByText("What Arjun Kapoor changed").first()).toBeVisible();
+    // The extra light was the couple's ask, which the vendor took; the
+    // travel radius was their ask too, which the vendor countered.
+    await expect(ws.getByText("You asked for this — Arjun Kapoor accepted it.").first()).toBeVisible();
+    await expect(ws.getByText("How Arjun Kapoor changed your wording").first()).toBeVisible();
+    await expect(ws.getByText(/of your asks accepted/).last()).toBeVisible();
     await expect(ws.getByLabel("Your uplighting · quantity")).toHaveValue("3");
   });
 

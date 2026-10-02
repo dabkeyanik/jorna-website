@@ -86,6 +86,7 @@ test.describe("contracts — Phase 0", () => {
       status: "approved",
       contract_status: "sent",
       guest_email: "rohan@example.com",
+      email_sent: true,
     });
 
     await page.goto("contracts/new/?lead=lead-9");
@@ -100,6 +101,47 @@ test.describe("contracts — Phase 0", () => {
     await page.getByRole("button", { name: "Send & hold date" }).click();
 
     await expect(page.getByRole("heading", { name: "On its way" })).toBeVisible();
+    expect(api.requestsTo("POST", "/leads/lead-9/convert")).toHaveLength(1);
+    expect(api.requestsTo("POST", "/leads/lead-9/convert")[0].body).toMatchObject({ email_client: true });
+    expect(api.requestsTo("POST", "/contracts")).toHaveLength(0);
+  });
+
+  test("when the email can't be sent, the vendor is told to share the link themselves", async ({
+    page,
+    api,
+  }) => {
+    await loginAs(page, api);
+    const vendor = mockVendorDetail();
+    api.get("/vendors/me", vendor);
+    api.get("/services", services(vendor.vendor_id));
+    api.get("/contract-templates", { items: [], total: 0 });
+    api.get("/leads", {
+      items: [mockLead({ lead_id: "lead-9", name: "Rohan Das", email: "rohan@example.com" })],
+      total: 1,
+    });
+    api.post("/leads/lead-9/convert", {
+      booking_id: "c-2",
+      contract_token: "tok-2",
+      status: "approved",
+      contract_status: "sent",
+      guest_email: "rohan@example.com",
+      email_sent: false,
+    });
+
+    await page.goto("contracts/new/?lead=lead-9");
+    await expect(page.getByLabel("Client name")).toHaveValue("Rohan Das");
+    await expect(page.getByLabel("Client email")).toHaveValue("rohan@example.com");
+
+    await page.getByLabel("Date", { exact: true }).fill("2030-07-01");
+    await page.getByLabel("Start time").fill("18:00");
+    await page.getByLabel("End time").fill("22:00");
+    // Adding the package drafts the usual payment plan — nothing more to set.
+    await page.getByLabel("Add a package").selectOption("svc-flat");
+    await page.getByRole("button", { name: "Send & hold date" }).click();
+
+    await expect(page.getByRole("heading", { name: "Send this link" })).toBeVisible();
+    await expect(page.getByText(/We couldn't email rohan@example.com/)).toBeVisible();
+    await expect(page.getByText(/We emailed the link/)).toHaveCount(0);
     expect(api.requestsTo("POST", "/leads/lead-9/convert")).toHaveLength(1);
     expect(api.requestsTo("POST", "/leads/lead-9/convert")[0].body).toMatchObject({ email_client: true });
     expect(api.requestsTo("POST", "/contracts")).toHaveLength(0);

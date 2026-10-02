@@ -24,7 +24,7 @@ import {
   updateContract,
 } from "@/lib/jorna";
 import { defaultClauses, fromContract, problems, toDocument, type Draft } from "@/lib/contractDraft";
-import { draftToSave } from "@/lib/negotiation";
+import { draftToSave, roundOf } from "@/lib/negotiation";
 import type { Contract, ProposalHistory, VendorDetail } from "@/lib/types";
 import { NegotiationWorkspace } from "./NegotiationWorkspace";
 
@@ -123,7 +123,7 @@ export function VendorNegotiation({
       header={{
         counterpart: client,
         contractTitle: contract.document_title || `${contract.service_name ?? "Services"} agreement`,
-        round: Math.max(1, history.proposals.length),
+        round: roundOf(history),
         lastEditedBy: open ? client : answeredLast ? vendorName : vendorName,
         updatedAt: open ? open.created_at : (latest?.responded_at ?? contract.sent_at ?? null),
       }}

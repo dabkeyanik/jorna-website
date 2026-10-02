@@ -42,6 +42,7 @@ test.describe("contracts — Phase 4 (requests become proposals)", () => {
       status: "approved",
       guest_email: "priya@example.com",
       hold_expires_at: "2030-05-08T12:00:00",
+      email_sent: true,
     });
 
     await page.goto("contracts/new/?request=vbooking-1");
