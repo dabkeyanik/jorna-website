@@ -192,12 +192,13 @@ export interface VendorSearchItem {
   travel_radius_miles?: number | null;
   open_to_long_distance?: boolean;
   tags?: string[];
-  /** "stripe" (protected, escrow-held) or "manual" (paid directly via
-   *  Venmo/Zelle) — see `paymentMethodBadge`. */
+  /** "stripe" (escrow-held) or "manual" (paid directly via Venmo/Zelle).
+   *  Not shown to clients: with escrow off every vendor is paid directly,
+   *  so a per-vendor tag said nothing. */
   payment_method?: "stripe" | "manual" | null;
   /** Only meaningful when payment_method is "stripe" — false means this
-   *  vendor can be sent a request but not yet paid (see `paymentMethodBadge`
-   *  and the readiness note on /vendor). */
+   *  vendor can be sent a request but not yet paid (see the readiness note
+   *  on /vendor). */
   stripe_ready?: boolean | null;
 }
 
@@ -1195,21 +1196,6 @@ export const PAYMENT_STATUS_LABELS: Record<string, string> = {
   marked_paid: "Payment sent",
   confirmed_paid: "Payment received",
 };
-
-/**
- * Label + tone for a vendor's payment track, shared across every place a
- * client sees a vendor before booking (search cards, the profile header).
- * Always shown both ways rather than only flagging "Direct" — a badge
- * that's silently absent for the majority case reads as a bug, not as
- * "this one's protected."
- */
-export function paymentMethodBadge(
-  paymentMethod?: "stripe" | "manual" | null,
-): { label: string; tone: string } {
-  return paymentMethod === "manual"
-    ? { label: "Direct", tone: "text-gold" }
-    : { label: "Protected", tone: "text-green" };
-}
 
 // ── What a booking's price figure actually is ────────────────────────
 //
