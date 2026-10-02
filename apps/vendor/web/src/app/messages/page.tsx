@@ -199,7 +199,7 @@ function ClientMessages() {
                 plan — either one starts a conversation.
               </p>
               <div className="mt-5 flex flex-wrap justify-center gap-2">
-                <LinkButton href="/browse" variant="ghost">
+                <LinkButton href={clientAppUrl("/marketplace")} variant="ghost">
                   Browse vendors
                 </LinkButton>
                 <LinkButton href={clientAppUrl("/bundles")} variant="ghost">

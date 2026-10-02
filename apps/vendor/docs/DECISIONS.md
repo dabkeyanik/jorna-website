@@ -679,3 +679,15 @@ no written way to change or end a booking once it was signed.
 - Buttons are on the contract view (the contract and each attached document)
   and on both signing pages, before and after signing.
 
+## Decision: "Browse vendors" leaves for the client app's marketplace (2026-10-01)
+
+**Context.** Every "Browse vendors", "See all vendors" and "Back to
+marketplace" link on jornaevents.com pointed at `/browse`. That page only
+redirects to Home, so a couple looking for vendors went in a circle.
+
+**Decision.** Those links, and the signed-in "Browse vendors" tab, go to
+`clientAppUrl("/marketplace")` (book.jornaevents.com/app/marketplace), where
+the marketplace lives. `/browse` stays as a redirect for old bookmarks. The
+signed-out header still doesn't advertise browsing; that earlier decision
+stands.
+

@@ -272,7 +272,7 @@ export default function HowItWorksPage() {
                   <LinkButton href={primary.href} size="lg">
                     {primary.label}
                   </LinkButton>
-                  <LinkButton href="/browse" variant="ghost" size="lg">
+                  <LinkButton href={clientAppUrl("/marketplace")} variant="ghost" size="lg">
                     Browse vendors
                   </LinkButton>
                 </>
