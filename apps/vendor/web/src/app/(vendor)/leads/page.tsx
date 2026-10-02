@@ -689,7 +689,7 @@ function LeadsInner() {
         }}
       />
       <ContractNegotiation
-        key={negotiating ?? "closed"}
+        key={negotiating ?? "negotiation-closed"}
         bookingId={negotiating}
         onClose={() => setNegotiating(null)}
         onDone={(message) => {
