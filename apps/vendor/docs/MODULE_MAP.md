@@ -146,6 +146,14 @@ always "none, verify manually" until a test runner is added.
   - `(vendor)/contracts/view/page.tsx` — one contract (`?id=`): items,
     payments with per-payment confirm, terms, timeline, send/resend, edit,
     void. A query param, not a route segment — static export.
+  - The negotiation workspace (`components/negotiation/`, backend
+    DECISIONS #23/#24): `NegotiationWorkspace` draws the contract as a page
+    (`ContractPaper`) beside "Review and revise"; `VendorNegotiation` and
+    `ClientNegotiation` decide what Send means for each side. The Leads page
+    opens it as a panel (`NegotiationPanel`), `(vendor)/contracts/changes/`
+    as a page, and the couple's signing page full-screen. The value model
+    (Original / Proposed / Yours, item and clause toggles) is
+    `lib/negotiation.ts`, unit-tested.
   - `lib/contractTemplates.ts` — templates on the account (`/contract-
     templates`), made from the builder and managed in `vendor-profile/`;
     moves any a browser saved in `localStorage` before that onto the account

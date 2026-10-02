@@ -163,7 +163,9 @@ test.describe("vendor leads (/leads)", () => {
 
     await page.goto("leads/");
     await page.getByRole("tab", { name: /Negotiations/ }).click();
+    // A sent contract opens into the negotiation; the lead's own actions are a click away.
     await page.getByRole("button", { name: /Sana Omar/ }).click();
+    await page.getByRole("dialog", { name: "Contract negotiation" }).getByRole("button", { name: "Lead details" }).click();
     const drawer = page.getByRole("dialog");
     await expect(drawer.getByRole("link", { name: "View contract" })).toBeVisible();
     await drawer.getByRole("button", { name: "Copy link" }).click();
@@ -172,7 +174,10 @@ test.describe("vendor leads (/leads)", () => {
     expect(api.requestsTo("POST", "/contracts/c1/send")).toHaveLength(0);
   });
 
-  test("a contract with proposed changes leads with Review changes", async ({ page, api }) => {
+  test("a contract with proposed changes opens the negotiation, and the drawer leads back to it", async ({
+    page,
+    api,
+  }) => {
     await loginAs(page, api);
     mockLeads(api);
     api.get("/leads/pipeline", {
@@ -194,13 +199,15 @@ test.describe("vendor leads (/leads)", () => {
 
     await page.goto("leads/");
     await page.getByRole("button", { name: /Sana Omar/ }).click();
+    const panel = page.getByRole("dialog", { name: "Contract negotiation" });
+    await expect(panel).toBeVisible();
+    await panel.getByRole("button", { name: "Lead details" }).click();
+
     const drawer = page.getByRole("dialog");
     await expect(drawer.getByText("They proposed changes to the contract")).toBeVisible();
-    await expect(drawer.getByRole("link", { name: "Review changes" })).toHaveAttribute(
-      "href",
-      /\/contracts\/changes\/?\?id=c1/,
-    );
     await expect(drawer.getByRole("link", { name: "View contract" })).toBeVisible();
+    await drawer.getByRole("button", { name: "Review changes" }).click();
+    await expect(page.getByRole("dialog", { name: "Contract negotiation" })).toBeVisible();
   });
 
   test("a hard load sends the token with the page's first requests", async ({ page, api }) => {

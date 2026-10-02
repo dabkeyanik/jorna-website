@@ -1295,6 +1295,8 @@ export interface ContractCreateInput {
 export type ContractUpdateInput = Partial<ContractCreateInput> & {
   /** Revise: this edit answers the client's open change proposal. */
   proposal_id?: string;
+  /** With proposal_id: a note to the client sent with the new version. */
+  proposal_note?: string | null;
 };
 
 // ── Documents attached to a booking (backend 0067, DECISIONS #21) ─────
@@ -1480,11 +1482,26 @@ export interface ContractRevisionRow {
 }
 
 /** GET …/proposals, on either side. Newest first. */
+/** One side's unsaved work in the negotiation workspace (backend 0069,
+ *  DECISIONS #24). `changes` holds the whole working version's terms. */
+export interface NegotiationDraft {
+  base_revision: number;
+  changes: Partial<TermsVersion>;
+  message: string | null;
+  /** The open proposal a vendor's draft answers. */
+  proposal_id: string | null;
+  updated_at: string;
+  /** The contract moved past base_revision since it was saved. */
+  stale: boolean;
+}
+
 export interface ProposalHistory {
   current_revision: number | null;
   open_proposal: ChangeProposal | null;
   proposals: ChangeProposal[];
   revisions: ContractRevisionRow[];
+  /** The caller's own saved draft (absent on an older backend). */
+  draft?: NegotiationDraft | null;
 }
 
 /** What a client sends: any terms, minus the derived total. */

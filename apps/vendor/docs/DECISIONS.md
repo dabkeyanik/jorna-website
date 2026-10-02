@@ -724,9 +724,25 @@ awaiting your signature", "Booked") for the same states.
   - terms, with word-level differences
   - policies
 
-  `components/ContractCompare` draws it. Wide screens get columns; on a phone each change stacks, with the old value struck through and the new one highlighted. Unchanged sections fold behind "Show unchanged". The couple's signing page and the vendor's `/contracts/changes` both use it.
-- **The couple proposes on the signing page** (`booking-link/ProposeChanges`; `?propose=1` opens it straight away). Their working copy is the editor's own model (`contractDraft.fromContract`). `proposalChanges` sends only the sections that differ, plus the schedule whenever the total moves. Signing stays available the whole time.
+  `components/ContractCompare` draws it. Wide screens get columns; on a phone each change stacks, with the old value struck through and the new one highlighted. Unchanged sections fold behind "Show unchanged". The couple's signing page and the vendor's `/contracts/changes` both use it. (Superseded on the vendor side by the workspace — see below.)
+- **The couple proposes on the signing page** (`booking-link/ProposeChanges`, since replaced by the workspace below; `?propose=1` opens it straight away). Their working copy is the editor's own model (`contractDraft.fromContract`). `proposalChanges` sends only the sections that differ, plus the schedule whenever the total moves. Signing stays available the whole time.
 - **Ids survive editing.** `contractDraft` used to drop line and payment ids on save, so every version had new ones. They're kept now, so versions compare line by line.
-- **Revise is the editor**, opened with the proposal laid over the contract (`/contracts/new?edit=…&proposal=…`). Saving sends `proposal_id`.
+- **Revise is the editor** (now inline in the workspace; the editor route still works), opened with the proposal laid over the contract (`/contracts/new?edit=…&proposal=…`). Saving sends `proposal_id`.
 - **Price counters:** the panel shows only for a counter that's already open, on both sides. Starting a new one is retired.
 - **The client app** names the two negotiation stages "Changes proposed" and "New version to review", and links "Propose changes" next to "Review & sign".
+
+## Decision: negotiation happens in one workspace, from the Figma design, with drafts on the server (2026-10-02)
+
+**Context.** The Figma Make design ("Wedding Vendor Dashboard") draws negotiation as one screen: the contract as a page with the other side's changes in red, and beside it each changed value as Original / Proposed / Your revised value, a clause checklist, Save draft and Send. What shipped first was a comparison page with Accept / Decline / Revise, where Revise opened the full editor. The user chose to rebuild to the design, replace `/contracts/changes` with it, keep drafts on the server (backend DECISIONS #24), and give the couple the same screen in this round.
+
+**Decision.**
+- **One workspace for both sides** (`components/negotiation/NegotiationWorkspace`). The host decides what Send means:
+  - the vendor, with the couple's proposal open: Send with nothing changed is **Accept**, anything changed is **Revise** (`PATCH` with `proposal_id` and `proposal_note`), and **Decline** stays a separate button;
+  - the vendor, with nothing open: Send is a plain edit;
+  - the couple: Send is a proposal. Their own open proposal opens read-only, with Change and Withdraw.
+- **Values, not sections.** `lib/negotiation` reads a version as negotiable values (date, each line's quantity and price, each payment, policies, each clause's text), matched across versions by saved id, so three versions line up. The cards show what the other side changed, what you've changed, and anything picked from "Change something else". Lines and clauses that one version lacks get checkboxes; the vendor's clause checklist also offers their saved default clauses.
+- **Marks:** rose for the other side's change, gold for yours. "View original" shows the version before.
+- **Where it opens:** a Negotiation lead with a sent contract opens straight into it from Leads ("Lead details" goes back to the drawer for copy link, void and archive). `/contracts/changes?id=` is the same screen full-page, for links from the contract page and notifications. The signing page opens it full-screen in place of the old proposal form, which is gone.
+- **The full editor is still there** for structural changes (reordering, new packages) — nothing in the workspace replaces it.
+- `lib/contractDiff` and `ContractCompare` stay: the signing page's "What changed" summary and the contract page still use them.
+

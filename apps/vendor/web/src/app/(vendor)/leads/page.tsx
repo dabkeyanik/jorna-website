@@ -6,8 +6,11 @@
 // Which ones need the vendor, and why, is the server's call — this page only
 // draws it, so web and iOS can't disagree.
 //
-// A lead opens in a side drawer with what that stage can do. All price talk
-// happens here (the counter-offer panel), never in Messages.
+// A lead opens in a side drawer with what that stage can do; a sent contract
+// opens straight into the negotiation workspace (components/negotiation),
+// where the couple's proposed changes are answered. Negotiation happens here,
+// never in Messages. The old counter-offer panel stays for counters already
+// open (backend DECISIONS #23).
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -30,6 +33,7 @@ import { centsToMoney } from "@/lib/vendorPlan";
 import type { Contract, Pipeline, PipelineItem } from "@/lib/types";
 import { Button } from "@jorna/shared/components/ui";
 import { NegotiationPanel } from "@/components/NegotiationPanel";
+import { NegotiationPanel as ContractNegotiation } from "@/components/negotiation/NegotiationPanel";
 import { Drawer, FilterTabs, PageHeader, PrimaryAction, StatTile, StatusPill, type Tone } from "@/components/vendor/ui";
 import { Icon } from "@/components/vendor/Icon";
 
@@ -108,6 +112,17 @@ function sortItems(items: PipelineItem[], sort: Sort): PipelineItem[] {
 
 // ── Row ──────────────────────────────────────────────────────────────
 
+/** A sent, unsigned contract opens straight into the negotiation workspace;
+ *  everything else (inquiries, drafts, voided) into the lead drawer. */
+function negotiable(item: PipelineItem): boolean {
+  return (
+    item.source === "contract" &&
+    !item.archived &&
+    Boolean(item.booking_id) &&
+    (item.contract_status === "sent" || item.contract_status === "viewed" || item.contract_status === "expired")
+  );
+}
+
 function LeadRow({ item, onOpen }: { item: PipelineItem; onOpen: () => void }) {
   const l = LOOK[look(item)];
   return (
@@ -163,10 +178,12 @@ function LeadDrawer({
   item,
   onClose,
   onChanged,
+  onNegotiate,
 }: {
   item: PipelineItem | null;
   onClose: () => void;
   onChanged: () => void;
+  onNegotiate: (bookingId: string) => void;
 }) {
   const [contract, setContract] = useState<Contract | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -359,19 +376,15 @@ function LeadDrawer({
 
           {isContract && (status === "sent" || status === "viewed" || status === "expired") ? (
             <>
-              {item.proposal_status === "open" ? (
-                <>
-                  <LinkPrimary href={`/contracts/changes?id=${item.booking_id}`}>Review changes</LinkPrimary>
-                  <Link
-                    href={`/contracts/view?id=${item.booking_id}`}
-                    className="self-center px-2 text-sm font-semibold text-gold"
-                  >
-                    View contract
-                  </Link>
-                </>
-              ) : (
-                <LinkPrimary href={`/contracts/view?id=${item.booking_id}`}>View contract</LinkPrimary>
-              )}
+              <Button className={ghost} onClick={() => onNegotiate(item.booking_id!)}>
+                {item.proposal_status === "open" ? "Review changes" : "Open negotiation"}
+              </Button>
+              <Link
+                href={`/contracts/view?id=${item.booking_id}`}
+                className="self-center px-2 text-sm font-semibold text-gold"
+              >
+                View contract
+              </Link>
               <Button variant="ghost" className={ghost} disabled={busy != null} onClick={copyLink}>
                 Copy link
               </Button>
@@ -505,6 +518,9 @@ function LeadsInner() {
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("recent");
   const [openId, setOpenId] = useState<string | null>(params.get("open"));
+  // The negotiation workspace (backend DECISIONS #23): a contract's booking id.
+  const [negotiating, setNegotiating] = useState<string | null>(params.get("negotiate"));
+  const [notice, setNotice] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -570,6 +586,12 @@ function LeadsInner() {
         action={<PrimaryAction href="/contracts/new">New lead</PrimaryAction>}
       />
 
+      {notice ? (
+        <p role="status" className="mb-4 rounded-lg bg-ground-2 px-3 py-2 text-sm text-ink-soft">
+          ✓ {notice}
+        </p>
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-3">
         <StatTile icon="leads" tone="amber" label="Inquiries" value={c.inquiries} note="No contract sent yet" />
         <StatTile icon="clock" tone="green" label="Waiting on couple" value={c.waiting} note="No action needed" />
@@ -621,7 +643,11 @@ function LeadsInner() {
 
         <div className="grid gap-2">
           {shown.map((item) => (
-            <LeadRow key={item.id} item={item} onOpen={() => setOpenId(item.id)} />
+            <LeadRow
+              key={item.id}
+              item={item}
+              onOpen={() => (negotiable(item) ? setNegotiating(item.booking_id!) : setOpenId(item.id))}
+            />
           ))}
         </div>
         {shown.length === 0 ? (
@@ -647,6 +673,25 @@ function LeadsInner() {
         item={open}
         onClose={() => setOpenId(null)}
         onChanged={() => setTick((n) => n + 1)}
+        onNegotiate={(id) => {
+          setOpenId(null);
+          setNegotiating(id);
+        }}
+      />
+      <ContractNegotiation
+        key={negotiating ?? "closed"}
+        bookingId={negotiating}
+        onClose={() => setNegotiating(null)}
+        onDone={(message) => {
+          setNegotiating(null);
+          setNotice(message);
+          setTick((n) => n + 1);
+        }}
+        onDetails={() => {
+          const lead = pipeline?.items.find((i) => i.booking_id === negotiating);
+          setNegotiating(null);
+          if (lead) setOpenId(lead.id);
+        }}
       />
     </div>
   );

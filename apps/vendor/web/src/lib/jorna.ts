@@ -51,8 +51,10 @@ import type {
   VendorSearchItem,
   VendorSearchParams,
   VendorAvailability,
+  NegotiationDraft,
   ProposalHistory,
   TermsChanges,
+  TermsVersion,
 } from "./types";
 
 /** Generate the three comparison bundles (Budget / Balanced / Top Rated). */
@@ -892,6 +894,31 @@ export function proposeGuestChanges(
 
 export function withdrawGuestProposal(token: string, proposalId: string): Promise<ProposalHistory> {
   return apiFetch<ProposalHistory>(`/guest-bookings/${token}/proposals/${proposalId}/withdraw`, { method: "POST" });
+}
+
+// ── Negotiation drafts (backend 0069, DECISIONS #24) ─────────────────
+
+export interface DraftInput {
+  base_revision: number;
+  changes: Partial<TermsVersion>;
+  message?: string | null;
+  proposal_id?: string | null;
+}
+
+export function saveContractDraft(bookingId: string, draft: DraftInput): Promise<NegotiationDraft> {
+  return apiFetch<NegotiationDraft>(`/contracts/${bookingId}/proposals/draft`, { method: "PUT", body: draft });
+}
+
+export function dropContractDraft(bookingId: string): Promise<void> {
+  return apiFetch<void>(`/contracts/${bookingId}/proposals/draft`, { method: "DELETE" });
+}
+
+export function saveGuestDraft(token: string, draft: Omit<DraftInput, "proposal_id">): Promise<NegotiationDraft> {
+  return apiFetch<NegotiationDraft>(`/guest-bookings/${token}/proposals/draft`, { method: "PUT", body: draft });
+}
+
+export function dropGuestDraft(token: string): Promise<void> {
+  return apiFetch<void>(`/guest-bookings/${token}/proposals/draft`, { method: "DELETE" });
 }
 
 /** Send a draft, or resend an expired offer — restarts the date hold. 409s
