@@ -15,7 +15,7 @@ import { Field } from "@jorna/shared/components/ui";
 import { fillGuestBookingDetails, proposeGuestChanges, saveGuestDraft, withdrawGuestProposal } from "@/lib/jorna";
 import { fromContract, proposalChanges } from "@/lib/contractDraft";
 import { termsOf } from "@/lib/contractDiff";
-import { draftToSave, proposalProblems } from "@/lib/negotiation";
+import { draftToSave, proposalProblems, roundOf } from "@/lib/negotiation";
 import type { GuestBooking, ProposalHistory } from "@/lib/types";
 import { NegotiationWorkspace } from "./NegotiationWorkspace";
 
@@ -52,17 +52,22 @@ export function ClientNegotiation({
         original: current,
         proposed: current,
         initial: changing ? (fromSaved ?? mine) : mine,
+        ask: null,
         stale: changing && Boolean(saved?.stale),
       };
     }
-    // The vendor's answer is still the version on the table: show what it changed.
+    // The vendor's answer is still the version on the table: show what it
+    // changed against what the couple had asked for, so their own asks the
+    // vendor took read as theirs, not the vendor's.
     const answered =
       latest && (latest.status === "accepted" || latest.status === "revised") && latest.result_revision === booking.revision;
+    const declined = latest && latest.status === "declined" && latest.base_revision === booking.revision;
     const before = answered ? history.revisions.find((r) => r.revision === latest.base_revision)?.terms : null;
     return {
       original: before ? fromContract({ ...booking, ...before }) : current,
       proposed: current,
       initial: fromSaved ?? current,
+      ask: (answered && before) || declined ? fromContract({ ...booking, ...latest.proposed }) : null,
       stale: Boolean(saved?.stale),
     };
   }, [booking, history, open, latest, changing]);
@@ -79,13 +84,14 @@ export function ClientNegotiation({
       header={{
         counterpart: vendorName,
         contractTitle: booking.document_title || `${booking.service_name ?? "Services"} agreement`,
-        round: Math.max(1, history.proposals.length),
+        round: roundOf(history),
         lastEditedBy: open ? you : vendorName,
         updatedAt: open ? open.created_at : (latest?.responded_at ?? null),
       }}
       original={drafts.original}
       proposed={drafts.proposed}
       initial={drafts.initial}
+      ask={drafts.ask}
       stale={drafts.stale}
       vendorName={vendorName}
       clientName={you}

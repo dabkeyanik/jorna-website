@@ -25,6 +25,7 @@ import { KIND_LABEL, documentStatus } from "@/lib/attachedDocuments";
 import { downloadContractPdf, downloadDocumentPdf } from "@/lib/download";
 import { describeDue, describeWhen, money } from "@/lib/contractDraft";
 import {
+  emailNotice,
   guestBookingLink,
   guestBookingPreviewLink,
   guestDocumentLink,
@@ -79,6 +80,8 @@ function ContractViewInner() {
   const [copied, setCopied] = useState(false);
   const [confirmVoid, setConfirmVoid] = useState(false);
   const [emailOnSend, setEmailOnSend] = useState(true);
+  /** The send went through but the client's email didn't (backend email_sent). */
+  const [emailWarning, setEmailWarning] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace(`/login?next=${encodeURIComponent(`/contracts/view?id=${id}`)}&role=vendor`);
@@ -217,6 +220,11 @@ function ContractViewInner() {
           {error}
         </p>
       ) : null}
+      {emailWarning ? (
+        <p role="status" className="mt-4 rounded-lg bg-gold/10 px-3 py-2 text-sm text-ink">
+          {emailWarning}
+        </p>
+      ) : null}
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
         {canSend ? (
@@ -224,7 +232,10 @@ function ContractViewInner() {
             <Button
               disabled={busy !== null}
               onClick={() =>
-                act("send", () => sendContract(c.booking_id, { emailClient: emailOnSend && Boolean(c.guest_email) }))
+                act("send", async () => {
+                  const sent = await sendContract(c.booking_id, { emailClient: emailOnSend && Boolean(c.guest_email) });
+                  if (sent.email_sent === false) setEmailWarning(emailNotice(false, c.guest_email));
+                })
               }
             >
               {busy === "send"

@@ -746,3 +746,12 @@ awaiting your signature", "Booked") for the same states.
 - **The full editor is still there** for structural changes (reordering, new packages) — nothing in the workspace replaces it.
 - `lib/contractDiff` and `ContractCompare` stay: the signing page's "What changed" summary and the contract page still use them.
 
+
+## Decision: rounds count turns, asks are credited to whoever asked, and the contract says when money is due (2026-10-02)
+
+Found in a local end-to-end run of the negotiation workspace.
+
+- **Round N is the turn of the back-and-forth** (`lib/negotiation.roundOf`): 1 for the contract, +1 for each proposal the couple sent, +1 for each answer (accepted, revised, declined). Sent → proposed → revised is Round 3.
+- **Who asked for what.** On the couple's side, after the vendor answers, each difference is read against what the couple asked for (`attribute`). Their own ask the vendor took shows as theirs ("You asked for this — … accepted it", gold), not the vendor's. A countered ask shows original / you asked / theirs. An ask the vendor kept as it was says so. Only changes nobody asked for are the vendor's (rose). Items and clauses get the same labels.
+- **"We emailed the link" only when we did.** The backend now returns `email_sent` (true / false / null) from create, send, lead convert, accept-with-a-proposal and accept-with-usual-terms. The app claims an email only on true, says to share the link on false, and stays neutral when it isn't told. The timeline shows "Couldn't email the link" on a failure.
+- **The booking card reads the contract.** `bookingMoney.balanceDue` comes from the next unpaid payment on the schedule (`describeDue`), e.g. "Due May 31, 2030 (14 days before the event)", instead of the hard-coded "Due after the event". All payments confirmed reads as paid in full. Contracts without a schedule keep the old wording.

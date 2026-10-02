@@ -1112,6 +1112,9 @@ export type ContractLifecycle =
  *  guest never sees their own token echoed back) and no vendor-identity
  *  fields the guest view has instead. */
 export interface Contract {
+  /** On a create/send response only: whether the client's link email went
+   *  (true/false), or null when the vendor didn't ask us to email. */
+  email_sent?: boolean | null;
   booking_id: string;
   vendor_id: string;
   service_id: string;

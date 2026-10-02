@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import { fromContract, proposalChanges, type ContractTermsSource, type Draft } from "./contractDraft";
 import { termsOf } from "./contractDiff";
 import {
+  attribute,
   changedValues,
   clauseToggles,
   followTotal,
   lineToggles,
   proposalProblems,
+  roundOf,
+  rowAttribution,
   sameValue,
   setClauseIncluded,
   setLineIncluded,
@@ -137,5 +140,46 @@ describe("sending", () => {
     const d = base();
     const overtime = valuesOf(d).find((v) => v.id === "policy.overtime")!;
     expect(proposalChanges(overtime.set(d, "300"), termsOf(contract as never))).toEqual({ overtime_rate_cents: 30_000 });
+  });
+});
+
+describe("rounds", () => {
+  const p = (status: string) => ({ status }) as never;
+  it("counts every turn: the contract, each proposal, each answer", () => {
+    expect(roundOf({ proposals: [] })).toBe(1);
+    expect(roundOf({ proposals: [p("open")] })).toBe(2);
+    expect(roundOf({ proposals: [p("revised")] })).toBe(3);
+    expect(roundOf({ proposals: [p("open"), p("declined")] })).toBe(4);
+    // Withdrawn or replaced: a turn the couple took, with no answer.
+    expect(roundOf({ proposals: [p("withdrawn"), p("superseded")] })).toBe(3);
+  });
+});
+
+describe("who asked for what", () => {
+  const before = base();
+  const v = (id: string) => valuesOf(before).find((x) => x.id === id)!;
+  const set = (d: Draft, id: string, raw: string) => v(id).set(d, raw);
+  // The couple asked for 3 lights, 50 miles and $120/hr.
+  const ask = set(set(set(before, "line:lights.quantity", "3"), "clause:travel", "50 miles included."), "policy.overtime", "120");
+  // The vendor took the lights, offered 40 miles, kept overtime, and moved the start time on their own.
+  const answer = set(set(set(before, "line:lights.quantity", "3"), "clause:travel", "40 miles included."), "event.start", "17:00");
+
+  it("credits an ask the other side took to the side that asked", () => {
+    expect(attribute(v("line:lights.quantity"), before, answer, ask)).toBe("accepted");
+    expect(attribute(v("clause:travel"), before, answer, ask)).toBe("countered");
+    expect(attribute(v("policy.overtime"), before, answer, ask)).toBe("kept");
+    expect(attribute(v("event.start"), before, answer, ask)).toBe("theirs");
+    expect(attribute(v("event.venue"), before, answer, ask)).toBeNull();
+  });
+
+  it("without an ask, every difference is the other side's", () => {
+    expect(attribute(v("line:lights.quantity"), before, answer, null)).toBe("theirs");
+  });
+
+  it("does the same for items and clauses added or removed", () => {
+    expect(rowAttribution(false, true, true)).toBe("accepted");
+    expect(rowAttribution(false, false, true)).toBe("kept");
+    expect(rowAttribution(true, false, null)).toBe("theirs");
+    expect(rowAttribution(true, true, true)).toBeNull();
   });
 });

@@ -540,7 +540,10 @@ function NewContractInner() {
   if (created) {
     const link = guestBookingLink(created.contract_token);
     const isDraft = created.contract_status === "draft";
-    const emailed = !isDraft && emailClient && created.guest_email && !linkCopied;
+    // Only what the backend says actually happened (email_sent), never what
+    // the vendor asked for.
+    const emailed = !isDraft && !linkCopied && created.email_sent === true;
+    const emailFailed = !isDraft && !linkCopied && created.email_sent === false;
     return (
       <div className="mx-auto w-[min(640px,100%-2rem)]">
         <div className="text-center">
@@ -555,7 +558,9 @@ function NewContractInner() {
                 ? "Paste it wherever you talk to your client. They fill in their own details and sign — no account needed."
                 : emailed
                   ? `We emailed the link to ${created.guest_email}. You can share it yourself too.`
-                  : "Your client opens it, fills in their own details, and signs — no account needed on their end."}
+                  : emailFailed
+                    ? `We couldn't email ${created.guest_email ?? "your client"}. Copy the link below and send it yourself — your client fills in their details and signs, no account needed.`
+                    : "Your client opens it, fills in their own details, and signs — no account needed on their end."}
           </p>
           {!isDraft && created.hold_expires_at ? (
             <p className="mt-2 text-sm text-ink-faint">

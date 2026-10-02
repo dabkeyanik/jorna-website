@@ -21,16 +21,19 @@ import {
   SECTIONS,
   addClause,
   addExtraLine,
-  changedValues,
+  attribute,
   clauseToggles,
   differs,
   followTotal,
   lineToggles,
+  rowAttribution,
   setClauseIncluded,
   setLineIncluded,
   showValue,
   unionValues,
+  type Attribution,
   type NegotiableValue,
+  type Toggle,
 } from "@/lib/negotiation";
 import { ContractPaper, MARK_CLASS, type Mark } from "./ContractPaper";
 
@@ -64,11 +67,11 @@ function when(iso: string | null): string {
     : `${d.toLocaleDateString(undefined, { day: "numeric", month: "short" })} at ${time}`;
 }
 
-function Summary({ label, value }: { label: string; value: ReactNode }) {
+function Summary({ label, value, wrap }: { label: string; value: ReactNode; wrap?: boolean }) {
   return (
     <div className="min-w-0">
       <p className="text-xs text-ink-faint">{label}</p>
-      <p className="truncate text-sm font-semibold text-ink">{value}</p>
+      <p className={`text-sm font-semibold text-ink ${wrap ? "" : "truncate"}`}>{value}</p>
     </div>
   );
 }
@@ -126,6 +129,7 @@ export function NegotiationWorkspace({
   original,
   proposed,
   initial,
+  ask,
   vendorName,
   clientName,
   otherMessage,
@@ -153,6 +157,10 @@ export function NegotiationWorkspace({
   proposed: Draft;
   /** Where your version starts: a saved draft, or `proposed`. */
   initial: Draft;
+  /** What this side last asked for (their proposal), when the other side
+   *  has answered it — so a change can be shown as accepted from your ask
+   *  rather than as the other side's. */
+  ask?: Draft | null;
   vendorName: string;
   clientName: string;
   /** The other side's note with their change. */
@@ -191,23 +199,51 @@ export function NegotiationWorkspace({
   const [notice, setNotice] = useState<string | null>(null);
   const [declining, setDeclining] = useState(false);
 
-  const theirChanges = useMemo(() => changedValues(original, proposed), [original, proposed]);
-  const theirIds = useMemo(() => new Set(theirChanges.map((v) => v.id)), [theirChanges]);
+  // Why each value differs between the version before and the one on the
+  // table: the other side's change, or your own ask accepted, countered or kept.
+  const why = useMemo(() => {
+    const out = new Map<string, Exclude<Attribution, null>>();
+    for (const v of unionValues(original, proposed, ...(ask ? [ask] : []))) {
+      const a = attribute(v, original, proposed, ask);
+      if (a) out.set(v.id, a);
+    }
+    return out;
+  }, [original, proposed, ask]);
+  const theirIds = useMemo(
+    () => new Set([...why].filter(([, a]) => a === "theirs" || a === "countered").map(([id]) => id)),
+    [why],
+  );
+  const count = (a: Attribution) => [...why.values()].filter((x) => x === a).length;
   const all = useMemo(() => unionValues(yours, proposed, original), [yours, proposed, original]);
   const inYours = useMemo(() => new Set(unionValues(yours).map((v) => v.id)), [yours]);
 
-  // The cards: what they changed, what you've changed or added, what you picked.
+  // The cards: what changed and why, what you've changed or added, what you picked.
   const cards = all.filter(
     (v) =>
       inYours.has(v.id) &&
-      (theirIds.has(v.id) ||
+      (why.has(v.id) ||
         differs(v, yours, proposed) ||
         picked.includes(v.id) ||
         (v.has != null && !v.has(proposed))),
   );
   const others = all.filter((v) => inYours.has(v.id) && !cards.includes(v));
-  const lines = lineToggles(original, proposed, yours);
-  const clauses = clauseToggles(original, proposed, yours, perspective === "vendor" ? clauseLibrary : []);
+  const lines = lineToggles(original, proposed, yours, ask);
+  const clauses = clauseToggles(original, proposed, yours, perspective === "vendor" ? clauseLibrary : [], ask);
+
+  /** An item's or clause's line in the checklist: who put it in or took it out. */
+  const rowNote = <T,>(t: Toggle<T>): string => {
+    if (t.included !== t.inProposed) return t.included ? "Added by you" : "Removed by you";
+    switch (rowAttribution(t.inOriginal, t.inProposed, t.inAsk)) {
+      case "accepted":
+        return t.inProposed ? `You asked · ${other} added it` : `You asked · ${other} removed it`;
+      case "kept":
+        return t.inAsk ? `You asked · ${other} left it out` : `You asked · ${other} kept it`;
+      case "theirs":
+        return t.inProposed ? `Added by ${other}` : `Removed by ${other}`;
+      default:
+        return t.included ? "Included" : "Excluded";
+    }
+  };
   const unchanged = unionValues(yours, proposed).every((v) => !differs(v, yours, proposed));
   const yourCount = unionValues(yours, proposed).filter((v) => differs(v, yours, proposed)).length;
 
@@ -219,14 +255,16 @@ export function NegotiationWorkspace({
       if (line && !id.includes(".")) {
         const t = lines.find((x) => x.id === line);
         if (!t) return null;
-        if (t.inProposed !== t.inOriginal && t.included === t.inProposed) return "other";
         if (t.included !== t.inProposed) return "yours";
+        const a = rowAttribution(t.inOriginal, t.inProposed, t.inAsk);
+        if (a === "accepted") return "yours";
+        if (a === "theirs") return "other";
       }
       return null;
     }
-    const shown = showOriginal ? original : yours;
     if (showOriginal) return theirIds.has(id) ? "other" : null;
-    if (differs(v, shown, proposed)) return "yours";
+    if (differs(v, yours, proposed)) return "yours";
+    if (why.get(id) === "accepted") return "yours";
     return theirIds.has(id) ? "other" : null;
   };
 
@@ -263,9 +301,15 @@ export function NegotiationWorkspace({
     }
   }
 
-  const changeCount = `${theirChanges.length} value${theirChanges.length === 1 ? "" : "s"} changed${
-    yourCount && !readOnly ? ` · ${yourCount} by you` : ""
-  }`;
+  const theirCount = theirIds.size;
+  const changeCount = [
+    `${theirCount} value${theirCount === 1 ? "" : "s"} changed by ${other}`,
+    count("accepted") ? `${count("accepted")} of your asks accepted` : null,
+    count("kept") ? `${count("kept")} kept as it was` : null,
+    yourCount && !readOnly ? `${yourCount} by you` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const proposedLabel = perspective === "vendor" ? `${other}'s proposal` : `${other}'s version`;
 
   const revisePanel = (
@@ -276,9 +320,11 @@ export function NegotiationWorkspace({
         <p className="mt-1 text-sm text-ink-soft">
           {readOnly
             ? "Nothing to answer right now."
-            : theirChanges.length
+            : theirCount
               ? `Review what ${other} changed, then enter the value you want to send back.`
-              : "Change any value below, then send it."}
+              : why.size
+                ? `See how ${other} answered what you asked for. Change anything else below.`
+                : "Change any value below, then send it."}
         </p>
       </div>
 
@@ -300,13 +346,60 @@ export function NegotiationWorkspace({
         return (
           <div key={section} className="grid gap-3">
             {inSection.map((v) => {
-              const theirs = theirIds.has(v.id);
+              const a = why.get(v.id) ?? null;
+              const theirs = a === "theirs";
               return (
                 <div key={v.id} className="rounded-xl border border-card-edge bg-card p-4 shadow-[var(--shadow-card)]">
                   <p className="text-xs uppercase tracking-wide text-ink-faint">{v.section}</p>
                   <p className="font-semibold text-ink">{v.label}</p>
+                  {a && a !== "theirs" ? (
+                    <p className={`mt-1 text-xs ${a === "accepted" ? "text-ink-soft" : "text-ink-faint"}`}>
+                      {a === "accepted"
+                        ? `You asked for this — ${other} accepted it.`
+                        : a === "countered"
+                          ? `You asked for a change — ${other} put a different value.`
+                          : `You asked for a change — ${other} kept it as it was.`}
+                    </p>
+                  ) : null}
                   <div className="mt-3 grid gap-2.5">
-                    {v.kind === "longtext" && theirs ? (
+                    {a === "countered" && v.kind !== "longtext" && ask ? (
+                      <div className="grid grid-cols-3 gap-2">
+                        <label className="text-xs text-ink-faint">
+                          Original
+                          <p className={`mt-1 ${readonly}`}>{showValue(v.kind, v.get(original))}</p>
+                        </label>
+                        <label className="text-xs text-ink-faint">
+                          You asked
+                          <p className={`mt-1 ${readonly}`}>{showValue(v.kind, v.get(ask))}</p>
+                        </label>
+                        <label className="text-xs text-ink-faint">
+                          {proposedLabel}
+                          <p className={`mt-1 ${readonly} ${MARK_CLASS.other} !px-3`}>
+                            {showValue(v.kind, v.get(proposed))}
+                          </p>
+                        </label>
+                      </div>
+                    ) : a === "countered" && ask ? (
+                      <div>
+                        <p className="mb-1 text-xs text-ink-faint">How {other} changed your wording</p>
+                        <ClauseWords before={v.get(ask)} after={v.get(proposed)} />
+                      </div>
+                    ) : (a === "accepted" || a === "kept") && ask ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="text-xs text-ink-faint">
+                          {a === "accepted" ? "Original agreement" : "You asked"}
+                          <p className={`mt-1 ${readonly}`}>
+                            {showValue(v.kind, a === "accepted" ? v.get(original) : v.get(ask))}
+                          </p>
+                        </label>
+                        <label className="text-xs text-ink-faint">
+                          Now
+                          <p className={`mt-1 ${readonly} ${a === "accepted" ? `${MARK_CLASS.yours} !px-3` : ""}`}>
+                            {showValue(v.kind, v.get(proposed))}
+                          </p>
+                        </label>
+                      </div>
+                    ) : v.kind === "longtext" && theirs ? (
                       <div>
                         <p className="mb-1 text-xs text-ink-faint">What {other} changed</p>
                         <ClauseWords before={v.get(original)} after={v.get(proposed)} />
@@ -391,15 +484,7 @@ export function NegotiationWorkspace({
                       onChange={(e) => change((d) => setLineIncluded(d, t.item, e.target.checked))}
                     />
                     <span className="flex-1">{t.item.name || "New item"}</span>
-                    <span className="text-xs text-ink-faint">
-                      {t.inProposed && !t.inOriginal
-                        ? `Added by ${other}`
-                        : !t.inProposed && t.inOriginal
-                          ? `Removed by ${other}`
-                          : t.included
-                            ? "Added by you"
-                            : "Removed by you"}
-                    </span>
+                    <span className="text-xs text-ink-faint">{rowNote(t)}</span>
                   </label>
                 </li>
               ))}
@@ -453,10 +538,7 @@ export function NegotiationWorkspace({
                     <span className="block text-sm font-medium text-ink">{t.item.title || "Untitled clause"}</span>
                     <span className="line-clamp-2 block text-xs text-ink-faint">{t.item.body}</span>
                   </span>
-                  <span className="shrink-0 text-xs text-ink-faint">
-                    {t.inProposed !== t.inOriginal ? (t.inProposed ? `Added by ${other}` : `Removed by ${other}`) : null}
-                    {t.inProposed === t.inOriginal ? (t.included ? "Included" : "Excluded") : null}
-                  </span>
+                  <span className="shrink-0 text-xs text-ink-faint">{rowNote(t)}</span>
                 </button>
               </li>
             ))}
@@ -567,8 +649,8 @@ export function NegotiationWorkspace({
         {changeCount}
         {header.lastEditedBy ? ` · last edited by ${header.lastEditedBy}` : ""}
       </p>
-      <div className="hidden grid-cols-4 gap-x-4 border-b border-line-soft px-6 py-3 sm:grid">
-        <Summary label="Proposed changes" value={changeCount} />
+      <div className="hidden grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] gap-x-4 border-b border-line-soft px-6 py-3 sm:grid">
+        <Summary label="Proposed changes" value={changeCount} wrap />
         <Summary label="Last edited by" value={header.lastEditedBy ?? "—"} />
         {header.updatedAt ? <Summary label="Updated" value={when(header.updatedAt)} /> : <span />}
         <p className="flex items-center gap-2 text-xs text-ink-faint">

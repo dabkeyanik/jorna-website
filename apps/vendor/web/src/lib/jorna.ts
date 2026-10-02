@@ -831,7 +831,7 @@ export function listVendorBookings(
 export function setBookingStatus(
   bookingId: string,
   status: "approved" | "rejected",
-): Promise<unknown> {
+): Promise<{ email_sent?: boolean | null }> {
   return apiFetch(`/bookings/${bookingId}/status`, {
     method: "PUT",
     body: { status },

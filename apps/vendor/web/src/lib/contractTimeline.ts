@@ -33,6 +33,8 @@ export function describeEvent(e: ContractEvent, c: { signer_name?: string | null
       }`;
     case "emailed":
       return `Link emailed to ${typeof d.to === "string" ? d.to : "your client"}`;
+    case "email_failed":
+      return `Couldn't email the link to ${typeof d.to === "string" ? d.to : "your client"}`;
     case "viewed":
       return "Your client opened it";
     case "edited":

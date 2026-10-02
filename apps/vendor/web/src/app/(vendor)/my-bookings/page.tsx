@@ -220,7 +220,11 @@ function Expanded({
         <Info
           label="Remaining balance"
           value={m.paidInFull ? "$0" : money(m.balanceCents)}
-          sub={m.paidInFull ? "Paid in full" : eventIsOver(b) ? "Due now" : "Due after the event"}
+          sub={
+            m.paidInFull
+              ? "Paid in full"
+              : (m.balanceDue ?? (eventIsOver(b) ? "Due now" : "Due after the event"))
+          }
         />
       </div>
 

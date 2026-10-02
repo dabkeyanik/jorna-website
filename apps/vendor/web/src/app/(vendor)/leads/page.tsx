@@ -27,7 +27,7 @@ import {
   updateLead,
   voidContract,
 } from "@/lib/jorna";
-import { guestBookingLink } from "@/lib/contractLink";
+import { emailNotice, guestBookingLink } from "@/lib/contractLink";
 import { describeEvent } from "@/lib/contractTimeline";
 import { centsToMoney } from "@/lib/vendorPlan";
 import type { Contract, Pipeline, PipelineItem } from "@/lib/types";
@@ -316,11 +316,16 @@ function LeadDrawer({
                 className={ghost}
                 disabled={busy != null}
                 onClick={() =>
-                  run(
-                    "accept",
-                    () => setBookingStatus(item.booking_id!, "approved"),
-                    "Sent — we've emailed them a contract built from your usual terms. The date is held until they sign.",
-                  )
+                  run("accept", async () => {
+                    const r = await setBookingStatus(item.booking_id!, "approved");
+                    setNotice(
+                      r.email_sent === true
+                        ? "Sent — we've emailed them a contract built from your usual terms. The date is held until they sign."
+                        : r.email_sent === false
+                          ? "Sent a contract built from your usual terms, but we couldn't email them. Copy the link from the contract and send it yourself. The date is held until they sign."
+                          : "Sent a contract built from your usual terms. The date is held until they sign.",
+                    );
+                  })
                 }
               >
                 Send with my usual terms
@@ -363,7 +368,12 @@ function LeadDrawer({
                   variant="ghost"
                   className={ghost}
                   disabled={busy != null}
-                  onClick={() => run("send", () => sendContract(item.booking_id!, { emailClient: true }), `Sent to ${item.email}.`)}
+                  onClick={() =>
+                    run("send", async () => {
+                      const c = await sendContract(item.booking_id!, { emailClient: true });
+                      setNotice(emailNotice(c.email_sent, item.email));
+                    })
+                  }
                 >
                   Send by email
                 </Button>
