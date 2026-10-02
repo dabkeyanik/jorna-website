@@ -38,7 +38,9 @@ test.describe("marketplace search", () => {
     expect(api.requestsTo("GET", "/vendors/search")).toHaveLength(1);
   });
 
-  test("shows a Direct badge for a manual-track vendor and Protected for the default", async ({
+  // Escrow is off (lib/flags ESCROW_ENABLED), so every vendor is paid
+  // directly — a per-vendor payment tag said nothing and is gone.
+  test("cards carry no payment-track tag, whichever track the vendor is on", async ({
     page,
     api,
   }) => {
@@ -59,7 +61,8 @@ test.describe("marketplace search", () => {
 
     await page.goto("marketplace/");
 
-    await expect(page.getByText("Direct")).toBeVisible();
-    await expect(page.getByText("Protected")).toBeVisible();
+    await expect(page.getByText("Live Dhol")).toBeVisible();
+    await expect(page.getByText("Direct", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Protected", { exact: true })).toHaveCount(0);
   });
 });

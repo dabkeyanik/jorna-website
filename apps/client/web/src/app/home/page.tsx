@@ -69,8 +69,8 @@ const STEPS = [
   {
     n: "03",
     icon: IconShield,
-    title: "Book and pay safely",
-    body: "Pick a team, adjust it, then pay into escrow. Your money is held until the event happens and both sides confirm.",
+    title: "Book on a signed contract",
+    body: "Pick a team, adjust it, then sign each vendor's contract. You pay them directly by Venmo or Zelle, and every payment is recorded on your booking.",
   },
 ];
 
@@ -125,23 +125,25 @@ const EXAMPLE_BUNDLES: ExampleBundle[] = [
   },
 ];
 
-const ESCROW_STAGES = [
-  { label: "Unpaid", status: "Pending", desc: "Not yet charged", tone: "maroon" },
-  { label: "In escrow", status: "In escrow", desc: "Securely held", tone: "gold" },
-  { label: "Released", status: "Released", desc: "After you confirm", tone: "green" },
-  { label: "Refunded", status: "Refunded", desc: "If something goes wrong", tone: "maroon" },
+// Escrow is off (lib/flags ESCROW_ENABLED): clients pay vendors directly, on
+// a signed contract. Same wording as the vendor site's /for-clients.
+const PAYMENT_STAGES = [
+  { label: "Contract", status: "Signed", desc: "Price and terms agreed first", tone: "maroon" },
+  { label: "Deposit", status: "Sent", desc: "Paid to the vendor directly", tone: "gold" },
+  { label: "Receipt", status: "Confirmed", desc: "The vendor confirms it arrived", tone: "green" },
+  { label: "Balance", status: "Settled", desc: "Recorded on your booking", tone: "green" },
 ] as const;
 
 const TRUST_POINTS = [
   {
     icon: IconLock,
-    title: "Your money is held, not spent",
-    body: "When you pay, it goes into escrow — not straight to the vendor. It stays there until after the celebration, so you're never out of pocket for someone who doesn't show up.",
+    title: "Terms in writing before you pay",
+    body: "Every booking starts with a contract: the price, the deposit, the cancellation window and any overtime rate, all set out before you sign — no surprises on the day.",
   },
   {
     icon: IconShield,
-    title: "Vendors are paid when you confirm",
-    body: "After the event you confirm it went well, and only then is the vendor paid. If something goes wrong, the money doesn't move until it's sorted.",
+    title: "Pay the vendor directly",
+    body: "You pay your vendor by Venmo or Zelle — no card fees, no middleman. Mark each payment as sent and your vendor confirms it arrived, so there's a record of every one.",
   },
   {
     icon: IconUsers,
@@ -153,7 +155,7 @@ const TRUST_POINTS = [
 const VENDOR_PERKS = [
   "Free to list — you only pay when you get booked",
   "Jorna matches you to hosts planning the events you serve",
-  "Guaranteed payment through escrow on every booking",
+  "Get paid directly by Venmo or Zelle — no card fees",
   "Set your own rates, availability, and negotiation preferences",
   "One inbox for every client conversation",
 ];
@@ -168,12 +170,12 @@ const FAQ_ITEMS = [
     a: "Both. Start from a generated bundle and swap any vendor in it, or skip bundles entirely and book one at a time from the Marketplace.",
   },
   {
-    q: "What if a vendor cancels or doesn't show up?",
-    a: "Because the money sits in escrow, a vendor who doesn't show up can't be paid. If one cancels, the payment is refunded rather than released.",
+    q: "How do I pay vendors?",
+    a: "Directly, by Venmo or Zelle, on the schedule in the contract you signed. Mark each payment as sent and your vendor confirms it arrived, so every payment is recorded on your booking.",
   },
   {
-    q: "How long does money stay in escrow?",
-    a: "From when you pay until after the event, once both sides confirm it went ahead. The booking shows its status the whole time, so you always know where your money is.",
+    q: "What if a vendor cancels?",
+    a: "Your contract sets out the cancellation window you both agreed to before signing. Because you pay the vendor directly, a refund is between you and them — the signed terms are what you both go by.",
   },
 ];
 
@@ -232,8 +234,8 @@ export default function HomePage() {
             <p className="mt-6 max-w-[56ch] text-lg leading-relaxed text-ink-soft md:text-xl">
               Describe your wedding, sangeet, or mehndi. Jorna assembles three complete
               vendor teams for you to compare — venue, catering, DJ, photographer, and
-              more — and holds your payments safely in escrow until the celebration is
-              done.
+              more — then book each one on a signed contract, with every price and
+              deadline in writing before you pay.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               {loading ? null : (
@@ -517,8 +519,8 @@ export default function HomePage() {
               </h2>
               <p className="mt-4 leading-relaxed text-ground/75">
                 Jorna brings the hosts to you. No chasing leads, no awkward payment
-                conversations — every booking is protected and paid through escrow once
-                the event is done.
+                conversations — your deposit, cancellation and overtime terms are in a
+                signed contract before anyone pays.
               </p>
               <ul className="mt-8 space-y-3">
                 {VENDOR_PERKS.map((perk) => (
@@ -544,26 +546,26 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Escrow / trust ───────────────────────────────────────────── */}
+      {/* ── Paying / trust ───────────────────────────────────────────── */}
       <section className="bg-panel px-5 py-20 md:py-28">
         <div className="mx-auto w-[min(var(--container-wide),100%)]">
           <div className="mx-auto mb-12 max-w-lg text-center">
-            <Eyebrow>Protected by escrow</Eyebrow>
+            <Eyebrow>How paying works</Eyebrow>
             <h2 className="serif text-3xl text-maroon dark:text-gold md:text-4xl">
-              Safe to pay months in advance.
+              Every payment, accounted for.
             </h2>
             <p className="mt-4 leading-relaxed text-ink-soft">
-              Booking a celebration means handing over large sums, sometimes a year
-              ahead. Jorna was built specifically to make that feel safe.
+              Booking a celebration means paying large sums, sometimes a year ahead.
+              Jorna puts the terms in writing first and keeps a record of every payment.
             </p>
           </div>
 
           <div className="rounded-2xl border border-card-edge bg-card p-6 shadow-[var(--shadow-card)] md:p-8">
             <p className="mb-5 text-xs font-semibold uppercase tracking-[0.2em] text-ink-faint">
-              Where your money is, at every stage
+              From signed contract to settled balance
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
-              {ESCROW_STAGES.map((stage) => (
+              {PAYMENT_STAGES.map((stage) => (
                 <div
                   key={stage.label}
                   className="rounded-xl border border-line-soft bg-panel p-4"
