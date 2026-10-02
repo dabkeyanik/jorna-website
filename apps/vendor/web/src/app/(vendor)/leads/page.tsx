@@ -38,6 +38,8 @@ type Sort = "recent" | "upcoming" | "value";
 type Look = "attention" | "waiting" | "inquiry";
 
 const REASON: Record<string, string> = {
+  changes_proposed: "They proposed changes to the contract",
+  revised: "Your new version is with them",
   new_request: "New request — they're waiting for your reply",
   new_lead: "New lead — reach out to them",
   draft: "Contract drafted but not sent",
@@ -357,7 +359,19 @@ function LeadDrawer({
 
           {isContract && (status === "sent" || status === "viewed" || status === "expired") ? (
             <>
-              <LinkPrimary href={`/contracts/view?id=${item.booking_id}`}>View contract</LinkPrimary>
+              {item.proposal_status === "open" ? (
+                <>
+                  <LinkPrimary href={`/contracts/changes?id=${item.booking_id}`}>Review changes</LinkPrimary>
+                  <Link
+                    href={`/contracts/view?id=${item.booking_id}`}
+                    className="self-center px-2 text-sm font-semibold text-gold"
+                  >
+                    View contract
+                  </Link>
+                </>
+              ) : (
+                <LinkPrimary href={`/contracts/view?id=${item.booking_id}`}>View contract</LinkPrimary>
+              )}
               <Button variant="ghost" className={ghost} disabled={busy != null} onClick={copyLink}>
                 Copy link
               </Button>

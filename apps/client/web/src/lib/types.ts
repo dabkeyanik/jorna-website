@@ -343,6 +343,8 @@ export interface BundleEventInfo {
   guest_count?: number | null;
 }
 
+export type ProposalStatus = "open" | "accepted" | "declined" | "revised" | "superseded" | "withdrawn";
+
 export interface BundleBooking {
   booking_id: string;
   status: string;
@@ -352,6 +354,10 @@ export interface BundleBooking {
    *  Null on a request accepted before that, which has nothing to sign. */
   contract_token?: string | null;
   contract_status?: "draft" | "sent" | "viewed" | "signed" | "declined" | "voided" | "expired" | null;
+  /** The latest change proposal on an unsigned contract (backend
+   *  DECISIONS #23): "open" while the vendor owes an answer; "accepted" or
+   *  "revised" once a new version is back. Null when there's none. */
+  proposal_status?: ProposalStatus | null;
   signed_at?: string | null;
   hold_expires_at?: string | null;
   /** The contract's payments, in order. Null for a booking paid in one go,
@@ -522,6 +528,7 @@ export interface Contract {
   signed_snapshot_sha256?: string | null;
   status?: string;
   contract_status?: BundleBooking["contract_status"];
+  proposal_status?: ProposalStatus | null;
   hold_expires_at?: string | null;
   payment_status?: string | null;
 }

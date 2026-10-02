@@ -126,6 +126,17 @@ describe("bookingStage", () => {
     expect(bookingStage(booking({ contract_status: "voided" }))).toBeNull();
   });
 
+  it("says where a negotiation stands while the contract is unsigned", () => {
+    expect(bookingStage(booking({ proposal_status: "open" }))).toBe("changes_proposed");
+    expect(bookingStage(booking({ contract_status: "viewed", proposal_status: "accepted" }))).toBe("new_version");
+    expect(bookingStage(booking({ proposal_status: "revised" }))).toBe("new_version");
+    // Declined or withdrawn: the version on the table is the one they had.
+    expect(bookingStage(booking({ proposal_status: "declined" }))).toBe("contract_to_review");
+    expect(bookingStage(booking({ proposal_status: "withdrawn" }))).toBe("contract_to_review");
+    // An expired offer isn't negotiable whatever the proposal says.
+    expect(bookingStage(booking({ contract_status: "expired", proposal_status: "open" }))).toBeNull();
+  });
+
   it("is Deposit due on a signed contract until the first payment is confirmed", () => {
     const signed = { signed_at: "2030-01-01T00:00:00", contract_status: "signed" as const, date_iso: future };
     expect(bookingStage(booking({ ...signed, payment_schedule: [inst(), inst({ id: "j" })] }))).toBe(

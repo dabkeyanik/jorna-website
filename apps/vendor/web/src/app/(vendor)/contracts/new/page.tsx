@@ -28,6 +28,7 @@ import {
   convertLead,
   createContract,
   getContract,
+  getContractProposals,
   getMyVendor,
   listLeads,
   listMyServices,
@@ -72,6 +73,7 @@ import {
   categoryLabel,
   priceUnitLabel,
   type BlockType,
+  type ChangeProposal,
   type Contract,
   type DueType,
   type LayoutBlock,
@@ -218,6 +220,9 @@ function NewContractInner() {
   const params = useSearchParams();
   const leadId = params.get("lead");
   const editId = params.get("edit");
+  // Revise (backend DECISIONS #23): the client's proposed changes, already
+  // in, as the start of the vendor's next version.
+  const proposalId = params.get("proposal");
   const requestId = params.get("request");
   // A gallery card on /contracts opens the editor on a saved template.
   const templateId = params.get("template");
@@ -226,6 +231,9 @@ function NewContractInner() {
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [templates, setTemplates] = useState<SavedContractTemplate[]>([]);
   const [editing, setEditing] = useState<Contract | null>(null);
+  const [revising, setRevising] = useState<ChangeProposal | null>(null);
+  /** ?proposal= named one that's no longer open. */
+  const [staleProposal, setStaleProposal] = useState(false);
   const [request, setRequest] = useState<VendorBooking | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -273,12 +281,13 @@ function NewContractInner() {
           return;
         }
         setVendor(mine);
-        const [svc, leads, tpl, existing, requests] = await Promise.all([
+        const [svc, leads, tpl, existing, requests, proposals] = await Promise.all([
           listMyServices(mine.vendor_id).catch(() => null),
           leadId ? listLeads().catch(() => null) : Promise.resolve(null),
           loadTemplates().catch(() => [] as SavedContractTemplate[]),
           editId ? getContract(editId) : Promise.resolve(null),
           requestId ? listVendorBookings(mine.vendor_id, { limit: 100 }) : Promise.resolve(null),
+          editId && proposalId ? getContractProposals(editId).catch(() => null) : Promise.resolve(null),
         ]);
         if (cancelled) return;
         // Private (hidden) packages are exactly what contracts are for;
@@ -290,7 +299,14 @@ function NewContractInner() {
 
         if (existing) {
           setEditing(existing);
-          setDraft(fromContract(existing));
+          const open = proposals?.open_proposal?.proposal_id === proposalId ? proposals?.open_proposal : null;
+          if (open) {
+            setRevising(open);
+            setDraft(fromContract({ ...existing, ...open.proposed }));
+          } else {
+            setDraft(fromContract(existing));
+            if (proposalId) setStaleProposal(true);
+          }
           setAutoPlan(false);
           return;
         }
@@ -338,7 +354,7 @@ function NewContractInner() {
     return () => {
       cancelled = true;
     };
-  }, [user, router, leadId, editId, requestId, templateId]);
+  }, [user, router, leadId, editId, proposalId, requestId, templateId]);
 
   const issues = useMemo(() => problemsByStep(draft, todayIso()), [draft]);
   const total = totalCents(draft);
@@ -457,7 +473,7 @@ function NewContractInner() {
     try {
       const doc = toDocument(draft);
       if (mode === "save" && editing) {
-        await updateContract(editing.booking_id, doc);
+        await updateContract(editing.booking_id, revising ? { ...doc, proposal_id: revising.proposal_id } : doc);
         router.push(`/contracts/view?id=${editing.booking_id}`);
         return;
       }
@@ -993,10 +1009,12 @@ function NewContractInner() {
           ← {editing ? "Back to the contract" : request ? "Back to requests" : "All contracts"}
         </Link>
         <h1 className="serif mt-2 text-3xl text-maroon dark:text-gold">
-          {editing ? "Edit contract" : request ? `Accept ${request.client_name ? `${request.client_name}'s` : "this"} request` : "New contract"}
+          {revising ? "Revise the contract" : editing ? "Edit contract" : request ? `Accept ${request.client_name ? `${request.client_name}'s` : "this"} request` : "New contract"}
         </h1>
         <p className="mt-1 text-sm text-ink-soft">
-          {request
+          {revising
+            ? `${editing?.guest_name || "Your client"}'s proposed changes are already in. Keep what you like, change the rest — saving sends this version to them and restarts your hold.`
+            : request
             ? "Set what's included, the payment plan and your terms. They sign on a link we email them — the date is held for them until then."
             : editing
               ? editing.contract_status === "draft"
@@ -1004,6 +1022,11 @@ function NewContractInner() {
                 : "Your client will see the new version. If they had it open, they'll need to review it again before signing."
               : "Write it the way your client will read it. Move sections around with the arrows."}
         </p>
+        {staleProposal ? (
+          <p role="status" className="mt-3 rounded-lg bg-panel px-3 py-2 text-sm text-ink-soft">
+            That proposal has already been answered, so this is the contract as it stands.
+          </p>
+        ) : null}
       </header>
 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
@@ -1104,7 +1127,7 @@ function NewContractInner() {
 
             {editing ? (
               <Button className="mt-4 w-full" disabled={busy !== null} onClick={() => submit("save")}>
-                {busy === "save" ? "Saving…" : "Save changes"}
+                {busy === "save" ? "Saving…" : revising ? "Send new version" : "Save changes"}
               </Button>
             ) : (
               <div className="mt-4 grid gap-2">

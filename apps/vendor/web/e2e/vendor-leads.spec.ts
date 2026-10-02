@@ -172,6 +172,37 @@ test.describe("vendor leads (/leads)", () => {
     expect(api.requestsTo("POST", "/contracts/c1/send")).toHaveLength(0);
   });
 
+  test("a contract with proposed changes leads with Review changes", async ({ page, api }) => {
+    await loginAs(page, api);
+    mockLeads(api);
+    api.get("/leads/pipeline", {
+      ...PIPELINE,
+      items: [
+        item({
+          id: "booking:c1",
+          source: "contract",
+          stage: "negotiation",
+          booking_id: "c1",
+          name: "Sana Omar",
+          contract_status: "viewed",
+          proposal_status: "open",
+          attention: "needs_you",
+          attention_reason: "changes_proposed",
+        }),
+      ],
+    });
+
+    await page.goto("leads/");
+    await page.getByRole("button", { name: /Sana Omar/ }).click();
+    const drawer = page.getByRole("dialog");
+    await expect(drawer.getByText("They proposed changes to the contract")).toBeVisible();
+    await expect(drawer.getByRole("link", { name: "Review changes" })).toHaveAttribute(
+      "href",
+      /\/contracts\/changes\/?\?id=c1/,
+    );
+    await expect(drawer.getByRole("link", { name: "View contract" })).toBeVisible();
+  });
+
   test("archiving a request hides it without declining", async ({ page, api }) => {
     await loginAs(page, api);
     mockLeads(api);
