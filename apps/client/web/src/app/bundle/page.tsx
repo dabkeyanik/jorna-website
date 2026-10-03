@@ -1969,6 +1969,13 @@ function BundleInner() {
                     : "Committed"}
               </p>
               <p className="serif text-3xl text-ink">{money(cash.committed)}</p>
+              {/* Asked for, not yet agreed. Kept out of the figure above until
+                  the vendor accepts (#102). */}
+              {cash.requested > 0 ? (
+                <p className="text-xs text-ink-soft">
+                  + {money(cash.requested)} requested, waiting on the vendor
+                </p>
+              ) : null}
             </div>
             {cash.outstanding > 0 ? (
               <p className="text-sm text-ink-soft">

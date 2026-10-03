@@ -486,6 +486,13 @@ export function taskDetail(task: PlanTask, where?: string): string {
 export interface MoneyBreakdown {
   /** Everything still live — what the celebration will cost as booked. */
   committed: number;
+  /**
+   * Asked for but not accepted: a sent plan's booking still `pending` with the
+   * vendor. Nothing is promised until they say yes, so it stays out of
+   * `committed`. A draft's bookings aren't counted here — no vendor has been
+   * asked, and the plan shows its whole figure as an estimate.
+   */
+  requested: number;
   /** Paid, held by Jorna, not yet the vendor's. */
   inEscrow: number;
   /** Paid out. */
@@ -528,6 +535,7 @@ export interface MoneyBreakdown {
 export function moneyForBundle(bundle: BundleDetail): MoneyBreakdown {
   const sum: MoneyBreakdown = {
     committed: 0,
+    requested: 0,
     inEscrow: 0,
     released: 0,
     outstanding: 0,
@@ -535,6 +543,7 @@ export function moneyForBundle(bundle: BundleDetail): MoneyBreakdown {
     refunded: 0,
     strandedInEscrow: 0,
   };
+  const draft = isDraftBundle(bundle);
 
   for (const b of bundle.bookings ?? []) {
     const pay = b.payment_status ?? "unpaid";
@@ -558,6 +567,13 @@ export function moneyForBundle(bundle: BundleDetail): MoneyBreakdown {
     // fed the budget comparison.
     if (b.price_pending_quantity) {
       sum.unpricedCount += 1;
+      continue;
+    }
+
+    // Sent, and the vendor hasn't answered. Counting it as committed is how a
+    // plan read "$1,500 committed" before anyone had agreed to anything.
+    if (!draft && b.status === "pending") {
+      sum.requested += price;
       continue;
     }
 
