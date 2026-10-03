@@ -1260,7 +1260,7 @@ export function ServicesManager({
           <p className="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-ink-faint">Services &amp; pricing</p>
           <h2 className="serif mt-1 text-xl text-ink">Your packages</h2>
           <p className="mt-1 text-sm text-ink-soft">
-            Show couples what they can book with you. Each one has its own price and terms.
+            Show clients what they can book with you. Each one has its own price and terms.
           </p>
         </div>
         {editing === null ? (
@@ -1387,7 +1387,7 @@ export function ServicesManager({
                     </ul>
                   ) : (
                     <p className="text-sm text-ink-faint">
-                      Nothing listed yet — add what&apos;s included so couples can compare.
+                      Nothing listed yet — add what&apos;s included so clients can compare.
                     </p>
                   )}
                   <dl className="grid grid-cols-2 overflow-hidden rounded-xl border border-card-edge bg-card text-sm">

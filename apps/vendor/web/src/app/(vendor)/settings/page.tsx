@@ -53,7 +53,7 @@ function PaymentsAndHolds({ vendor, onSaved }: { vendor: VendorDetail; onSaved: 
     const v = venmo.trim();
     const z = zelle.trim();
     if (paymentMethod === "manual" && !v && !z) {
-      setError("Add a Venmo handle or Zelle contact so couples know how to pay you.");
+      setError("Add a Venmo handle or Zelle contact so clients know how to pay you.");
       return;
     }
     const days = holdDays.trim() ? Number(holdDays) : null;
@@ -183,7 +183,7 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-3xl">
-      <PageHeader eyebrow="Account" title="Settings" subtitle="Your account, how couples pay you, and how Jorna works for you." />
+      <PageHeader eyebrow="Account" title="Settings" subtitle="Your account, how clients pay you, and how Jorna works for you." />
 
       {error ? (
         <p role="alert" className="mb-6 rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
@@ -197,7 +197,7 @@ export default function SettingsPage() {
 
       {vendor ? (
         <>
-          <Section title="Payments and holds" hint="Couples pay you directly; these show on every contract you send.">
+          <Section title="Payments and holds" hint="Clients pay you directly; these show on every contract you send.">
             <PaymentsAndHolds vendor={vendor} onSaved={setVendor} />
           </Section>
 

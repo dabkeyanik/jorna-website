@@ -75,16 +75,24 @@ function waitedFor(iso: string): string {
   return `${Math.round(mins / 1440)}d`;
 }
 
+// The same three words on every page ("Copy rules" in apps/vendor/CLAUDE.md). The keys are
+// vendorPlan's; only what a vendor reads changed.
 const TAB_LABEL: Record<BookingTab, string> = {
   deposit_due: "Deposit due",
-  confirmed: "Confirmed",
-  over: "Over",
+  confirmed: "Upcoming",
+  over: "Done",
 };
 const TAB_TONE: Record<BookingTab, Tone> = { deposit_due: "amber", confirmed: "green", over: "grey" };
 
 function initials(name?: string | null): string {
   const parts = (name ?? "").replace(/&/g, " ").split(/\s+/).filter(Boolean);
   return (parts[0]?.[0] ?? "·").toUpperCase() + (parts[1]?.[0] ?? "").toUpperCase();
+}
+
+/** The header's one line: who's waiting on you today, in words. */
+function todayLine(needReply: number): string {
+  if (needReply === 0) return "Nothing needs you today.";
+  return needReply === 1 ? "1 client is waiting on you." : `${needReply} clients are waiting on you.`;
 }
 
 function greeting(now: Date): string {
@@ -123,7 +131,7 @@ function relativeTime(iso?: string | null): string | null {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-const coupleName = (b: VendorBooking) => b.event_name || b.client_name || b.guest_name || "A celebration";
+const clientName = (b: VendorBooking) => b.event_name || b.client_name || b.guest_name || "A celebration";
 
 // ── Cards ────────────────────────────────────────────────────────────
 
@@ -198,7 +206,7 @@ function NextEventCard({
           <span className="rounded-full bg-white/15 px-2.5 py-1 text-[0.7rem] font-semibold tracking-[0.05em]">
             {countdownLabel(b.date_iso)}
           </span>
-          <p className="serif mt-3 text-2xl leading-tight">{coupleName(b)}</p>
+          <p className="serif mt-3 text-2xl leading-tight">{clientName(b)}</p>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/75">
             <span className="flex items-center gap-1.5">
               <Icon name="calendar" size={15} /> {prettyDate(b.date_iso, { weekday: "short", month: "short", day: "numeric" })}
@@ -236,7 +244,7 @@ function LeadsCard({ open, needReply, newThisWeek, oldestWaitingIso }: LeadNumbe
     <Card className="flex min-h-[16.5rem] flex-col p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <Kicker>Open leads</Kicker>
+          <Kicker>Clients you&apos;re talking to</Kicker>
           <p className="serif mt-1 text-[2.5rem] leading-none tracking-[-0.06em] text-ink">{open}</p>
         </div>
         {newThisWeek ? <StatusPill tone="green">+{newThisWeek} this week</StatusPill> : null}
@@ -252,7 +260,7 @@ function LeadsCard({ open, needReply, newThisWeek, oldestWaitingIso }: LeadNumbe
         <p className="mt-2 text-xs text-ink-faint">
           {needReply > 0 && oldestWaitingIso
             ? `Oldest has waited ${waitedFor(oldestWaitingIso)}.`
-            : "Requests, offers and contracts not signed yet."}
+            : "Not signed yet."}
         </p>
       </div>
       <CardLink href="/leads">Review leads</CardLink>
@@ -378,35 +386,33 @@ function BookingsCard({ bookings }: { bookings: VendorBooking[] }) {
       <Card className="h-full p-5">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <Kicker>Your schedule</Kicker>
-            <p className="serif mt-1 text-lg text-ink">Bookings</p>
+            <p className="serif text-lg text-ink">Booked</p>
           </div>
           <FilterTabs<BookingFilter>
-            label="Booking stage"
+            label="Bookings"
             value={filter}
             onChange={setFilter}
             options={[
               { value: "all", label: "All" },
-              { value: "deposit_due", label: "Deposit due", count: count("deposit_due") },
-              { value: "confirmed", label: "Confirmed", count: count("confirmed") },
-              { value: "over", label: "Over", count: count("over") },
+              { value: "deposit_due", label: TAB_LABEL.deposit_due, count: count("deposit_due") },
+              { value: "confirmed", label: TAB_LABEL.confirmed, count: count("confirmed") },
+              { value: "over", label: TAB_LABEL.over, count: count("over") },
             ]}
           />
         </div>
 
-        <dl className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-ink/[0.04] px-4 py-3 text-sm sm:flex sm:items-center sm:gap-8">
-          <div>
-            <dt className="text-xs text-ink-faint">Deposits owed</dt>
-            <dd className="serif text-lg text-ink">{centsToMoney(owed)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-ink-faint">Received this month</dt>
-            <dd className="serif text-lg text-ink">{centsToMoney(received)}</dd>
-          </div>
+        {/* Each figure says what it is in the same line, not under a label. */}
+        <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-ink/[0.04] px-4 py-3 text-sm sm:flex sm:items-center sm:gap-8">
+          <p className="text-ink-soft">
+            <span className="serif text-lg text-ink">{centsToMoney(owed)}</span> waiting to be paid
+          </p>
+          <p className="text-ink-soft">
+            <span className="serif text-lg text-ink">{centsToMoney(received)}</span> paid this month
+          </p>
           <Link href="/my-earnings" className="col-span-2 flex items-center gap-1 text-xs font-semibold text-gold sm:ml-auto">
             View earnings <Icon name="chevron" size={14} />
           </Link>
-        </dl>
+        </div>
 
         <ul className="mt-3">
           {shown.map(({ b, tab }) => (
@@ -416,10 +422,10 @@ function BookingsCard({ bookings }: { bookings: VendorBooking[] }) {
                 className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 border-t border-line-soft px-1.5 py-3 text-ink-soft transition hover:bg-panel/50 sm:grid-cols-[auto_minmax(0,1fr)_7rem_6.5rem_auto]"
               >
                 <span className="grid size-9 place-items-center rounded-full bg-maroon/10 text-[0.7rem] font-bold text-maroon dark:bg-gold/15 dark:text-gold">
-                  {initials(coupleName(b))}
+                  {initials(clientName(b))}
                 </span>
                 <span className="grid min-w-0">
-                  <strong className="truncate text-sm text-ink">{coupleName(b)}</strong>
+                  <strong className="truncate text-sm text-ink">{clientName(b)}</strong>
                   <small className="truncate text-xs text-ink-faint">{b.service_name}</small>
                 </span>
                 <span className="hidden text-xs text-ink-faint sm:block">{prettyDate(b.date_iso) ?? "Date TBD"}</span>
@@ -458,10 +464,7 @@ function InboxCard({ conversations }: { conversations: ConversationSummary[] }) 
     <section aria-label="Inbox">
       <Card className="flex h-full flex-col p-5">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <Kicker>Inbox</Kicker>
-            <p className="serif mt-1 text-lg text-ink">Messages</p>
-          </div>
+          <p className="serif text-lg text-ink">Messages</p>
           <Link href="/messages" className="text-xs font-semibold text-gold">
             View all
           </Link>
@@ -612,7 +615,7 @@ function OverviewInner() {
       <PageHeader
         eyebrow={now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
         title={firstName ? `${greeting(now)}, ${firstName}` : greeting(now)}
-        subtitle="Here's what's happening with your business."
+        subtitle={todayLine(leads.needReply)}
         action={<PrimaryAction href="/contracts/new">New contract</PrimaryAction>}
       />
 

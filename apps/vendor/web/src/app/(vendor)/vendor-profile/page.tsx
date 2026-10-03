@@ -182,11 +182,11 @@ export default function VendorProfilePage() {
       <PageHeader
         eyebrow="Public presence"
         title="Vendor profile"
-        subtitle="What couples see when they find you — your packages and your story."
+        subtitle="What clients see when they find you — your packages and your story."
         action={<PrimaryAction onClick={() => packagesRef.current?.startNew()}>Add package</PrimaryAction>}
       />
 
-      {/* The design's identity card: who couples see, and a way to look. */}
+      {/* The design's identity card: who clients see, and a way to look. */}
       <section className="overflow-hidden rounded-2xl border border-card-edge bg-card shadow-[var(--shadow-card)]">
         <div className="relative h-24 bg-[#641f34] [background-image:radial-gradient(circle_at_85%_20%,#9b5365_0,transparent_40%),radial-gradient(circle_at_10%_100%,#3b0f1b_0,transparent_55%)]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4 px-5 pb-5 pt-12 sm:px-6">
@@ -219,7 +219,7 @@ export default function VendorProfilePage() {
         <section className="mt-9">
         <p className="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-ink-faint">Profile details</p>
         <h2 className="serif mt-1 text-xl text-ink">About your business</h2>
-        <p className="mt-1 text-sm text-ink-soft">Help couples understand your style, story and where you&apos;ll travel.</p>
+        <p className="mt-1 text-sm text-ink-soft">Help clients understand your style, story and where you&apos;ll travel.</p>
         <Card className="mt-4 p-6">
           <div className="grid gap-4">
             <VendorIdentityFields
