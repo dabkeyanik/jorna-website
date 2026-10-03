@@ -136,6 +136,30 @@ function bundle(bookings: BundleBooking[]): BundleDetail {
 }
 
 describe("moneyForBundle — where a plan's money actually is", () => {
+  it("keeps a sent request the vendor hasn't answered out of committed (#102)", () => {
+    const cash = moneyForBundle(bundle([booking({ status: "pending", price: 1500 })]));
+    expect(cash.committed).toBe(0);
+    expect(cash.requested).toBe(1500);
+    expect(cash.outstanding).toBe(0);
+  });
+
+  it("moves a request into committed once the vendor accepts", () => {
+    const cash = moneyForBundle(
+      bundle([
+        booking({ booking_id: "b1", status: "pending", price: 1500 }),
+        booking({ booking_id: "b2", status: "approved", price: 800 }),
+      ]),
+    );
+    expect(cash.committed).toBe(800);
+    expect(cash.requested).toBe(1500);
+  });
+
+  it("counts a draft's bookings as its estimate, not as requested", () => {
+    const cash = moneyForBundle({ ...bundle([booking({ status: "pending" })]), status: "draft" });
+    expect(cash.committed).toBe(100);
+    expect(cash.requested).toBe(0);
+  });
+
   it("counts an approved, unpaid booking as outstanding (baseline, unchanged)", () => {
     const cash = moneyForBundle(bundle([booking({ status: "approved" })]));
     expect(cash.outstanding).toBe(100);

@@ -102,6 +102,7 @@ interface Celebration {
 
 const ZERO_MONEY: MoneyBreakdown = {
   committed: 0,
+  requested: 0,
   inEscrow: 0,
   released: 0,
   outstanding: 0,
@@ -231,8 +232,11 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
   // frequently the largest. Reporting "$5,240 of $40,000" on a celebration
   // heading for $60,000 is worse than reporting nothing.
   const unpriced = celebration.money.unpricedCount;
+  // Against everything asked for, not just what's agreed: a plan sent out
+  // over budget is over budget whether or not the vendors have answered yet.
+  const { committed, requested } = celebration.money;
   const overBudget =
-    budget != null && unpriced === 0 && celebration.money.committed > budget;
+    budget != null && unpriced === 0 && committed + requested > budget;
 
   return (
     <Card
@@ -312,9 +316,17 @@ function CelebrationCard({ celebration }: { celebration: Celebration }) {
           <p className="text-xs text-ink-soft">
             {/* A draft has committed to nothing — no vendor has been asked,
                 and the figure is a sum of listed rates the client can still
-                change. "Estimated" is what it is until the plan is sent. */}
-            {money(celebration.money.committed)}{" "}
-            {stage === "draft" ? "estimated" : "committed"}
+                change. "Estimated" is what it is until the plan is sent.
+                Once sent, requests the vendors haven't answered aren't
+                committed either: "$1,500 committed" read as a promise nobody
+                had made (#102). */}
+            {committed > 0 || requested === 0 ? (
+              <>
+                {money(committed)} {stage === "draft" ? "estimated" : "committed"}
+                {requested > 0 ? " · " : null}
+              </>
+            ) : null}
+            {requested > 0 ? <>{money(requested)} requested</> : null}
             {unpriced > 0 ? <span className="text-ink-faint"> so far</span> : null}
             {celebration.budget ? (
               <span className={overBudget ? "text-maroon dark:text-gold" : "text-ink-faint"}>
