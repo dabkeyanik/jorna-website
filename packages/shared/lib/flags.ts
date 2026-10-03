@@ -7,3 +7,10 @@
 // MVP: Venmo/Zelle is the only payment option shown anywhere a vendor sets
 // one up or a client sees one.
 export const ESCROW_ENABLED = process.env.NEXT_PUBLIC_ESCROW_ENABLED !== "false";
+
+// Web push. Off until it's switched back on: the backend's Firebase
+// credentials were removed from production on 2026-09-29 (no devices were
+// registered), so an opt-in would register a browser that never hears
+// anything. Turning it back on needs FIREBASE_CREDENTIALS_JSON on the backend
+// first (jorna-backend docs/STAGING.md), then NEXT_PUBLIC_PUSH_ENABLED=true here.
+export const PUSH_ENABLED = process.env.NEXT_PUBLIC_PUSH_ENABLED === "true";

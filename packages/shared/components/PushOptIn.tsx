@@ -56,7 +56,8 @@ export function PushOptIn({ showWhenOn = false }: { showWhenOn?: boolean } = {})
 
   // Can't do push here — explain why rather than vanishing.
   if (!avail.ok) {
-    if (avail.reason === "unconfigured") return null; // dev misconfig, not user-facing
+    // Switched off, or a dev misconfig: nothing the user can act on.
+    if (avail.reason === "off" || avail.reason === "unconfigured") return null;
     const msg =
       avail.reason === "ios-add-to-home"
         ? "To get notifications on iPhone or iPad, open Jorna from your Home Screen — tap Share, then “Add to Home Screen” (needs iOS 16.4+), and open it from that icon."
