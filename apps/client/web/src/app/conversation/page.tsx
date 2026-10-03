@@ -130,16 +130,16 @@ function ConversationInner() {
     });
   }, []);
 
-  const loadMessages = useCallback(async () => {
-    if (!conversationId) return;
-    try {
-      const res = await getConversationMessages(conversationId, { limit: 100 });
-      upsert(res.items);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't load this conversation.");
-    } finally {
-      setLoading(false);
-    }
+  // A promise chain, not async/await: state is only set once the request
+  // settles, so the effect below never updates state synchronously.
+  const loadMessages = useCallback(() => {
+    if (!conversationId) return Promise.resolve();
+    return getConversationMessages(conversationId, { limit: 100 })
+      .then(
+        (res) => upsert(res.items),
+        (err) => setError(err instanceof ApiError ? err.message : "Couldn't load this conversation."),
+      )
+      .finally(() => setLoading(false));
   }, [conversationId, upsert]);
 
   // Who this is with, and what it's about. Fetched once — it doesn't change

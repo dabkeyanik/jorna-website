@@ -4,7 +4,7 @@
 // on /account and on the vendor app's Settings page, so they're written once.
 // The caller owns the signed-out redirect; this renders nothing without a user.
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@jorna/shared/lib/api";
 import { changePassword, updateMe, uploadAvatar } from "@/lib/jorna";
@@ -34,14 +34,18 @@ export function AccountSettings({ loginNext }: { loginNext: string }) {
   const [changingPw, setChangingPw] = useState(false);
   const [pwErr, setPwErr] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!user) return;
+  // Refill the form whenever the signed-in user changes (sign-in, or the
+  // saved profile coming back) — during render, not in an effect, so the
+  // form never paints a frame with the previous values.
+  const [filledFrom, setFilledFrom] = useState<typeof user>(null);
+  if (user && user !== filledFrom) {
+    setFilledFrom(user);
     setFName(user.f_name ?? "");
     setLName(user.l_name ?? "");
     setEmail(user.email ?? "");
     setPhone(user.phone ?? "");
     setLocation(user.location ?? "");
-  }, [user]);
+  }
 
   if (!user) return null;
 

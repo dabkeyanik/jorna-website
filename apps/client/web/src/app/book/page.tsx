@@ -50,7 +50,11 @@ function BookInner() {
   const [timeEnd, setTimeEnd] = useState("");
   // Cleared whenever the times change, so acknowledging one overnight window
   // doesn't silently carry over to a different pair of times.
-  const [overnightAck, setOvernightAck] = useState(false);
+  // The overnight acknowledgement holds for the times it was given for;
+  // changing either time asks again, without an effect to reset it.
+  const [ackedTimes, setAckedTimes] = useState<string | null>(null);
+  const overnightAck = ackedTimes === `${timeStart}-${timeEnd}`;
+  const setOvernightAck = (ack: boolean) => setAckedTimes(ack ? `${timeStart}-${timeEnd}` : null);
   const [location, setLocation] = useState("");
   const [guests, setGuests] = useState("");
   const [performers, setPerformers] = useState("");
@@ -60,7 +64,9 @@ function BookInner() {
   // they're starting a new plan and there was nothing to inherit.
   const [filledFrom, setFilledFrom] = useState<string[] | null>(null);
   const [draftBusy, setDraftBusy] = useState(false);
-  const [dateConflict, setDateConflict] = useState(false);
+  // The availability check's answer, kept with the question it answers: a
+  // different date or time reads as no conflict until its own answer lands.
+  const [conflictCheck, setConflictCheck] = useState<{ key: string; conflict: boolean } | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -68,31 +74,28 @@ function BookInner() {
     }
   }, [authLoading, user, router, serviceId]);
 
-  useEffect(() => {
-    setOvernightAck(false);
-  }, [timeStart, timeEnd]);
-
   // A soft warning, not a hard block: lib/availability's own notes say this
   // endpoint fails open (untyped, often empty), so a wrong guess about the
   // shape must cost a missed warning, never a client wrongly blocked from
   // sending a request the vendor could actually take.
+  const conflictKey = service && dateIso
+    ? [service.vendor_id, dateIso, (multiDay && dateEnd) || dateIso, timeStart, timeEnd].join("|")
+    : null;
   useEffect(() => {
-    if (!service || !dateIso) {
-      setDateConflict(false);
-      return;
-    }
+    if (!service || !dateIso || !conflictKey) return;
     let cancelled = false;
     getVendorAvailability(service.vendor_id, dateIso, (multiDay && dateEnd) || dateIso)
       .then((avail) => {
         if (cancelled) return;
         const window = timeStart && timeEnd ? { start: timeStart, end: timeEnd } : null;
-        setDateConflict(hasConflictOn(avail, dateIso, window));
+        setConflictCheck({ key: conflictKey, conflict: hasConflictOn(avail, dateIso, window) });
       })
-      .catch(() => !cancelled && setDateConflict(false));
+      .catch(() => !cancelled && setConflictCheck({ key: conflictKey, conflict: false }));
     return () => {
       cancelled = true;
     };
-  }, [service, dateIso, dateEnd, multiDay, timeStart, timeEnd]);
+  }, [service, dateIso, dateEnd, multiDay, timeStart, timeEnd, conflictKey]);
+  const dateConflict = conflictKey !== null && conflictCheck?.key === conflictKey && conflictCheck.conflict;
 
   useEffect(() => {
     if (!serviceId || !user) return;

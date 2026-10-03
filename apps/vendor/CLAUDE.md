@@ -134,11 +134,12 @@ exercise it. Add a spec next to the existing ones (`home`, `auth`,
 check — favor the ones with real logic (gating, redirects, status-dependent
 rendering) over pure layout.
 
-Note: `web/eslint.config.mjs` downgrades `react-hooks/set-state-in-effect`
-to a warning rather than error — see the comment there and
-[issue #2](https://github.com/jornaevents-commits/jorna-website/issues/2) before
-"fixing" any of those warnings casually; each one needs individual review; a
-blanket rewrite risks changing auth/booking/payment behavior.
+Note: `react-hooks/set-state-in-effect` is an error (it was a warning until
+[issue #2](https://github.com/jornaevents-commits/jorna-website/issues/2) was
+worked through). Don't set state synchronously in an effect: derive it during
+render, keep a loaded value with the key it was loaded for (see `nav.tsx`'s
+badges or `app/vendor/page.tsx`), or set it only when a promise settles (write
+the load as a `.then` chain — the rule doesn't follow `await`).
 
 ## Issue & work tracking
 

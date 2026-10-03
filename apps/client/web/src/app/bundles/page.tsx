@@ -421,21 +421,22 @@ function DashboardInner() {
     if (!authLoading && !user) router.replace("/login?next=/bundles");
   }, [authLoading, user, router]);
 
-  const load = useCallback(async () => {
-    if (!user) return;
-    try {
-      // An events failure shouldn't empty the dashboard — bundles are the part
-      // that always exists, so a missing event list just costs the join.
-      const [bundles, events] = await Promise.all([
-        listBundles(),
-        listEvents().catch(() => [] as EventItem[]),
-      ]);
-      setCelebrations(toCelebrations(events, bundles));
-      setError(null);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't load your celebrations.");
-      setCelebrations([]);
-    }
+  // A promise chain, not async/await: state is only set once the requests
+  // settle, so the mount effect below never updates state synchronously.
+  const load = useCallback(() => {
+    if (!user) return Promise.resolve();
+    // An events failure shouldn't empty the dashboard — bundles are the part
+    // that always exists, so a missing event list just costs the join.
+    return Promise.all([listBundles(), listEvents().catch(() => [] as EventItem[])]).then(
+      ([bundles, events]) => {
+        setCelebrations(toCelebrations(events, bundles));
+        setError(null);
+      },
+      (err) => {
+        setError(err instanceof ApiError ? err.message : "Couldn't load your celebrations.");
+        setCelebrations([]);
+      },
+    );
   }, [user]);
 
   useEffect(() => {
