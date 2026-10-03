@@ -14,7 +14,7 @@ import { Icon, type IconName } from "@/components/vendor/Icon";
 
 // ── Page header ──────────────────────────────────────────────────────
 
-const primaryClass =
+export const primaryClass =
   "inline-flex h-10 shrink-0 items-center gap-2 rounded-[11px] bg-maroon px-4 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(91,27,43,0.2)] transition hover:brightness-110 disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold";
 
 /** The one primary button a page header carries ("New contract", "New lead", …). */

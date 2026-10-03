@@ -26,8 +26,9 @@ import { guestBookingLink, guestBookingPreviewLink } from "@/lib/contractLink";
 import { deleteTemplate, loadTemplates, templatesOfKind } from "@/lib/contractTemplates";
 import { KIND_LABEL } from "@/lib/attachedDocuments";
 import { Button } from "@jorna/shared/components/ui";
-import { Drawer, FilterTabs, PageHeader, PrimaryAction, StatusPill, type Tone } from "@/components/vendor/ui";
+import { Drawer, FilterTabs, PageHeader, StatusPill, type Tone } from "@/components/vendor/ui";
 import { Icon } from "@/components/vendor/Icon";
+import { NewMenu } from "@/components/vendor/NewMenu";
 
 /** The plan's statuses: Draft, Sent, Viewed, Signed, Deposit due, Paid,
  *  Expired, Declined, Void — plus the two where the couple says they've paid
@@ -318,7 +319,7 @@ export default function ContractsPage() {
         eyebrow="Document workspace"
         title="Contracts"
         subtitle="Create, send and manage every client agreement in one place."
-        action={<PrimaryAction href="/contracts/new">New contract</PrimaryAction>}
+        action={<NewMenu />}
       />
 
       <section aria-label="Template gallery">

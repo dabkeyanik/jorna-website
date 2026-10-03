@@ -34,8 +34,9 @@ import type { Contract, Pipeline, PipelineItem } from "@/lib/types";
 import { Button } from "@jorna/shared/components/ui";
 import { NegotiationPanel } from "@/components/NegotiationPanel";
 import { NegotiationPanel as ContractNegotiation } from "@/components/negotiation/NegotiationPanel";
-import { Drawer, FilterTabs, PageHeader, PrimaryAction, StatTile, StatusPill, type Tone } from "@/components/vendor/ui";
+import { Drawer, FilterTabs, PageHeader, StatTile, StatusPill, type Tone } from "@/components/vendor/ui";
 import { Icon } from "@/components/vendor/Icon";
+import { NewMenu } from "@/components/vendor/NewMenu";
 
 type Filter = "all" | "inquiry" | "negotiation" | "archived";
 type Sort = "recent" | "upcoming" | "value";
@@ -593,7 +594,16 @@ function LeadsInner() {
         eyebrow="Sales pipeline"
         title="Leads"
         subtitle="Everyone you're talking to who hasn't signed yet."
-        action={<PrimaryAction href="/contracts/new">New lead</PrimaryAction>}
+        action={
+          <NewMenu
+            first="client"
+            onClientAdded={(lead) => {
+              setNotice(`${lead.name} is on your leads as an inquiry.`);
+              setFilter("all");
+              setTick((n) => n + 1);
+            }}
+          />
+        }
       />
 
       {notice ? (

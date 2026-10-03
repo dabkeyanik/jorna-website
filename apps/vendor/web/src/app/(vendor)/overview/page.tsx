@@ -27,8 +27,9 @@ import {
 } from "@/lib/vendorPlan";
 import type { ConversationSummary, Lead, Pipeline, VendorBooking, VendorDetail } from "@/lib/types";
 import { Button, Card } from "@jorna/shared/components/ui";
-import { FilterTabs, PageHeader, PrimaryAction, StatusPill, type Tone } from "@/components/vendor/ui";
+import { FilterTabs, PageHeader, StatusPill, type Tone } from "@/components/vendor/ui";
 import { Icon } from "@/components/vendor/Icon";
+import { NewMenu } from "@/components/vendor/NewMenu";
 
 interface Snapshot {
   vendor: VendorDetail;
@@ -616,7 +617,7 @@ function OverviewInner() {
         eyebrow={now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
         title={firstName ? `${greeting(now)}, ${firstName}` : greeting(now)}
         subtitle={todayLine(leads.needReply)}
-        action={<PrimaryAction href="/contracts/new">New contract</PrimaryAction>}
+        action={<NewMenu />}
       />
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-2 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,0.8fr)_minmax(0,1.05fr)]">
