@@ -72,7 +72,13 @@ test.describe("vendor overview (/overview)", () => {
     await page.goto("overview/");
 
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Priya");
-    await expect(page.getByRole("link", { name: "New contract" })).toHaveAttribute("href", /\/contracts\/new\/?$/);
+    // One "New" button; on Overview the contract comes first.
+    await page.getByRole("button", { name: "New", exact: true }).click();
+    const first = page.getByRole("menu", { name: "New" }).getByRole("menuitem").first();
+    await expect(first).toContainText("Send a contract");
+    await expect(first).toHaveAttribute("href", /\/contracts\/new\/?$/);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu", { name: "New" })).toHaveCount(0);
 
     // The request and the informal lead are both open; both wait on a reply,
     // and the header says so in words.

@@ -97,7 +97,6 @@ test.describe("vendor leads (/leads)", () => {
     await page.goto("leads/");
 
     await expect(page.getByRole("heading", { name: "Leads", level: 1 })).toBeVisible();
-    await expect(page.getByRole("link", { name: "New lead" })).toHaveAttribute("href", /\/contracts\/new\/?$/);
     const list = page.getByRole("region", { name: "Pipeline" });
     await expect(list.getByText("Meera Shah")).toBeVisible();
     await expect(list.getByText("Needs your attention").first()).toBeVisible();
@@ -241,5 +240,36 @@ test.describe("vendor leads (/leads)", () => {
     await expect(page.getByText("Archived.")).toBeVisible();
     expect(api.requestsTo("POST", "/bookings/b1/archive")[0].body).toMatchObject({ archived: true });
     expect(api.requestsTo("PUT", "/bookings/b1/status")).toHaveLength(0);
+  });
+  test("New on Leads offers Add a client first, and adds one as an inquiry", async ({ page, api }) => {
+    await loginAs(page, api);
+    mockLeads(api);
+    api.post("/leads", { lead_id: "lead-new", vendor_id: "v1", name: "Kiran Mehta", email: "kiran@example.com" });
+
+    await page.goto("leads/");
+    await page.getByRole("button", { name: "New", exact: true }).click();
+    const items = page.getByRole("menu", { name: "New" }).getByRole("menuitem");
+    await expect(items.first()).toContainText("Add a client");
+    await expect(items.nth(1)).toHaveAttribute("href", /\/contracts\/new\/?$/);
+
+    await items.first().click();
+    const drawer = page.getByRole("dialog");
+    await drawer.getByLabel("Name", { exact: true }).fill("Kiran Mehta");
+    // A client you can't reach isn't a lead.
+    await drawer.getByRole("button", { name: "Add client" }).click();
+    await expect(drawer.getByRole("alert")).toContainText("email or a phone number");
+    expect(api.requestsTo("POST", "/leads")).toHaveLength(0);
+
+    await drawer.getByLabel("Email", { exact: true }).fill("kiran@example.com");
+    await drawer.getByLabel("Event date").fill("2027-06-12");
+    await drawer.getByRole("button", { name: "Add client" }).click();
+
+    await expect(page.getByText("Kiran Mehta is on your leads as an inquiry.")).toBeVisible();
+    expect(api.requestsTo("POST", "/leads")[0].body).toMatchObject({
+      name: "Kiran Mehta",
+      email: "kiran@example.com",
+      phone: null,
+      event_date_iso: "2027-06-12",
+    });
   });
 });

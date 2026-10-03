@@ -41,8 +41,9 @@ import { eventIsOver, formatCheckInTime, type VendorBooking, type VendorDetail }
 import { Button } from "@jorna/shared/components/ui";
 import { DateChangeRequest } from "@/components/DateChangeRequest";
 import { MessageVendorButton } from "@/components/MessageVendorButton";
-import { FilterTabs, PageHeader, PrimaryAction, StatTile, StatusPill, type Tone } from "@/components/vendor/ui";
+import { FilterTabs, PageHeader, StatTile, StatusPill, type Tone } from "@/components/vendor/ui";
 import { Icon } from "@/components/vendor/Icon";
+import { NewMenu } from "@/components/vendor/NewMenu";
 
 // The same three words as Overview ("Copy rules" in apps/vendor/CLAUDE.md).
 const TAB: Record<BookingTab, { label: string; tone: Tone }> = {
@@ -438,7 +439,7 @@ function BookingsInner() {
         eyebrow="Event management"
         title="Bookings"
         subtitle="Every celebration from signature to final payment."
-        action={<PrimaryAction href="/contracts/new">New booking</PrimaryAction>}
+        action={<NewMenu />}
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
