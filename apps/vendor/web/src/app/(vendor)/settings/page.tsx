@@ -11,7 +11,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@jorna/shared/lib/api";
-import { ESCROW_ENABLED } from "@jorna/shared/lib/flags";
+import { ESCROW_ENABLED, PUSH_ENABLED } from "@jorna/shared/lib/flags";
 import { getCalendarStatus, getMyVendor, updateMyVendor } from "@/lib/jorna";
 import type { CalendarStatus, VendorDetail } from "@/lib/types";
 import { Button, Card, Field } from "@jorna/shared/components/ui";
@@ -211,9 +211,13 @@ export default function SettingsPage() {
         </>
       ) : null}
 
-      <Section title="Notifications">
-        <PushOptIn showWhenOn />
-      </Section>
+      {/* The opt-in renders nothing while push is off; an empty section would
+          read as broken (#101). */}
+      {PUSH_ENABLED ? (
+        <Section title="Notifications">
+          <PushOptIn showWhenOn />
+        </Section>
+      ) : null}
 
       <Section title="Theme">
         <ThemePicker />

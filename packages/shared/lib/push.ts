@@ -10,6 +10,7 @@
 
 import { firebaseConfig, VAPID_PUBLIC_KEY, firebasePushConfigured } from "./firebaseConfig";
 import { apiFetch } from "./api";
+import { PUSH_ENABLED } from "./flags";
 
 const SW_URL = "/app/firebase-messaging-sw.js";
 const SW_SCOPE = "/app/";
@@ -18,13 +19,14 @@ const LOCAL_TOKEN_KEY = "jorna_push_token";
 export type PermissionState = NotificationPermission | "unsupported";
 
 // Why push isn't available — so the UI can explain instead of vanishing.
+//   off             — switched off for this build (PUSH_ENABLED); not user-facing
 //   unconfigured    — Firebase values not filled in (dev only; not user-facing)
 //   insecure        — not an https / secure context
 //   ios-add-to-home — iOS, but not launched from a Home Screen install (16.4+)
 //   unsupported     — browser lacks the APIs / FCM isn't supported here
 export type PushAvailability =
   | { ok: true }
-  | { ok: false; reason: "unconfigured" | "insecure" | "ios-add-to-home" | "unsupported" };
+  | { ok: false; reason: "off" | "unconfigured" | "insecure" | "ios-add-to-home" | "unsupported" };
 
 function isIOS(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -43,6 +45,7 @@ function isStandalone(): boolean {
 
 /** Whether this browser can do web push right now, and if not, why. */
 export async function pushAvailability(): Promise<PushAvailability> {
+  if (!PUSH_ENABLED) return { ok: false, reason: "off" };
   if (!firebasePushConfigured) return { ok: false, reason: "unconfigured" };
   if (typeof window === "undefined") return { ok: false, reason: "unsupported" };
   if (!window.isSecureContext) return { ok: false, reason: "insecure" };
