@@ -64,12 +64,12 @@ test.describe("vendor bookings (/my-bookings)", () => {
     await expect(list.getByText("Priya's Wedding")).toHaveCount(0);
     await expect(page.getByRole("tab", { name: /Deposit due/ })).toContainText("1");
 
-    await page.getByRole("tab", { name: /Confirmed/ }).click();
+    await page.getByRole("tab", { name: /Upcoming/ }).click();
     await expect(list.getByText("Riya & Kabir")).toBeVisible();
     await expect(list.getByText("Meera & Arjun")).toHaveCount(0);
   });
 
-  test("Over keeps every past event, paid or not, and says which", async ({ page, api }) => {
+  test("Done keeps every past event, paid or not, and says which", async ({ page, api }) => {
     await loginAs(page, api);
     const vendor = mockVendorDetail();
     api.get("/vendors/me", vendor);
@@ -98,9 +98,9 @@ test.describe("vendor bookings (/my-bookings)", () => {
 
     await page.goto("my-bookings/");
 
-    await expect(page.getByRole("tab", { name: /Over/ })).toContainText("2");
+    await expect(page.getByRole("tab", { name: /Done/ })).toContainText("2");
     await expect(page.getByText("1 with a balance due")).toBeVisible();
-    await page.getByRole("tab", { name: /Over/ }).click();
+    await page.getByRole("tab", { name: /Done/ }).click();
     const list = page.getByRole("region", { name: "Booking list" });
     const owed = list.getByRole("button", { name: /Asha & Dev/ });
     const paid = list.getByRole("button", { name: /Nisha & Rahul/ });

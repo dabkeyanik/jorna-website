@@ -179,7 +179,7 @@ function EarningsInner() {
       <PageHeader
         eyebrow="Money"
         title="Earnings"
-        subtitle="What you've been paid, what's on its way, and how couples pay you."
+        subtitle="What you've been paid, what's on its way, and how clients pay you."
       />
 
       {error ? (

@@ -2,7 +2,7 @@
 
 // Bookings (plan step 3 of the 2026-10 redesign): what's been agreed — a
 // contract signed, or a marketplace request accepted before contracts. Tabs
-// are lib/vendorPlan's bookingTab (Deposit due / Confirmed / Over), the same
+// are lib/vendorPlan's bookingTab (shown as Deposit due / Upcoming / Done), the same
 // ones Overview shows. Requests and unsigned offers live on Leads.
 //
 // Each row expands to the design's five-step progress, the event's details,
@@ -44,15 +44,16 @@ import { MessageVendorButton } from "@/components/MessageVendorButton";
 import { FilterTabs, PageHeader, PrimaryAction, StatTile, StatusPill, type Tone } from "@/components/vendor/ui";
 import { Icon } from "@/components/vendor/Icon";
 
+// The same three words as Overview ("Copy rules" in apps/vendor/CLAUDE.md).
 const TAB: Record<BookingTab, { label: string; tone: Tone }> = {
   deposit_due: { label: "Deposit due", tone: "amber" },
-  confirmed: { label: "Confirmed", tone: "green" },
-  over: { label: "Over", tone: "grey" },
+  confirmed: { label: "Upcoming", tone: "green" },
+  over: { label: "Done", tone: "grey" },
 };
 
 type Filter = "all" | BookingTab;
 
-const couple = (b: VendorBooking) => b.event_name || b.client_name || b.guest_name || "A celebration";
+const eventName = (b: VendorBooking) => b.event_name || b.client_name || b.guest_name || "A celebration";
 const clientName = (b: VendorBooking) => b.client_name || b.guest_name || "Your client";
 
 function initials(name: string): string {
@@ -441,12 +442,12 @@ function BookingsInner() {
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatTile icon="clock" tone="amber" label="Deposit due" value={count("deposit_due")} note="Signed, deposit not in" />
-        <StatTile icon="bookings" tone="green" label="Confirmed" value={count("confirmed")} note="Upcoming events" />
+        <StatTile icon="clock" tone="amber" label={TAB.deposit_due.label} value={count("deposit_due")} note="Signed, deposit not in" />
+        <StatTile icon="bookings" tone="green" label={TAB.confirmed.label} value={count("confirmed")} note="Deposit in, event ahead" />
         <StatTile
           icon="sparkles"
           tone="grey"
-          label="Over"
+          label={TAB.over.label}
           value={count("over")}
           note={balancesDue ? `${balancesDue} with a balance due` : "Past events"}
         />
@@ -467,14 +468,14 @@ function BookingsInner() {
           </div>
           <div className="min-w-0 max-w-full">
             <FilterTabs<Filter>
-              label="Booking stage"
+              label="Bookings"
               value={filter}
               onChange={setFilter}
               options={[
                 { value: "all", label: "All", count: rows.length },
-                { value: "deposit_due", label: "Deposit due", count: count("deposit_due") },
-                { value: "confirmed", label: "Confirmed", count: count("confirmed") },
-                { value: "over", label: "Over", count: count("over") },
+                { value: "deposit_due", label: TAB.deposit_due.label, count: count("deposit_due") },
+                { value: "confirmed", label: TAB.confirmed.label, count: count("confirmed") },
+                { value: "over", label: TAB.over.label, count: count("over") },
               ]}
             />
           </div>
@@ -499,10 +500,10 @@ function BookingsInner() {
                   className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-3 px-3.5 py-3 text-left md:grid-cols-[auto_minmax(0,1fr)_8rem_minmax(0,1fr)_7rem_6rem_auto]"
                 >
                   <span className="grid size-10 place-items-center rounded-full bg-maroon/10 text-xs font-bold text-maroon dark:bg-gold/15 dark:text-gold">
-                    {initials(couple(b))}
+                    {initials(eventName(b))}
                   </span>
                   <span className="grid min-w-0">
-                    <strong className="truncate text-sm text-ink">{couple(b)}</strong>
+                    <strong className="truncate text-sm text-ink">{eventName(b)}</strong>
                     <small className="truncate text-xs text-ink-faint">{b.service_name}</small>
                   </span>
                   <span className="hidden min-w-0 md:grid">
@@ -555,7 +556,7 @@ function BookingsInner() {
         {shown.length === 0 ? (
           <p className="py-14 text-center text-sm text-ink-faint">
             {rows.length === 0
-              ? "No bookings yet. A booking appears here once the couple signs their contract — requests and offers are on Leads."
+              ? "No bookings yet. A booking appears here once the client signs their contract — requests and offers are on Leads."
               : "No bookings in this category."}
           </p>
         ) : null}

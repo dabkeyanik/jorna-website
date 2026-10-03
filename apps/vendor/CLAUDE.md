@@ -81,6 +81,23 @@ docs/               architecture docs (read before cross-cutting changes)
   ship with a bare `wrangler deploy` — use `npm run deploy` (see
   `docs/DECISIONS.md` for why).
 
+## Copy rules (vendor pages)
+
+Agreed 2026-10-03. Vendor pages should read like a person talking: what's
+happening, and what the vendor needs to do.
+
+- Name the client and the action, not the system state ("Priya sent
+  changes", not "Changes proposed").
+- One word per idea. The customer is a **client** everywhere, never
+  "couple" (events aren't all weddings). Booking stages are **Deposit due**,
+  **Upcoming** and **Done** on every page; `vendorPlan`'s `BookingTab` keys
+  (`deposit_due`, `confirmed`, `over`) are internal and don't change. The
+  Leads page keeps its name and its Inquiries / Negotiations tabs.
+- No kicker + title pairs that say the same thing twice ("Inbox" over
+  "Messages").
+- Numbers come with their noun ("$1,700 waiting to be paid"), not a bare
+  figure under a label.
+
 ## Commands
 
 ```bash

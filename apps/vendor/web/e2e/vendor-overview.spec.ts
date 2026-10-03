@@ -29,7 +29,7 @@ function mockOverview(api: import("./support/api-mock").ApiMock) {
       }),
       // A marketplace request: a lead waiting on the vendor, not a booking.
       mockVendorBooking({ booking_id: "request", event_name: "Priya's Wedding", status: "pending", date_iso: isoInDays(40) }),
-      // Happened, not paid off: stays under Over.
+      // Happened, not paid off: stays under Done.
       mockVendorBooking({
         booking_id: "past",
         event_name: "Sana & Omar",
@@ -74,7 +74,9 @@ test.describe("vendor overview (/overview)", () => {
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Priya");
     await expect(page.getByRole("link", { name: "New contract" })).toHaveAttribute("href", /\/contracts\/new\/?$/);
 
-    // The request and the informal lead are both open; both wait on a reply.
+    // The request and the informal lead are both open; both wait on a reply,
+    // and the header says so in words.
+    await expect(page.getByText("2 clients are waiting on you.")).toBeVisible();
     await expect(page.getByText("2 need your reply")).toBeVisible();
     // Only the request came in this week; the lead has waited longest.
     await expect(page.getByText("+1 this week")).toBeVisible();
@@ -86,10 +88,11 @@ test.describe("vendor overview (/overview)", () => {
     const bookings = page.getByRole("region", { name: "Bookings" });
     await expect(page.getByRole("tab", { name: /Deposit due/ })).toContainText("1");
     await expect(page.getByText("$750")).toBeVisible();
+    await expect(bookings.getByText("waiting to be paid")).toBeVisible();
     // The request isn't a booking yet.
     await expect(bookings.getByText("Priya's Wedding")).toHaveCount(0);
 
-    await page.getByRole("tab", { name: /Over/ }).click();
+    await page.getByRole("tab", { name: /Done/ }).click();
     await expect(bookings.getByText("Sana & Omar")).toBeVisible();
     await expect(bookings.getByText("Meera & Arjun")).toHaveCount(0);
 

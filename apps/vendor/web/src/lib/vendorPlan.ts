@@ -1023,7 +1023,8 @@ export function calendarMonth(
 
 /**
  * A booking's tab on the Overview card (and, from plan step 3, the Bookings
- * page): Deposit due, Confirmed, or Over. A booking exists once it's agreed —
+ * page): Deposit due, Confirmed, or Over, which vendors read as Deposit due,
+ * Upcoming and Done (2026-10-03 copy pass). A booking exists once it's agreed —
  * a contract signed, or a marketplace request accepted — so anything before
  * that (a lead) is null, as is anything dead.
  *

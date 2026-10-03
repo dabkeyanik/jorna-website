@@ -65,7 +65,7 @@ function look(item: PipelineItem): Look {
 
 const LOOK: Record<Look, { label: string; tone: Tone; border: string }> = {
   attention: { label: "Needs your attention", tone: "red", border: "border-l-[#cf736b]" },
-  waiting: { label: "Waiting on couple", tone: "green", border: "border-l-[#78aa8c]" },
+  waiting: { label: "Waiting on client", tone: "green", border: "border-l-[#78aa8c]" },
   inquiry: { label: "Inquiry", tone: "amber", border: "border-l-[#d9bc5b]" },
 };
 
@@ -604,7 +604,7 @@ function LeadsInner() {
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatTile icon="leads" tone="amber" label="Inquiries" value={c.inquiries} note="No contract sent yet" />
-        <StatTile icon="clock" tone="green" label="Waiting on couple" value={c.waiting} note="No action needed" />
+        <StatTile icon="clock" tone="green" label="Waiting on client" value={c.waiting} note="No action needed" />
         <StatTile icon="messages" tone="red" label="Needs your attention" value={c.needs_you} note="Reply soon" />
       </div>
 
@@ -664,7 +664,7 @@ function LeadsInner() {
           <p className="py-14 text-center text-sm text-ink-faint">
             {filter === "archived"
               ? "Nothing archived."
-              : "No leads here yet. Requests from the marketplace, couples you add from Messages and contracts you send all show up here."}
+              : "No leads here yet. Requests from the marketplace, clients you add from Messages and contracts you send all show up here."}
           </p>
         ) : null}
 
@@ -672,7 +672,7 @@ function LeadsInner() {
           {(["inquiry", "waiting", "attention"] as const).map((k) => (
             <span key={k} className="flex items-center gap-1.5">
               <i aria-hidden="true" className={`h-3 w-1 rounded-full border-l-4 ${LOOK[k].border}`} />
-              {k === "inquiry" ? "Inquiry" : k === "waiting" ? "Waiting on the couple" : "Needs your attention"}
+              {k === "inquiry" ? "Inquiry" : k === "waiting" ? "Waiting on the client" : "Needs your attention"}
             </span>
           ))}
         </div>

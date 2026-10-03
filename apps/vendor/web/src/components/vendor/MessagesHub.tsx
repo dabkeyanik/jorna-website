@@ -158,10 +158,10 @@ function NewMessagePicker({
     }
   }
   return (
-    <Drawer open={open} onClose={onClose} title="New message" subtitle="Message a couple you have a lead or booking with.">
+    <Drawer open={open} onClose={onClose} title="New message" subtitle="Message a client you have a lead or booking with.">
       {choices.length === 0 ? (
         <p className="text-sm text-ink-faint">
-          No couples to message yet. Couples who book or send a request through Jorna appear here.
+          No clients to message yet. Clients who book or send a request through Jorna appear here.
         </p>
       ) : (
         <ul className="grid gap-2">
@@ -357,7 +357,7 @@ export function MessagesHub() {
       <PageHeader
         eyebrow="Client communication"
         title="Messages"
-        subtitle="Every couple's conversation, organised and moving forward."
+        subtitle="Every client's conversation, organised and moving forward."
         action={<PrimaryAction onClick={() => setPicking(true)}>New message</PrimaryAction>}
       />
 
@@ -572,7 +572,7 @@ export function MessagesHub() {
               <div className="grid justify-items-center gap-2.5 border-t border-line-soft pt-4">{relationActions}</div>
             </>
           ) : (
-            <p className="text-sm text-ink-faint">Details about the couple show here.</p>
+            <p className="text-sm text-ink-faint">Details about the client show here.</p>
           )}
         </aside>
       </section>
