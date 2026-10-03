@@ -25,16 +25,18 @@ export default function ActivityPage() {
     if (!authLoading && !user) router.replace("/login?next=/activity");
   }, [authLoading, user, router]);
 
-  const load = useCallback(async () => {
-    if (!user) return;
-    setError(null);
-    try {
-      // Force: this is the page you open *to* check, so it shouldn't show a
-      // minute-old cache. It refreshes the badge's cache on the way through.
-      setItems(await loadAttention({ force: true }));
-    } catch {
-      setError("Couldn't load what's waiting on you.");
-    }
+  // Force: this is the page you open *to* check, so it shouldn't show a
+  // minute-old cache. It refreshes the badge's cache on the way through.
+  // State is only set once it settles (see the retry button for the reset).
+  const load = useCallback(() => {
+    if (!user) return Promise.resolve();
+    return loadAttention({ force: true }).then(
+      (items) => {
+        setItems(items);
+        setError(null);
+      },
+      () => setError("Couldn't load what's waiting on you."),
+    );
   }, [user]);
 
   useEffect(() => {
@@ -55,7 +57,10 @@ export default function ActivityPage() {
       {error ? (
         <Card className="mt-8 p-6 text-center">
           <p className="text-ink-soft">{error}</p>
-          <Button size="md" className="mt-4" onClick={() => void load()}>
+          <Button size="md" className="mt-4" onClick={() => {
+              setError(null);
+              void load();
+            }}>
             Try again
           </Button>
         </Card>

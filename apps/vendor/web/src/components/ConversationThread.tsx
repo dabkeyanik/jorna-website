@@ -111,16 +111,18 @@ export function ConversationThread({
     });
   }, []);
 
-  const loadMessages = useCallback(async () => {
-    try {
-      const res = await getConversationMessages(conversationId, { limit: 100 });
-      upsert(res.items);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't load this conversation.");
-    } finally {
-      setLoaded(true);
-    }
-  }, [conversationId, upsert]);
+  // A promise chain, not async/await: state is only set once the request
+  // settles, so the effect below never updates state synchronously.
+  const loadMessages = useCallback(
+    () =>
+      getConversationMessages(conversationId, { limit: 100 })
+        .then(
+          (res) => upsert(res.items),
+          (err) => setError(err instanceof ApiError ? err.message : "Couldn't load this conversation."),
+        )
+        .finally(() => setLoaded(true)),
+    [conversationId, upsert],
+  );
 
   // Initial load, live socket, and a 5s poll fallback.
   useEffect(() => {

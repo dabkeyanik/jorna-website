@@ -56,15 +56,15 @@ export function NegotiationPanel({
   // refused with no way to say why either way.
   const [note, setNote] = useState("");
 
-  const load = useCallback(async () => {
-    try {
-      setNeg(await getNegotiation(bookingId));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't load the negotiation.");
-    } finally {
-      setLoading(false);
-    }
-  }, [bookingId]);
+  // A promise chain, not async/await: state is only set once the request
+  // settles, so the mount effect below never updates state synchronously.
+  const load = useCallback(
+    () =>
+      getNegotiation(bookingId)
+        .then(setNeg, (err) => setError(err instanceof ApiError ? err.message : "Couldn't load the negotiation."))
+        .finally(() => setLoading(false)),
+    [bookingId],
+  );
 
   // Initial load, plus a poll and a refetch-on-return so a turn taken while
   // this tab was in the background (or just sitting open) shows up without a

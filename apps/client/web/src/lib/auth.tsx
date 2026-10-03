@@ -136,14 +136,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const r = typeof window !== "undefined" ? localStorage.getItem(REFRESH_KEY) : null;
     memory.access = a;
     memory.refresh = r;
-    if (!a) {
-      setLoading(false);
-      return;
-    }
-    apiFetch<User>("/me")
-      .then(setUser)
-      .catch(() => clear())
-      .finally(() => setLoading(false));
+    // With no token there's nothing to fetch, but loading still ends when a
+    // promise settles, as it does after /me — never synchronously in this
+    // effect. The tokens above are read synchronously either way, so a page's
+    // first requests still carry them.
+    const me = a ? apiFetch<User>("/me").then(setUser).catch(() => clear()) : Promise.resolve();
+    void me.finally(() => setLoading(false));
   }, [clear]);
 
   const afterTokens = useCallback(async (pair: TokenPair) => {

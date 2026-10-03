@@ -7,16 +7,11 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     rules: {
-      // This rule flags every "hydrate/reset state on mount or on a guard
-      // failing, then continue async work" effect — the pattern used
-      // throughout auth.tsx, nav.tsx, and the booking/payment pages — not
-      // just genuine bugs. Rewriting all of those to satisfy it is a real
-      // behavioral refactor of production auth/booking/payment code, not a
-      // lint fix, so it's downgraded to non-blocking rather than silenced;
-      // see https://github.com/jornaevents-commits/jorna-website/issues/2 for the
-      // tracked proper pass. Mirrors the day-one ruff scoping decision made
-      // in the backend's CI (see Desiconnect's docs/TESTING.md).
-      "react-hooks/set-state-in-effect": "warn",
+      // Back to blocking (issue #2): every effect that set state synchronously
+      // was rewritten — derived during render, keyed to what it was loaded
+      // for, or set only when a promise settles. A new one should get the same
+      // treatment (https://react.dev/learn/you-might-not-need-an-effect).
+      "react-hooks/set-state-in-effect": "error",
     },
   },
   // Override default ignores of eslint-config-next.

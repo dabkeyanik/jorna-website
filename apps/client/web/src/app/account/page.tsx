@@ -36,14 +36,18 @@ export default function AccountPage() {
     if (!authLoading && !user) router.replace("/login?next=/account");
   }, [authLoading, user, router]);
 
-  useEffect(() => {
-    if (!user) return;
+  // Refill the form whenever the signed-in user changes (sign-in, or the
+  // saved profile coming back) — during render, not in an effect, so the
+  // form never paints a frame with the previous values.
+  const [filledFrom, setFilledFrom] = useState<typeof user>(null);
+  if (user && user !== filledFrom) {
+    setFilledFrom(user);
     setFName(user.f_name ?? "");
     setLName(user.l_name ?? "");
     setEmail(user.email ?? "");
     setPhone(user.phone ?? "");
     setLocation(user.location ?? "");
-  }, [user]);
+  }
 
   if (authLoading || !user) {
     return <p className="py-20 text-center text-ink-soft">Loading…</p>;

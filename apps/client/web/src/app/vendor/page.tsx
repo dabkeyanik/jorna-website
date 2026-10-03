@@ -166,19 +166,18 @@ function VendorInner() {
   const vendorId = params.get("id");
   const { user } = useAuth();
 
-  const [vendor, setVendor] = useState<VendorDetail | null>(null);
-  const [services, setServices] = useState<ServiceItem[]>([]);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // What was loaded, and for which vendor: a different ?id= reads as
+  // loading until its own answer arrives, with nothing to reset by hand.
+  const [loaded, setLoaded] = useState<{
+    id: string;
+    vendor: VendorDetail | null;
+    services: ServiceItem[];
+    reviews: Review[];
+    error: string | null;
+  } | null>(null);
   useEffect(() => {
-    if (!vendorId) {
-      setError("No vendor specified.");
-      setLoading(false);
-      return;
-    }
+    if (!vendorId) return;
     let cancelled = false;
-    setLoading(true);
     Promise.all([
       getVendor(vendorId),
       listServices({ vendor_id: vendorId, limit: 50 }),
@@ -186,21 +185,29 @@ function VendorInner() {
       getVendorReviews(vendorId).catch(() => ({ items: [] as Review[] })),
     ])
       .then(([v, s, r]) => {
-        if (cancelled) return;
-        setVendor(v);
-        setServices(s.items);
-        setReviews(r.items);
+        if (!cancelled) setLoaded({ id: vendorId, vendor: v, services: s.items, reviews: r.items, error: null });
       })
       .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : "Couldn't load this vendor.");
-        }
-      })
-      .finally(() => !cancelled && setLoading(false));
+        if (cancelled) return;
+        setLoaded({
+          id: vendorId,
+          vendor: null,
+          services: [],
+          reviews: [],
+          error: err instanceof ApiError ? err.message : "Couldn't load this vendor.",
+        });
+      });
     return () => {
       cancelled = true;
     };
   }, [vendorId]);
+
+  const current = loaded && loaded.id === vendorId ? loaded : null;
+  const loading = Boolean(vendorId) && !current;
+  const error = vendorId ? (current?.error ?? null) : "No vendor specified.";
+  const vendor = current?.vendor ?? null;
+  const services = current?.services ?? [];
+  const reviews = current?.reviews ?? [];
 
   if (loading) return <p className="py-20 text-center text-ink-soft">Loading…</p>;
 

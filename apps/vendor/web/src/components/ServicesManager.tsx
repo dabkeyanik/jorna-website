@@ -17,7 +17,7 @@
 // terms that override the vendor's defaults. Years in business moved to the
 // vendor's own profile — it was asked again on every package.
 
-import { useEffect, useImperativeHandle, useState, type Ref } from "react";
+import { useEffect, useImperativeHandle, useMemo, useState, type Ref } from "react";
 import { ApiError } from "@jorna/shared/lib/api";
 import {
   createService,
@@ -229,11 +229,11 @@ export function ServicesManager({
   // screen the same way rather than making the vendor come back for it.
   const [newPhotos, setNewPhotos] = useState<File[]>([]);
   const [newVideos, setNewVideos] = useState<File[]>([]);
-  // Object URLs for the staged files above — kept in state (rather than
-  // computed inline on every render) so they're only ever created/revoked
-  // when newPhotos/newVideos actually change, via the effects below.
-  const [newPhotoPreviews, setNewPhotoPreviews] = useState<string[]>([]);
-  const [newVideoPreviews, setNewVideoPreviews] = useState<string[]>([]);
+  // Object URLs for the staged files above — memoized (rather than computed
+  // inline on every render) so they're only ever created when
+  // newPhotos/newVideos actually change, and revoked by the effects below.
+  const newPhotoPreviews = useMemo(() => newPhotos.map((f) => URL.createObjectURL(f)), [newPhotos]);
+  const newVideoPreviews = useMemo(() => newVideos.map((f) => URL.createObjectURL(f)), [newVideos]);
   // Local previews for an upload already in flight against a saved service,
   // keyed by service_id — cleared (and their object URLs revoked) once that
   // upload settles, success or failure, since refresh() brings the real
@@ -247,17 +247,9 @@ export function ServicesManager({
   // hold their own hook.
   const [dragActiveKey, setDragActiveKey] = useState<string | null>(null);
 
-  useEffect(() => {
-    const urls = newPhotos.map((f) => URL.createObjectURL(f));
-    setNewPhotoPreviews(urls);
-    return () => urls.forEach((u) => URL.revokeObjectURL(u));
-  }, [newPhotos]);
-
-  useEffect(() => {
-    const urls = newVideos.map((f) => URL.createObjectURL(f));
-    setNewVideoPreviews(urls);
-    return () => urls.forEach((u) => URL.revokeObjectURL(u));
-  }, [newVideos]);
+  // Each set of previews is revoked when it's replaced or the form unmounts.
+  useEffect(() => () => newPhotoPreviews.forEach((u) => URL.revokeObjectURL(u)), [newPhotoPreviews]);
+  useEffect(() => () => newVideoPreviews.forEach((u) => URL.revokeObjectURL(u)), [newVideoPreviews]);
 
   // Shared drag-and-drop wiring for all four pickers — spread onto a
   // dropzone's <label>. A plain function rather than a custom hook so it's

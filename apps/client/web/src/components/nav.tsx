@@ -109,20 +109,20 @@ export function useAppNav(): {
 } {
   const { user, loading } = useAuth();
   const pathname = usePathname() ?? "";
-  const [attention, setAttention] = useState(0);
-  const [messagesUnread, setMessagesUnread] = useState(0);
+  // Each value is kept with the user it was loaded for, and only counts for
+  // that user: signing out (or someone else signing in) shows the empty
+  // default at once, with no effect needed to reset it.
+  const [attention, setAttention] = useState<{ userId: string; value: number } | null>(null);
+  const [messagesUnread, setMessagesUnread] = useState<{ userId: string; value: number } | null>(null);
 
   // Re-check on navigation so the badge follows you as you act on things. Cheap:
   // lib/attention's TTL cache makes most of these a no-op, so this is roughly
   // one derivation a minute, not one per page.
   useEffect(() => {
-    if (!user) {
-      setAttention(0);
-      return;
-    }
+    if (!user) return;
     let cancelled = false;
     loadAttention()
-      .then((items) => !cancelled && setAttention(items.length))
+      .then((items) => !cancelled && setAttention({ userId: user.user_id, value: items.length }))
       .catch(() => {});
     return () => {
       cancelled = true;
@@ -133,24 +133,24 @@ export function useAppNav(): {
   // unread count isn't part of what lib/attention derives, so it can't share
   // that cache.
   useEffect(() => {
-    if (!user) {
-      setMessagesUnread(0);
-      return;
-    }
+    if (!user) return;
     let cancelled = false;
     getUnreadCount()
-      .then((r) => !cancelled && setMessagesUnread(r.unread_count))
+      .then((r) => !cancelled && setMessagesUnread({ userId: user.user_id, value: r.unread_count }))
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [user, pathname]);
 
+  const mine = <T,>(got: { userId: string; value: T } | null, fallback: T): T =>
+    user && got?.userId === user.user_id ? got.value : fallback;
+
   const signedOut = loading || !user;
   return {
     items: signedOut ? null : CLIENT_TABS,
-    attention,
-    messagesUnread,
+    attention: mine(attention, 0),
+    messagesUnread: mine(messagesUnread, 0),
     home: "/home",
     isActive: (item) =>
       item.match.some((m) => pathname === m || pathname.startsWith(`${m}/`)),

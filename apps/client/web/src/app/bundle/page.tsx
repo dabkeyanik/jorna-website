@@ -1490,45 +1490,45 @@ function BundleInner() {
     }
   }, [authLoading, user, router, bundleId]);
 
-  const load = useCallback(async () => {
-    if (!bundleId || !user) return;
-    try {
-      const detail = await getBundle(bundleId);
-      setBundle(detail);
+  // A promise chain, not async/await: state is only set once the bundle
+  // arrives, so the mount effect below never updates state synchronously.
+  const load = useCallback(() => {
+    if (!bundleId || !user) return Promise.resolve();
+    return getBundle(bundleId)
+      .then((detail) => {
+        setBundle(detail);
 
-      // Silent on failure: with no card the plan still sends, and each booking
-      // is payable by hand exactly as it was before.
-      void getSavedCard()
-        .then(setCard)
-        .catch(() => {});
-
-      // Likewise the chat: a draft has none, and a failure just means the link
-      // doesn't appear. Nothing on this page depends on it.
-      void getBundleConversation(bundleId)
-        .then((c) => setChatId(c?.conversation_id ?? null))
-        .catch(() => {});
-
-      // There is no GET /events/{id}, so the list is the source of the event's
-      // full record — budget, description, and what they said they needed, none
-      // of which the bundle's embedded summary carries.
-      const eventId = detail.event_id ?? detail.event?.event_id ?? null;
-      if (eventId) {
-        void listEvents()
-          .then((all) => setEvent(all.find((e) => e.event_id === eventId) ?? null))
+        // Silent on failure: with no card the plan still sends, and each booking
+        // is payable by hand exactly as it was before.
+        void getSavedCard()
+          .then(setCard)
           .catch(() => {});
-        void listBundles()
-          .then((all) =>
-            setSiblings(
-              all.filter((b) => b.bundle_id !== detail.bundle_id && b.event_id === eventId),
-            ),
-          )
+
+        // Likewise the chat: a draft has none, and a failure just means the link
+        // doesn't appear. Nothing on this page depends on it.
+        void getBundleConversation(bundleId)
+          .then((c) => setChatId(c?.conversation_id ?? null))
           .catch(() => {});
-      }
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't load this bundle.");
-    } finally {
-      setLoading(false);
-    }
+
+        // There is no GET /events/{id}, so the list is the source of the event's
+        // full record — budget, description, and what they said they needed, none
+        // of which the bundle's embedded summary carries.
+        const eventId = detail.event_id ?? detail.event?.event_id ?? null;
+        if (eventId) {
+          void listEvents()
+            .then((all) => setEvent(all.find((e) => e.event_id === eventId) ?? null))
+            .catch(() => {});
+          void listBundles()
+            .then((all) =>
+              setSiblings(
+                all.filter((b) => b.bundle_id !== detail.bundle_id && b.event_id === eventId),
+              ),
+            )
+            .catch(() => {});
+        }
+      })
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Couldn't load this bundle."))
+      .finally(() => setLoading(false));
   }, [bundleId, user]);
 
   useEffect(() => {

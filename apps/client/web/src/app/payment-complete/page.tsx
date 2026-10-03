@@ -19,26 +19,24 @@ function PaymentCompleteInner() {
   const bookingId = params.get("booking_id");
   const status = params.get("status");
 
-  const [phase, setPhase] = useState<Phase>(status === "cancel" ? "cancelled" : "working");
+  // What confirming the payment found, once it's been asked.
+  const [result, setResult] = useState<"paid" | "pending" | null>(null);
   const done = useRef(false);
 
   useEffect(() => {
-    if (loading || done.current) return;
-    if (status === "cancel") {
-      setPhase("cancelled");
-      return;
-    }
-    if (!bookingId || !user) {
-      setPhase("pending");
-      return;
-    }
+    if (loading || done.current || status === "cancel" || !bookingId || !user) return;
     done.current = true;
     syncBookingPayment(bookingId)
-      .then(() => setPhase("paid"))
+      .then(() => setResult("paid"))
       // A failure here doesn't mean the payment failed — the webhook may simply
       // not have landed yet. Say so instead of alarming the customer.
-      .catch(() => setPhase("pending"));
+      .catch(() => setResult("pending"));
   }, [bookingId, status, user, loading]);
+
+  // A cancelled checkout, or nothing we can confirm (no booking, signed out),
+  // is known without asking the server.
+  const phase: Phase =
+    status === "cancel" ? "cancelled" : (result ?? (!loading && (!bookingId || !user) ? "pending" : "working"));
 
   const copy: Record<Phase, { title: string; body: string }> = {
     working: { title: "Confirming your payment…", body: "One moment." },
