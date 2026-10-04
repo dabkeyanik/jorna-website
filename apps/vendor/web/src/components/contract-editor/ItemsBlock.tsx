@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   addonLine,
   customLine,
@@ -49,6 +50,22 @@ export function ItemsBlock({
     if (line) set({ lines: [...draft.lines, line] });
   }
 
+  // A new custom line starts with an empty name, so it gets the cursor; left
+  // empty, it's dropped rather than flagged as "Every line needs a name".
+  const [focusKey, setFocusKey] = useState<string | null>(null);
+
+  function addCustom() {
+    const line = customLine();
+    setFocusKey(line.key);
+    set({ lines: [...draft.lines, line] });
+  }
+
+  function leaveName(l: LineDraft) {
+    if (l.kind === "custom" && !l.name.trim() && !l.price.trim()) {
+      set({ lines: draft.lines.filter((x) => x.key !== l.key) });
+    }
+  }
+
   function updateLine(key: string, patch: Partial<LineDraft>) {
     set({ lines: draft.lines.map((l) => (l.key === key ? { ...l, ...patch } : l)) });
   }
@@ -73,13 +90,18 @@ export function ItemsBlock({
           {draft.lines.map((l) => (
             <div
               key={l.key}
-              className="grid grid-cols-2 items-center gap-2 rounded-lg border border-line-soft p-2 sm:grid-cols-[minmax(0,1fr)_5rem_7.5rem_6.5rem_3.5rem] sm:border-0 sm:p-0"
+              // Leaving the whole line, not just its name — they may fill the price first.
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) leaveName(l);
+              }}
+              className="grid grid-cols-[4.5rem_minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg border border-line-soft p-2 sm:grid-cols-[minmax(0,1fr)_5rem_7.5rem_6.5rem_3.5rem] sm:border-0 sm:p-0"
             >
-              <div className="col-span-2 min-w-0 sm:col-span-1">
+              <div className="col-span-4 min-w-0 sm:col-span-1">
                 <input
                   aria-label="Item"
                   value={l.name}
                   onChange={(e) => updateLine(l.key, { name: e.target.value })}
+                  autoFocus={l.key === focusKey}
                   placeholder="e.g. Uplighting"
                   className={inputClass}
                 />
@@ -155,7 +177,7 @@ export function ItemsBlock({
             </div>
           ))}
         <div>
-          <button type="button" onClick={() => set({ lines: [...draft.lines, customLine()] })} className={smallButton}>
+          <button type="button" onClick={addCustom} className={smallButton}>
             + Add a custom item
           </button>
         </div>
