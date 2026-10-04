@@ -240,6 +240,50 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+  # The real stack, after each vendor deploy to staging: a contract sent,
+  # opened, negotiated (when staging negotiates field by field) and signed,
+  # against the staging backend and its database. Two test accounts are made
+  # on the first run from the STAGING_E2E_* secrets. Not a gate on production
+  # yet — it reports, and production still waits for a person's approval.
+  staging-checks:
+    name: Staging checks
+    needs: [deploy-staging]
+    if: inputs.app == 'vendor' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/${{ inputs.app }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+        working-directory: .
+
+      - name: Work around Google Chrome apt repo outages
+        run: sudo rm -f /etc/apt/sources.list.d/google-chrome*.list
+
+      - run: npx --no-install playwright install --with-deps chromium
+      - run: npm run test:e2e:staging
+        env:
+          STAGING_API_BASE_URL: ${{ vars.STAGING_API_BASE_URL }}
+          STAGING_VENDOR_URL: https://staging.${{ inputs.pages_project }}.pages.dev
+          STAGING_E2E_VENDOR_PASSWORD: ${{ secrets.STAGING_E2E_VENDOR_PASSWORD }}
+          STAGING_E2E_CLIENT_PASSWORD: ${{ secrets.STAGING_E2E_CLIENT_PASSWORD }}
+
+      - name: Upload the staging report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-staging
+          path: apps/${{ inputs.app }}/web/playwright-report-staging/
+          retention-days: 14
+
   deploy:
     name: Deploy to Cloudflare Pages
     needs: [deploy-staging]

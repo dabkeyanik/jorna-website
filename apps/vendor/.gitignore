@@ -30,6 +30,7 @@ web/tsconfig.tsbuildinfo
 # Playwright E2E run output (traces, screenshots, HTML report)
 web/test-results/
 web/playwright-report/
+web/playwright-report-staging/
 web/blob-report/
 
 # Figma Make exports. The design lives in Figma; these are 1.4 MB snapshots of
