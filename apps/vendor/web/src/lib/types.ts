@@ -262,6 +262,15 @@ export interface VendorDetail {
   years_experience?: number | null;
   /** Days a sent contract holds its date; null means the backend's 7. */
   contract_hold_days?: number | null;
+  /** The schedule they usually offer (backend 0070); null for the old rule. */
+  default_payment_plan?: PaymentPlan | null;
+}
+
+/** A vendor's usual payment schedule: which preset, and when the final
+ *  balance falls due. Amounts come from each contract's own total. */
+export interface PaymentPlan {
+  preset: "full" | "deposit_balance" | "three";
+  balance_days_before: number;
 }
 
 /** Free-form contract terms (equipment/power, travel, custom clauses) —
@@ -777,6 +786,7 @@ export interface VendorUpdateInput {
   years_experience?: number | null;
   /** Days a sent contract holds its date (1–60); null for the backend's 7. */
   contract_hold_days?: number | null;
+  default_payment_plan?: PaymentPlan | null;
 }
 
 // ── Moderation ───────────────────────────────────────────────────────

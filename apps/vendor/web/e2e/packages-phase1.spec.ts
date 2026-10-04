@@ -69,9 +69,7 @@ test.describe("packages — Phase 1", () => {
     await page.getByLabel("Add-on 1 price").fill("250");
     await page.getByLabel("Add-on 1 unit").selectOption("hour");
 
-    // Custom terms show the vendor's default as the placeholder. .first():
-    // the Profile page's own Contract defaults section, further down, has
-    // fields with the same labels.
+    // Custom terms show the vendor's default as the placeholder.
     await page.getByRole("button", { name: /Custom contract terms/ }).click();
     await expect(page.getByLabel("Deposit (%)").first()).toHaveAttribute("placeholder", "25");
     await page.getByLabel("Cancellation window (days)").first().fill("30");

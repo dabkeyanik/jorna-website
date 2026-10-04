@@ -68,6 +68,16 @@ describe("schedule presets", () => {
     }
   });
 
+  it("put the balance where the vendor usually does, same as the backend's usual terms", () => {
+    expect(presetSchedule("deposit_balance", 100_000, 30, 21).map((r) => [r.label, r.dueDays])).toEqual([
+      ["Deposit", ""],
+      ["Final balance", "21"],
+    ]);
+    // The second of three always comes well before the balance.
+    expect(presetSchedule("three", 90_000, 50, 45).map((r) => r.dueDays)).toEqual(["", "75", "45"]);
+    expect(presetSchedule("three", 90_000).map((r) => r.dueDays)).toEqual(["", "60", "14"]);
+  });
+
   it("can move a gap onto the last payment", () => {
     const d = ready();
     d.schedule[0].amount = "100";
