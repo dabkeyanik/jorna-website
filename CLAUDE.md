@@ -23,8 +23,9 @@ What lives at the root instead of in each app:
 - **Dependabot and issue templates** — `.github/`.
 
 The apps still duplicate what had drifted apart before the merge
-(`web/src/lib/jorna.ts`, most of `types.ts`, `auth.tsx`, and components built
-on them). Until those are reconciled into `packages/shared`, a fix to one
+(`web/src/lib/jorna.ts`, most of `types.ts`, and components built on them).
+Auth is shared (`@jorna/shared/lib/auth`); each app's `lib/auth.tsx` only
+wraps it with its own caches and sign-out destination. Until those are reconciled into `packages/shared`, a fix to one
 usually belongs in both apps — check the other copy.
 
 `main` is protected: branch per change, open a PR, merge once CI is green
