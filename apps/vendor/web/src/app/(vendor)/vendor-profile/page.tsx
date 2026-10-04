@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
@@ -28,8 +29,7 @@ import { AvailabilityFields } from "@/components/AvailabilityFields";
 import {
   VendorIdentityFields,
   VendorReachFields,
-  VendorContractDefaultsFields,
-  contractDefaultsToStrings,
+  GuestCountModeField,
 } from "@/components/VendorProfileFields";
 
 function prettyDate(iso?: string | null): string | null {
@@ -62,11 +62,6 @@ export default function VendorProfilePage() {
   const [longDistance, setLongDistance] = useState(false);
   const [locationNegotiable, setLocationNegotiable] = useState(false);
   const [instagram, setInstagram] = useState("");
-  const [depositPercent, setDepositPercent] = useState("");
-  const [cancellationWindowHours, setCancellationWindowHours] = useState("");
-  const [overtimeRate, setOvertimeRate] = useState("");
-  const [equipmentPower, setEquipmentPower] = useState("");
-  const [travel, setTravel] = useState("");
   const [guestCountMode, setGuestCountMode] = useState<GuestCountMode>("optional");
 
   useEffect(() => {
@@ -96,13 +91,7 @@ export default function VendorProfilePage() {
         setLongDistance(Boolean(mine.open_to_long_distance));
         setLocationNegotiable(Boolean(mine.open_to_price_negotiation));
         setInstagram(mine.instagram_username ?? "");
-        const defaults = contractDefaultsToStrings(mine);
-        setDepositPercent(defaults.depositPercent);
-        setCancellationWindowHours(defaults.cancellationWindowHours);
-        setOvertimeRate(defaults.overtimeRate);
-        setEquipmentPower(defaults.equipmentPower);
-        setTravel(defaults.travel);
-        setGuestCountMode(defaults.guestCountMode as GuestCountMode);
+        setGuestCountMode(mine.default_guest_count_mode ?? "optional");
         // Both best-effort: the profile stays editable when either fails.
         const [r, svc] = await Promise.all([
           getVendorReviews(mine.vendor_id).catch(() => null),
@@ -151,15 +140,8 @@ export default function VendorProfilePage() {
         open_to_long_distance: longDistance,
         open_to_price_negotiation: locationNegotiable,
         instagram_username: instagram.trim().replace(/^@/, "") || null,
-        default_deposit_percent: depositPercent ? Number(depositPercent) : null,
-        default_cancellation_window_hours: cancellationWindowHours
-          ? Number(cancellationWindowHours)
-          : null,
-        default_overtime_rate_cents: overtimeRate ? Math.round(Number(overtimeRate) * 100) : null,
-        default_contract_terms:
-          equipmentPower.trim() || travel.trim()
-            ? { equipment_power: equipmentPower.trim() || undefined, travel: travel.trim() || undefined }
-            : null,
+        // Deposit, cancellation, overtime and clauses are edited on
+        // Contracts → Defaults now; sending them from here would overwrite it.
         default_guest_count_mode: guestCountMode,
       });
       setVendor(updated);
@@ -246,23 +228,17 @@ export default function VendorProfilePage() {
         </Card>
         </section>
 
-        <h2 className="serif mt-9 text-xl text-ink">Contract defaults</h2>
+        <h2 className="serif mt-9 text-xl text-ink">Booking requests</h2>
         <Card className="mt-5 p-6">
           <div className="grid gap-4">
-            <VendorContractDefaultsFields
-              depositPercent={depositPercent}
-              cancellationWindowHours={cancellationWindowHours}
-              overtimeRate={overtimeRate}
-              equipmentPower={equipmentPower}
-              travel={travel}
-              guestCountMode={guestCountMode}
-              onDepositPercentChange={setDepositPercent}
-              onCancellationWindowHoursChange={setCancellationWindowHours}
-              onOvertimeRateChange={setOvertimeRate}
-              onEquipmentPowerChange={setEquipmentPower}
-              onTravelChange={setTravel}
-              onGuestCountModeChange={setGuestCountMode}
-            />
+            <GuestCountModeField value={guestCountMode} onChange={setGuestCountMode} />
+            <p className="text-sm text-ink-soft">
+              Your deposit, cancellation window, overtime rate and default clauses moved to{" "}
+              <Link href="/contracts" className="font-semibold text-gold hover:underline">
+                Contracts → Defaults
+              </Link>
+              , next to the templates that use them.
+            </p>
           </div>
         </Card>
 

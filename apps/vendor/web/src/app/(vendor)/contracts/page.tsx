@@ -29,6 +29,7 @@ import { Button } from "@jorna/shared/components/ui";
 import { Drawer, FilterTabs, PageHeader, StatusPill, type Tone } from "@/components/vendor/ui";
 import { Icon } from "@/components/vendor/Icon";
 import { NewMenu } from "@/components/vendor/NewMenu";
+import { ContractDefaultsDrawer } from "@/components/vendor/ContractDefaultsDrawer";
 
 /** The plan's statuses: Draft, Sent, Viewed, Signed, Deposit due, Paid,
  *  Expired, Declined, Void — plus the two where the couple says they've paid
@@ -223,6 +224,7 @@ export default function ContractsPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [confirmVoidId, setConfirmVoidId] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
+  const [editingDefaults, setEditingDefaults] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login?next=/contracts&role=vendor");
@@ -319,8 +321,28 @@ export default function ContractsPage() {
         eyebrow="Document workspace"
         title="Contracts"
         subtitle="Create, send and manage every client agreement in one place."
-        action={<NewMenu />}
+        action={
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setEditingDefaults(true)}
+              className="inline-flex h-10 items-center rounded-[11px] border border-line px-4 text-sm font-semibold text-ink-soft transition hover:text-ink"
+            >
+              Defaults
+            </button>
+            <NewMenu />
+          </div>
+        }
       />
+
+      {editingDefaults ? (
+        <ContractDefaultsDrawer
+          open
+          onClose={() => setEditingDefaults(false)}
+          vendor={vendor}
+          onSaved={setVendor}
+        />
+      ) : null}
 
       <section aria-label="Template gallery">
         <div className="flex flex-wrap items-end justify-between gap-3">

@@ -2,9 +2,9 @@ import { test, expect } from "./support/fixtures";
 import { loginAs } from "./support/fixtures";
 import { mockVendorDetail } from "./support/mock-data";
 
-// Settings (sidebar footer), from the 2026-10 vendor redesign: Venmo/Zelle and
-// the tentative-hold length save to the vendor record, and the theme choice
-// sticks across a reload.
+// Settings (sidebar footer), from the 2026-10 vendor redesign: Venmo/Zelle
+// saves to the vendor record, and the theme choice sticks across a reload.
+// The tentative-hold length moved to Contracts → Defaults (plan 2.4).
 test.describe("vendor settings (/settings)", () => {
   function mockSettings(api: import("./support/api-mock").ApiMock) {
     const vendor = mockVendorDetail({ payment_method: "manual", venmo_handle: "@old" });
@@ -13,11 +13,11 @@ test.describe("vendor settings (/settings)", () => {
       google_calendar_connected: false,
       google_calendar_write_enabled: false,
     });
-    api.patch("/vendors/me", { ...vendor, venmo_handle: "@studio", contract_hold_days: 10 });
+    api.patch("/vendors/me", { ...vendor, venmo_handle: "@studio" });
     return vendor;
   }
 
-  test("saves Venmo and the hold length", async ({ page, api }) => {
+  test("saves Venmo, and points to Contracts for the hold length", async ({ page, api }) => {
     await loginAs(page, api);
     mockSettings(api);
 
@@ -28,28 +28,15 @@ test.describe("vendor settings (/settings)", () => {
     ).toHaveAttribute("aria-current", "page");
 
     await page.getByLabel("Venmo handle").fill("@studio");
-    await page.getByLabel("Tentative hold (days)").fill("10");
+    await expect(page.getByRole("link", { name: "Contracts → Defaults" })).toHaveAttribute("href", /\/contracts\/?$/);
     await page.getByRole("button", { name: "Save", exact: true }).click();
 
     await expect(page.getByText("Saved.")).toBeVisible();
     const calls = api.requestsTo("PATCH", "/vendors/me");
     expect(calls).toHaveLength(1);
-    expect(calls[0].body).toMatchObject({ venmo_handle: "@studio", contract_hold_days: 10 });
-  });
-
-  test("rejects a hold length outside 1–60 days without saving", async ({ page, api }) => {
-    await loginAs(page, api);
-    mockSettings(api);
-
-    await page.goto("settings/");
-    const field = page.getByLabel("Tentative hold (days)");
-    await field.fill("90");
-    await page.getByRole("button", { name: "Save", exact: true }).click();
-
-    // The field's own min/max stops the submit — the same limit the backend
-    // enforces (1–60).
-    expect(await field.evaluate((el: HTMLInputElement) => el.validity.rangeOverflow)).toBe(true);
-    expect(api.requestsTo("PATCH", "/vendors/me")).toHaveLength(0);
+    expect(calls[0].body).toMatchObject({ venmo_handle: "@studio" });
+    // Not sent from here, so it can't overwrite what Defaults saved.
+    expect(calls[0].body).not.toHaveProperty("contract_hold_days");
   });
 
   test("the theme choice survives a reload", async ({ page, api }) => {

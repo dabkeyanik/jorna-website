@@ -211,7 +211,15 @@ export type SchedulePreset = "full" | "deposit_balance" | "three";
  * the rounding remainder lands on the last payment, so the preset always
  * adds up exactly — the one thing the backend is strict about.
  */
-export function presetSchedule(preset: SchedulePreset, total: number, depositPercent = 50): InstallmentDraft[] {
+/** `balanceDays`: when the final balance falls due, in days before the
+ *  event — the vendor's usual (Vendor.default_payment_plan), else 14. Same
+ *  shapes as the backend's "Send with my usual terms" (_default_schedule). */
+export function presetSchedule(
+  preset: SchedulePreset,
+  total: number,
+  depositPercent = 50,
+  balanceDays = 14,
+): InstallmentDraft[] {
   const row = (label: string, cents: number, dueType: DueType, dueDays = ""): InstallmentDraft => ({
     key: newKey(),
     label,
@@ -225,14 +233,14 @@ export function presetSchedule(preset: SchedulePreset, total: number, depositPer
     const deposit = Math.round((total * depositPercent) / 100);
     return [
       row("Deposit", deposit, "on_signing"),
-      row("Final balance", total - deposit, "before_event", "14"),
+      row("Final balance", total - deposit, "before_event", String(balanceDays)),
     ];
   }
   const first = Math.round(total / 3);
   return [
     row("Deposit", first, "on_signing"),
-    row("Second payment", first, "before_event", "60"),
-    row("Final balance", total - 2 * first, "before_event", "14"),
+    row("Second payment", first, "before_event", String(Math.max(60, balanceDays + 30))),
+    row("Final balance", total - 2 * first, "before_event", String(balanceDays)),
   ];
 }
 

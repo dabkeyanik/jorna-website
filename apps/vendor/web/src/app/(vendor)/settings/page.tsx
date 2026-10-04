@@ -14,15 +14,14 @@ import { ApiError } from "@jorna/shared/lib/api";
 import { ESCROW_ENABLED, PUSH_ENABLED } from "@jorna/shared/lib/flags";
 import { getCalendarStatus, getMyVendor, updateMyVendor } from "@/lib/jorna";
 import type { CalendarStatus, VendorDetail } from "@/lib/types";
-import { Button, Card, Field } from "@jorna/shared/components/ui";
+import Link from "next/link";
+import { Button, Card } from "@jorna/shared/components/ui";
 import { PushOptIn } from "@jorna/shared/components/PushOptIn";
 import { AccountSettings } from "@/components/AccountSettings";
 import { GoogleCalendarCard } from "@/components/GoogleCalendarCard";
 import { VendorPaymentFields } from "@/components/VendorProfileFields";
 import { FilterTabs, PageHeader } from "@/components/vendor/ui";
 import { getThemeChoice, setThemeChoice, type ThemeChoice } from "@/lib/theme";
-
-const DEFAULT_HOLD_DAYS = 7;
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -34,7 +33,8 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
   );
 }
 
-/** Venmo/Zelle and the tentative-hold length: both saved on the vendor record. */
+/** Venmo/Zelle: how clients pay this vendor. How long a sent contract holds
+ *  the date used to live here too; it's on Contracts → Defaults now. */
 function PaymentsAndHolds({ vendor, onSaved }: { vendor: VendorDetail; onSaved: (v: VendorDetail) => void }) {
   // Escrow disabled → manual regardless of what an older vendor row says
   // (VendorPaymentFields normalizes the same way).
@@ -43,7 +43,6 @@ function PaymentsAndHolds({ vendor, onSaved }: { vendor: VendorDetail; onSaved: 
   );
   const [venmo, setVenmo] = useState(vendor.venmo_handle ?? "");
   const [zelle, setZelle] = useState(vendor.zelle_contact ?? "");
-  const [holdDays, setHoldDays] = useState(vendor.contract_hold_days?.toString() ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -56,11 +55,6 @@ function PaymentsAndHolds({ vendor, onSaved }: { vendor: VendorDetail; onSaved: 
       setError("Add a Venmo handle or Zelle contact so clients know how to pay you.");
       return;
     }
-    const days = holdDays.trim() ? Number(holdDays) : null;
-    if (days !== null && (!Number.isInteger(days) || days < 1 || days > 60)) {
-      setError("Hold a date for between 1 and 60 days.");
-      return;
-    }
     setBusy(true);
     setError(null);
     setSaved(false);
@@ -69,7 +63,6 @@ function PaymentsAndHolds({ vendor, onSaved }: { vendor: VendorDetail; onSaved: 
         payment_method: paymentMethod,
         venmo_handle: v || null,
         zelle_contact: z || null,
-        contract_hold_days: days,
       });
       onSaved(updated);
       setSaved(true);
@@ -91,16 +84,13 @@ function PaymentsAndHolds({ vendor, onSaved }: { vendor: VendorDetail; onSaved: 
           onVenmoHandleChange={setVenmo}
           onZelleContactChange={setZelle}
         />
-        <Field
-          label="Tentative hold (days)"
-          type="number"
-          min={1}
-          max={60}
-          placeholder={String(DEFAULT_HOLD_DAYS)}
-          value={holdDays}
-          onChange={(e) => setHoldDays(e.target.value)}
-          hint="How long a sent contract holds the date before it opens up again. You can change it per contract."
-        />
+        <p className="text-sm text-ink-soft">
+          How long a sent contract holds the date is on{" "}
+          <Link href="/contracts" className="font-semibold text-gold hover:underline">
+            Contracts → Defaults
+          </Link>
+          , with your other contract defaults.
+        </p>
         {error ? (
           <p role="alert" className="rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
             {error}
@@ -197,7 +187,7 @@ export default function SettingsPage() {
 
       {vendor ? (
         <>
-          <Section title="Payments and holds" hint="Clients pay you directly; these show on every contract you send.">
+          <Section title="How clients pay you" hint="Clients pay you directly; this shows on every contract you send.">
             <PaymentsAndHolds vendor={vendor} onSaved={setVendor} />
           </Section>
 

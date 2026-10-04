@@ -118,7 +118,11 @@ function usualSchedule(draft: Draft, services: ServiceItem[], vendor: VendorDeta
   if (total <= 0) return [];
   const first = services.find((s) => s.service_id === draft.lines.find((l) => l.kind === "package")?.serviceId);
   const pct = first?.deposit_percent ?? vendor?.default_deposit_percent ?? 50;
-  return presetSchedule(pct > 0 && pct < 100 ? "deposit_balance" : "full", total, pct);
+  // The schedule they set as usual on Contracts → Defaults, if they have;
+  // otherwise deposit + balance when they take a deposit.
+  const plan = vendor?.default_payment_plan;
+  const preset = plan?.preset ?? (pct > 0 && pct < 100 ? "deposit_balance" : "full");
+  return presetSchedule(preset, total, pct > 0 && pct < 100 ? pct : 50, plan?.balance_days_before);
 }
 
 function scrollToBlock(id: string) {
@@ -308,7 +312,7 @@ function NewContractInner() {
   }
 
   function applyPreset(preset: SchedulePreset) {
-    setPlan(presetSchedule(preset, total, defaultDepositPercent()));
+    setPlan(presetSchedule(preset, total, defaultDepositPercent(), vendor?.default_payment_plan?.balance_days_before));
   }
 
   // ── Terms ──
