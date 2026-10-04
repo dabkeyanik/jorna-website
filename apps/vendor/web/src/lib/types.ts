@@ -6,6 +6,7 @@ import { priceUnitKind, priceUnitLabel, type PriceUnitKind } from "@jorna/shared
 // Shared with the other app (packages/shared); re-exported so imports from
 // "@/lib/types" keep working.
 export type { TokenPair } from "@jorna/shared/lib/api";
+export type { User } from "@jorna/shared/lib/auth";
 export { priceUnitKind, priceUnitLabel, type PriceUnitKind };
 
 // The contract's shapes live once, in packages/shared (lib/contractTypes).
@@ -44,16 +45,6 @@ export type {
   TermsVersion,
 } from "@jorna/shared/lib/contractTypes";
 
-export interface User {
-  user_id: string;
-  email: string;
-  username: string;
-  f_name?: string | null;
-  l_name?: string | null;
-  phone?: string | null;
-  location?: string | null;
-  pfp_url?: string | null;
-}
 
 // ── AI bundle builder ────────────────────────────────────────────────
 

@@ -95,7 +95,7 @@ export function SiteHeader() {
         <nav className="flex shrink-0 items-center gap-2">
           <MobileNavMenu />
           {loading ? null : user ? (
-            <Button variant="ghost" onClick={logout}>
+            <Button variant="ghost" onClick={() => logout()}>
               Sign out
             </Button>
           ) : (

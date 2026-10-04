@@ -207,7 +207,7 @@ export default function AccountPage() {
       </Card>
 
       <div className="mt-8">
-        <Button variant="quiet" onClick={logout}>
+        <Button variant="quiet" onClick={() => logout()}>
           Sign out
         </Button>
       </div>
