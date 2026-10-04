@@ -31,10 +31,8 @@ import {
   type ServiceInput,
 } from "@/lib/jorna";
 import {
-  categoryLabel,
   priceUnitLabel,
   usableMedia,
-  type AddOn,
   type MediaItem,
   type PackageStatus,
   type ServiceItem,
@@ -44,27 +42,19 @@ import {
 import { geocodeUsAddress } from "@jorna/shared/lib/geocode";
 import { checkImageFiles, checkVideoFiles, describeRejections } from "@jorna/shared/lib/uploads";
 import { Button, Card, Chip, Field } from "@jorna/shared/components/ui";
-
-function money(n: number) {
-  return `$${Math.round(n).toLocaleString()}`;
-}
-
-/** "6 hours" — included hours if set, else the listing's duration. */
-function coverage(s: ServiceItem): string {
-  if (s.included_hours) return `${s.included_hours} hour${s.included_hours === 1 ? "" : "s"}`;
-  if (s.duration_minutes) {
-    const h = Math.round((s.duration_minutes / 60) * 10) / 10;
-    return `${h} hour${h === 1 ? "" : "s"}`;
-  }
-  return "Flexible";
-}
-
-/** The speciality it's listed under, in words. */
-function bestFor(s: ServiceItem, categories: TaxonomyCategory[]): string {
-  const cat = categories.find((c) => c.value === s.category);
-  const sub = cat?.subcategories?.find((x) => x.value === s.subcategory);
-  return sub?.label ?? cat?.label ?? (s.category ? categoryLabel(s.subcategory || s.category) : "Any event");
-}
+import { AddOnFields } from "@/components/packages/AddOnFields";
+import { PackageTermsFields } from "@/components/packages/PackageTermsFields";
+import { VenueLocationFields } from "@/components/packages/VenueLocationFields";
+import {
+  PRICE_UNITS,
+  bestFor,
+  blank,
+  coverage,
+  formFrom,
+  hasCustomTerms,
+  money,
+  type FormState,
+} from "@/components/packages/packageForm";
 
 /** Lets the page's header button open the new-package form. */
 export interface ServicesManagerHandle {
@@ -76,110 +66,6 @@ export interface ServicesManagerHandle {
 // distinct from MediaItem, which describes server-side media, since the two
 // shapes aren't interchangeable.
 type LocalPreview = { url: string; type: "image" | "video" };
-
-// The rate's multiplier. "event" is a flat price — everything else needs a
-// quantity from the client at booking time before it can be paid.
-const PRICE_UNITS = [
-  { value: "event", label: "Flat price" },
-  { value: "person", label: "Per person" },
-  { value: "hour", label: "Per hour" },
-  { value: "day", label: "Per day" },
-  { value: "performer", label: "Per performer" },
-];
-
-const ADD_ON_UNITS: { value: AddOn["price_unit"]; label: string }[] = [
-  { value: "event", label: "flat" },
-  { value: "person", label: "per person" },
-  { value: "hour", label: "per hour" },
-];
-
-/** An add-on row while it's being typed — price as text, same reason as
- *  FormState.price below. */
-type AddOnDraft = { id?: string; name: string; price: string; price_unit: AddOn["price_unit"] };
-
-// Same as ServiceInput, but price is the raw text the vendor is typing, not
-// a number — a native number input's own min/step validation fights a vendor
-// trying to clear a pre-filled price and type a new one (it can snap back to
-// "0" rather than let the field sit empty mid-edit). Plain text sidesteps
-// that entirely; save() parses and validates it before this goes anywhere
-// near the API.
-//
-// The other numeric fields are text for the same reason; terms are shown in
-// the units a vendor thinks in (days, dollars) and converted in save().
-type FormState = Omit<
-  ServiceInput,
-  | "price"
-  | "experience"
-  | "included_hours"
-  | "inclusions"
-  | "add_ons"
-  | "deposit_percent"
-  | "cancellation_window_hours"
-  | "overtime_rate_cents"
-> & {
-  price: string;
-  included_hours: string;
-  /** One inclusion per line. */
-  inclusionsText: string;
-  add_ons: AddOnDraft[];
-  deposit_percent: string;
-  cancellation_days: string;
-  overtime_rate: string;
-};
-
-const blank: FormState = {
-  name: "",
-  price: "",
-  // No default: the vendor picks. It used to start on "per hour" (iOS parity,
-  // and the safer mistake), but a vendor typing a flat price could miss the
-  // dropdown entirely and list an hourly rate by accident. Asking is safer
-  // than either default.
-  price_unit: "",
-  description: "",
-  negotiable: false,
-  require_guest_count: false,
-  require_performer_count: false,
-  is_popular: false,
-  status: "active",
-  included_hours: "",
-  inclusionsText: "",
-  add_ons: [],
-  deposit_percent: "",
-  cancellation_days: "",
-  overtime_rate: "",
-};
-
-/** The editable form for an existing package — also what Duplicate starts
- *  from. */
-function formFrom(s: ServiceItem): FormState {
-  return {
-    name: s.name,
-    price: String(s.price),
-    price_unit: s.price_unit ?? "event",
-    category: s.category ?? "",
-    subcategory: s.subcategory ?? "",
-    description: s.description ?? "",
-    negotiable: Boolean(s.negotiable),
-    require_guest_count: Boolean(s.require_guest_count),
-    require_performer_count: Boolean(s.require_performer_count),
-    is_popular: Boolean(s.is_popular),
-    location: s.location ?? "",
-    venue_latitude: s.venue_latitude ?? null,
-    venue_longitude: s.venue_longitude ?? null,
-    status: s.status === "hidden" ? "hidden" : "active",
-    included_hours: s.included_hours != null ? String(s.included_hours) : "",
-    inclusionsText: (s.inclusions ?? []).join("\n"),
-    add_ons: (s.add_ons ?? []).map((a) => ({ ...a, price: String(a.price) })),
-    deposit_percent: s.deposit_percent != null ? String(s.deposit_percent) : "",
-    cancellation_days:
-      s.cancellation_window_hours != null ? String(Math.round(s.cancellation_window_hours / 24)) : "",
-    overtime_rate: s.overtime_rate_cents != null ? String(s.overtime_rate_cents / 100) : "",
-  };
-}
-
-function hasCustomTerms(f: FormState): boolean {
-  return Boolean(f.deposit_percent || f.cancellation_days || f.overtime_rate);
-}
 
 export function ServicesManager({
   vendor,
@@ -316,7 +202,6 @@ export function ServicesManager({
       setExpanded(null);
     },
   }));
-
 
   function startEdit(s: ServiceItem) {
     const f = formFrom(s);
@@ -820,179 +705,17 @@ export function ServicesManager({
               />
             </label>
 
-            {/* Add-ons: priced extras a client can add on top of the package. */}
-            <div>
-              <p className="text-sm font-medium text-ink-soft">Add-ons (optional)</p>
-              <p className="mt-0.5 text-xs text-ink-faint">
-                Extras on top of the package price, like an extra hour or a second photographer.
-              </p>
-              {form.add_ons.length ? (
-                <div className="mt-2 grid gap-2">
-                  {form.add_ons.map((a, i) => (
-                    <div key={a.id ?? `new-${i}`} className="flex flex-wrap items-center gap-2">
-                      <input
-                        aria-label={`Add-on ${i + 1} name`}
-                        placeholder="Extra hour"
-                        value={a.name}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            add_ons: form.add_ons.map((x, j) =>
-                              j === i ? { ...x, name: e.target.value } : x,
-                            ),
-                          })
-                        }
-                        className="min-w-0 flex-1 rounded-xl border border-card-edge bg-ground-2 px-3 py-2 text-sm text-ink outline-none focus:border-gold"
-                      />
-                      <input
-                        aria-label={`Add-on ${i + 1} price`}
-                        inputMode="decimal"
-                        placeholder="$"
-                        value={a.price}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            add_ons: form.add_ons.map((x, j) =>
-                              j === i ? { ...x, price: e.target.value } : x,
-                            ),
-                          })
-                        }
-                        className="w-24 rounded-xl border border-card-edge bg-ground-2 px-3 py-2 text-sm text-ink outline-none focus:border-gold"
-                      />
-                      <select
-                        aria-label={`Add-on ${i + 1} unit`}
-                        value={a.price_unit}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            add_ons: form.add_ons.map((x, j) =>
-                              j === i ? { ...x, price_unit: e.target.value as AddOn["price_unit"] } : x,
-                            ),
-                          })
-                        }
-                        className="rounded-xl border border-card-edge bg-ground-2 px-2.5 py-2 text-sm text-ink outline-none focus:border-gold"
-                      >
-                        {ADD_ON_UNITS.map((u) => (
-                          <option key={u.value} value={u.value}>
-                            {u.label}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setForm({ ...form, add_ons: form.add_ons.filter((_, j) => j !== i) })
-                        }
-                        className="px-1 text-sm text-ink-faint hover:text-ink"
-                        aria-label={`Remove add-on ${i + 1}`}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              <Button
-                type="button"
-                variant="ghost"
-                size="md"
-                className="mt-2"
-                onClick={() =>
-                  setForm({
-                    ...form,
-                    add_ons: [...form.add_ons, { name: "", price: "", price_unit: "event" }],
-                  })
-                }
-              >
-                + Add an add-on
-              </Button>
-            </div>
+            <AddOnFields form={form} setForm={setForm} />
 
             {isVenue ? (
-              <div className="rounded-xl bg-panel p-4">
-                <p className="text-sm font-medium text-ink">Where is it?</p>
-                <p className="mt-1 text-xs text-ink-faint">
-                  A venue anchors the whole event — its map pin is what vendor
-                  check-in is measured against, so it&apos;s required.
-                </p>
-                <div className="mt-3 grid gap-3">
-                  <Field
-                    label="Address"
-                    required
-                    value={form.location ?? ""}
-                    onChange={(e) => setForm({ ...form, location: e.target.value })}
-                  />
-                  {/* The pin comes from the address lookup below; the raw
-                      numbers are only for fixing a pin that landed on the
-                      wrong door. */}
-                  <details className="rounded-lg border border-line-soft px-3 py-2">
-                    <summary className="cursor-pointer text-xs text-ink-soft">
-                      {form.venue_latitude != null && form.venue_longitude != null
-                        ? `Pin set (${form.venue_latitude.toFixed(4)}, ${form.venue_longitude.toFixed(4)}) — adjust by hand`
-                        : "Enter the pin by hand"}
-                    </summary>
-                  <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <Field
-                      label="Latitude"
-                      type="number"
-                      step="any"
-                      required
-                      value={form.venue_latitude ?? ""}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          venue_latitude: e.target.value ? Number(e.target.value) : null,
-                        })
-                      }
-                    />
-                    <Field
-                      label="Longitude"
-                      type="number"
-                      step="any"
-                      required
-                      value={form.venue_longitude ?? ""}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          venue_longitude: e.target.value ? Number(e.target.value) : null,
-                        })
-                      }
-                    />
-                  </div>
-                  </details>
-                  {matched ? (
-                    <p className="rounded-lg bg-green/10 px-3 py-2 text-xs text-ink-soft">
-                      Pinned to <strong className="font-semibold text-ink">{matched}</strong>. If
-                      that isn&apos;t the right door, adjust the coordinates above.
-                    </p>
-                  ) : null}
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      size="md"
-                      disabled={locating}
-                      onClick={locateFromAddress}
-                    >
-                      {locating ? "Looking up…" : "Find it from the address"}
-                    </Button>
-                    <Button type="button" variant="ghost" size="md" onClick={useMyLocation}>
-                      I&apos;m standing there now
-                    </Button>
-                  </div>
-                  <p className="text-xs text-ink-faint">
-                    Address lookup by the{" "}
-                    <a
-                      href="https://geocoding.geo.census.gov"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline hover:text-ink-soft"
-                    >
-                      US Census Bureau
-                    </a>
-                    . US addresses only.
-                  </p>
-                </div>
-              </div>
+              <VenueLocationFields
+                form={form}
+                setForm={setForm}
+                locating={locating}
+                matched={matched}
+                onLocate={locateFromAddress}
+                onUseMyLocation={useMyLocation}
+              />
             ) : null}
 
             {editing === "new" ? (
@@ -1173,56 +896,7 @@ export function ServicesManager({
               </span>
             </label>
 
-            {/* Per-package contract terms. Blank = the vendor's defaults from
-                Profile → Contract defaults, shown as placeholders so it's
-                clear what "blank" means. */}
-            <div className="rounded-xl bg-panel p-4">
-              <button
-                type="button"
-                onClick={() => setShowTerms((v) => !v)}
-                aria-expanded={showTerms}
-                className="text-sm font-medium text-ink"
-              >
-                {showTerms ? "▾" : "▸"} Custom contract terms for this package
-              </button>
-              {showTerms ? (
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <Field
-                    label="Deposit (%)"
-                    inputMode="numeric"
-                    placeholder={vendor.default_deposit_percent?.toString() ?? "—"}
-                    value={form.deposit_percent}
-                    onChange={(e) => setForm({ ...form, deposit_percent: e.target.value })}
-                  />
-                  <Field
-                    label="Cancellation window (days)"
-                    inputMode="numeric"
-                    placeholder={
-                      vendor.default_cancellation_window_hours != null
-                        ? String(Math.round(vendor.default_cancellation_window_hours / 24))
-                        : "—"
-                    }
-                    value={form.cancellation_days}
-                    onChange={(e) => setForm({ ...form, cancellation_days: e.target.value })}
-                  />
-                  <Field
-                    label="Overtime rate ($/hr)"
-                    inputMode="decimal"
-                    placeholder={
-                      vendor.default_overtime_rate_cents != null
-                        ? String(vendor.default_overtime_rate_cents / 100)
-                        : "—"
-                    }
-                    value={form.overtime_rate}
-                    onChange={(e) => setForm({ ...form, overtime_rate: e.target.value })}
-                  />
-                  <p className="text-xs text-ink-faint sm:col-span-3">
-                    Leave blank to use your defaults. New contracts for this package start
-                    from these.
-                  </p>
-                </div>
-              ) : null}
-            </div>
+            <PackageTermsFields key={editing ?? "none"} form={form} setForm={setForm} vendor={vendor} initiallyOpen={showTerms} />
 
             <div>
               <p className="mb-1.5 text-sm font-medium text-ink-soft">Who can see it</p>
