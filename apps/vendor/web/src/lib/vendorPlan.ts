@@ -7,7 +7,7 @@
 // both the dashboard and lib/attention's badge read them, so the two can't tell
 // a vendor different things. Every rule mirrors a backend guard.
 
-import { describeDue } from "./contractDraft";
+import { describeDue } from "@jorna/shared/lib/contractDraft";
 import {
   eventIsOver,
   type AvailabilitySlot,

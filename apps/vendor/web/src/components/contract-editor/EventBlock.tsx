@@ -1,7 +1,7 @@
 "use client";
 
 import { Field } from "@jorna/shared/components/ui";
-import { describeWhen, type Draft } from "@/lib/contractDraft";
+import { describeWhen, type Draft } from "@jorna/shared/lib/contractDraft";
 import type { VendorBooking } from "@/lib/types";
 import { todayIso, type SetDraft } from "./shared";
 

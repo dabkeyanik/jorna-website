@@ -25,7 +25,7 @@ import {
   updateDocument,
 } from "@/lib/jorna";
 import { KIND_LABEL, starterSections, type SectionDraft } from "@/lib/attachedDocuments";
-import { describeWhen, newKey } from "@/lib/contractDraft";
+import { describeWhen, newKey } from "@jorna/shared/lib/contractDraft";
 import {
   loadTemplates,
   saveDocumentTemplate,

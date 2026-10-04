@@ -8,7 +8,7 @@ import {
   type Draft,
   type InstallmentDraft,
   type SchedulePreset,
-} from "@/lib/contractDraft";
+} from "@jorna/shared/lib/contractDraft";
 import type { DueType } from "@/lib/types";
 import { inputClass, smallButton } from "./shared";
 

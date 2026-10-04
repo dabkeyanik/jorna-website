@@ -1,6 +1,6 @@
 "use client";
 
-import type { ClauseDraft } from "@/lib/contractDraft";
+import type { ClauseDraft } from "@jorna/shared/lib/contractDraft";
 
 /** One of the vendor's own terms sections, edited as it will read. */
 export function TermsBlock({

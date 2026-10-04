@@ -15,8 +15,8 @@
 // keeps the working version and calls back with it.
 
 import { useMemo, useState, type ReactNode } from "react";
-import { wordDiff } from "@/lib/contractDiff";
-import type { Draft } from "@/lib/contractDraft";
+import { wordDiff } from "../../lib/contractDiff";
+import type { Draft } from "../../lib/contractDraft";
 import {
   SECTIONS,
   addClause,
@@ -34,7 +34,7 @@ import {
   type Attribution,
   type NegotiableValue,
   type Toggle,
-} from "@/lib/negotiation";
+} from "../../lib/negotiation";
 import { ContractPaper, MARK_CLASS, type Mark } from "./ContractPaper";
 
 const input =

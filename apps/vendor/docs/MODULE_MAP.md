@@ -138,7 +138,9 @@ always "none, verify manually" until a test runner is added.
     unsigned contract, `?request=` accepts a marketplace request,
     `?template=` starts from a template. The draft model and all its
     arithmetic (totals, schedule presets, layout, templates, conversion
-    to/from the API) live in `lib/contractDraft.ts`, unit-tested.
+    to/from the API) live in `packages/shared/lib/contractDraft.ts`,
+    unit-tested; each block of the document is a component in
+    `components/contract-editor/`.
   - `(vendor)/contracts/document/page.tsx` — addenda and cancellation
     agreements attached to a signed booking (`?kind=`, `?booking=`, `?id=`);
     starter wording and status in `lib/attachedDocuments.ts`. The couple
@@ -146,14 +148,19 @@ always "none, verify manually" until a test runner is added.
   - `(vendor)/contracts/view/page.tsx` — one contract (`?id=`): items,
     payments with per-payment confirm, terms, timeline, send/resend, edit,
     void. A query param, not a route segment — static export.
-  - The negotiation workspace (`components/negotiation/`, backend
-    DECISIONS #23/#24): `NegotiationWorkspace` draws the contract as a page
-    (`ContractPaper`) beside "Review and revise"; `VendorNegotiation` and
+  - The negotiation workspace (backend DECISIONS #23/#24):
+    `NegotiationWorkspace` draws the contract as a page (`ContractPaper`)
+    beside "Review and revise" — both in
+    `packages/shared/components/negotiation/`, with `ContractCompare`, so
+    the client app can use them too. `VendorNegotiation` and
     `ClientNegotiation` decide what Send means for each side. The Leads page
     opens it as a panel (`NegotiationPanel`), `(vendor)/contracts/changes/`
     as a page, and the couple's signing page full-screen. The value model
     (Original / Proposed / Yours, item and clause toggles) is
-    `lib/negotiation.ts`, unit-tested.
+    `packages/shared/lib/negotiation.ts` and the comparison
+    `packages/shared/lib/contractDiff.ts`, both unit-tested. The contract's
+    types are `packages/shared/lib/contractTypes.ts`, re-exported from
+    `lib/types.ts`.
   - `lib/contractTemplates.ts` — templates on the account (`/contract-
     templates`), made from the builder and managed in `vendor-profile/`;
     moves any a browser saved in `localStorage` before that onto the account

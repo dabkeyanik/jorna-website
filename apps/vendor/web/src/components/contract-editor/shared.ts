@@ -1,7 +1,7 @@
 // Pieces every block of the contract editor (app/(vendor)/contracts/new)
 // shares: the field styles, and the words for a line's unit and a block.
 
-import type { Draft } from "@/lib/contractDraft";
+import type { Draft } from "@jorna/shared/lib/contractDraft";
 import type { BlockType } from "@/lib/types";
 
 /** A partial update to the draft. The page decides what else follows from

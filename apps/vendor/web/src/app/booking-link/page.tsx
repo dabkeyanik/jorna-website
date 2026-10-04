@@ -26,10 +26,10 @@ import {
   signGuestBooking,
   withdrawGuestProposal,
 } from "@/lib/jorna";
-import { describeDue } from "@/lib/contractDraft";
-import { termsOf } from "@/lib/contractDiff";
+import { describeDue } from "@jorna/shared/lib/contractDraft";
+import { termsOf } from "@jorna/shared/lib/contractDiff";
 import { Button, Card, Field } from "@jorna/shared/components/ui";
-import { ContractCompare } from "@/components/ContractCompare";
+import { ContractCompare } from "@jorna/shared/components/negotiation/ContractCompare";
 import type { GuestBooking, Installment, ProposalHistory } from "@/lib/types";
 import { DocumentView } from "./DocumentView";
 import { ClientNegotiation } from "@/components/negotiation/ClientNegotiation";
