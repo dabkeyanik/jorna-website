@@ -49,7 +49,11 @@ test.describe("contract editor and attached documents (step 7b)", () => {
 
     // A terms section, moved up above the payment schedule.
     await doc.getByRole("button", { name: "+ Meals" }).click();
-    await doc.getByRole("button", { name: "Move terms section up" }).click();
+    // Its ⋯ menu moves it (the arrows used to sit on every block).
+    const meals = doc.getByRole("region", { name: "Terms section" }).last();
+    await meals.hover();
+    await meals.getByRole("button", { name: "Terms section options" }).click();
+    await meals.getByRole("menuitem", { name: "Move terms section up" }).click();
 
     await page.getByRole("button", { name: "Copy link" }).click();
     await expect(page.getByRole("heading", { name: "Link copied" })).toBeVisible();

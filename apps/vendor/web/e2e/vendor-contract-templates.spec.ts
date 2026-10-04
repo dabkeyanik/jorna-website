@@ -36,6 +36,8 @@ test.describe("contract templates (/contracts/new, /contracts)", () => {
     await page.getByRole("button", { name: "Deposit + balance" }).click();
     await page.getByRole("button", { name: "+ Travel" }).click();
 
+    // Templates live in the header's ⋯ menu.
+    await page.getByRole("button", { name: "More" }).click();
     await page.getByLabel("Template name").fill("Standard DJ package");
     await page.getByRole("button", { name: "Save template" }).click();
     await expect(page.getByText("Saved “Standard DJ package” to your templates.")).toBeVisible();
@@ -84,6 +86,7 @@ test.describe("contract templates (/contracts/new, /contracts)", () => {
     });
 
     await page.goto("contracts/new/");
+    await page.getByRole("button", { name: "More" }).click();
     await page.getByLabel("Start from a template").selectOption({ label: "Sangeet" });
     await expect(page.getByLabel("Amount ($)").first()).toHaveValue("600");
     await expect(page.getByLabel("Amount ($)").last()).toHaveValue("1400");

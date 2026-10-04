@@ -74,15 +74,16 @@ import {
   type VendorBooking,
   type VendorDetail,
 } from "@/lib/types";
-import { Button, LinkButton } from "@jorna/shared/components/ui";
+import { Button, Field, LinkButton } from "@jorna/shared/components/ui";
+import { ContractPreview } from "@/components/contract-editor/ContractPreview";
 import { DocBlock } from "@/components/contract-editor/DocBlock";
+import { EditorMenu } from "@/components/contract-editor/EditorMenu";
 import { EventBlock } from "@/components/contract-editor/EventBlock";
 import { ItemsBlock } from "@/components/contract-editor/ItemsBlock";
 import { PartiesBlock } from "@/components/contract-editor/PartiesBlock";
 import { PoliciesBlock } from "@/components/contract-editor/PoliciesBlock";
 import { ScheduleBlock } from "@/components/contract-editor/ScheduleBlock";
 import { SignatureBlock } from "@/components/contract-editor/SignatureBlock";
-import { TemplatesCard } from "@/components/contract-editor/TemplatesCard";
 import { TermsBlock } from "@/components/contract-editor/TermsBlock";
 import { smallButton, todayIso } from "@/components/contract-editor/shared";
 
@@ -160,6 +161,12 @@ function NewContractInner() {
   // Whether the payment plan is still the one drafted for the vendor — see
   // usualSchedule. Any edit to the plan itself makes it theirs.
   const [autoPlan, setAutoPlan] = useState(true);
+
+  // Problems show under the block that has them once the vendor has left it
+  // (touched) or pressed Send (showAll) — not while a block is being filled.
+  const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set());
+  const [showAll, setShowAll] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
 
   const set = (patch: Partial<Draft>) =>
     setDraft((d) => {
@@ -273,11 +280,23 @@ function NewContractInner() {
   const defaultTitle = `${firstPackage || (vendor?.category ? categoryLabel(vendor.subcategory || vendor.category) : "Services")} agreement`;
   const vendorName = [vendor?.f_name, vendor?.l_name].filter(Boolean).join(" ") || "Your business";
 
-  const blockHasIssue = (b: LayoutBlock) =>
-    issues.some((i) =>
-      STEP_BLOCK[i.step] === b.type &&
-      (b.type !== "terms" || draft.clauses.some((c) => c.key === b.id && (!c.title.trim() || !c.body.trim()))),
-    );
+  /** This block's problems. A terms problem belongs only to the sections
+   *  that are actually missing a title or text. */
+  const issuesFor = (b: LayoutBlock): string[] =>
+    issues
+      .filter(
+        (i) =>
+          STEP_BLOCK[i.step] === b.type &&
+          (b.type !== "terms" || draft.clauses.some((c) => c.key === b.id && (!c.title.trim() || !c.body.trim()))),
+      )
+      .map((i) => i.message);
+
+  /** Show every problem and take the vendor to the first. */
+  function showProblems() {
+    setShowAll(true);
+    const first = layout.find((b) => issuesFor(b).length > 0);
+    if (first) scrollToBlock(first.id);
+  }
 
   // ── Payments ──
 
@@ -328,7 +347,6 @@ function NewContractInner() {
     }
   }
 
-
   // ── Send / copy / save ──
 
   async function copy(token: string) {
@@ -343,8 +361,7 @@ function NewContractInner() {
 
   async function submit(mode: "send" | "copy" | "draft" | "save") {
     if (mode !== "draft" && issues.length) {
-      setError(issues[0].message);
-      scrollToBlock(layout.find((b) => b.type === STEP_BLOCK[issues[0].step])?.id ?? "parties");
+      showProblems();
       return;
     }
     setBusy(mode);
@@ -477,7 +494,6 @@ function NewContractInner() {
     );
   }
 
-
   const scheduled = scheduledCents(draft);
   const vendorCategory = vendor.category ? categoryLabel(vendor.subcategory || vendor.category) : null;
 
@@ -490,22 +506,30 @@ function NewContractInner() {
       case "items":
         return <ItemsBlock draft={draft} set={set} services={services} total={total} />;
       case "schedule":
-        return <ScheduleBlock draft={draft} total={total} setPlan={setPlan} onPreset={applyPreset} />;
+        return (
+          <>
+            <ScheduleBlock draft={draft} total={total} setPlan={setPlan} onPreset={applyPreset} />
+            <PoliciesBlock draft={draft} set={set} />
+          </>
+        );
       case "terms": {
         const c = draft.clauses.find((x) => x.key === b.id);
         return c ? <TermsBlock clause={c} onChange={(patch) => updateClause(c.key, patch)} /> : null;
       }
       case "signature":
-        return <SignatureBlock clientName={request?.client_name || draft.clientName || "Client"} vendorName={vendorName} />;
+        return <SignatureBlock clientName={clientName} vendorName={vendorName} />;
     }
   }
 
-
   const sendLabel = request ? "Accept & send contract" : "Send & hold date";
+  const clientName = request?.client_name || draft.clientName || "Client";
+  const primary = editing
+    ? { label: busy === "save" ? "Saving…" : revising ? "Send new version" : "Save changes", run: () => submit("save") }
+    : { label: busy === "send" ? "Sending…" : sendLabel, run: () => submit("send") };
   const canEmail = request ? true : Boolean(draft.clientEmail.trim());
 
   return (
-    <div>
+    <div className="pb-24 lg:pb-0">
       <header className="mb-6">
         <Link
           href={editing ? `/contracts/view?id=${editing.booking_id}` : request ? "/my-bookings" : "/contracts"}
@@ -513,9 +537,17 @@ function NewContractInner() {
         >
           ← {editing ? "Back to the contract" : request ? "Back to requests" : "All contracts"}
         </Link>
-        <h1 className="serif mt-2 text-3xl text-maroon dark:text-gold">
-          {revising ? "Revise the contract" : editing ? "Edit contract" : request ? `Accept ${request.client_name ? `${request.client_name}'s` : "this"} request` : "New contract"}
-        </h1>
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+          <h1 className="serif text-3xl text-maroon dark:text-gold">
+            {revising ? "Revise the contract" : editing ? "Edit contract" : request ? `Accept ${request.client_name ? `${request.client_name}'s` : "this"} request` : "New contract"}
+          </h1>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="ghost" onClick={() => setPreviewing(true)}>
+              Preview as client
+            </Button>
+            <EditorMenu templates={templates} canPick={!editing} onPick={pickTemplate} onSave={saveAsTemplate} />
+          </div>
+        </div>
         <p className="mt-1 text-sm text-ink-soft">
           {revising
             ? `${editing?.guest_name || "Your client"}'s proposed changes are already in. Keep what you like, change the rest — saving sends this version to them and restarts your hold.`
@@ -525,8 +557,13 @@ function NewContractInner() {
               ? editing.contract_status === "draft"
                 ? "It's still a draft — nothing has gone to your client."
                 : "Your client will see the new version. If they had it open, they'll need to review it again before signing."
-              : "Write it the way your client will read it. Move sections around with the arrows."}
+              : "Write it the way your client will read it. Each section's ⋯ moves it or adds one below."}
         </p>
+        {templateNotice ? (
+          <p role="status" className="mt-3 rounded-lg bg-panel px-3 py-2 text-sm text-ink-soft">
+            {templateNotice}
+          </p>
+        ) : null}
         {staleProposal ? (
           <p role="status" className="mt-3 rounded-lg bg-panel px-3 py-2 text-sm text-ink-soft">
             That proposal has already been answered, so this is the contract as it stands.
@@ -560,7 +597,9 @@ function NewContractInner() {
                 block={b}
                 index={idx}
                 count={layout.length}
-                issue={blockHasIssue(b)}
+                issues={issuesFor(b)}
+                showIssues={showAll || touched.has(b.id)}
+                onLeave={() => setTouched((t) => (t.has(b.id) ? t : new Set(t).add(b.id)))}
                 onMove={(delta) => set({ layout: moveBlock(draft, b.id, delta) })}
                 onAddBelow={() => addSection(undefined, idx + 1)}
                 onRemove={
@@ -606,22 +645,14 @@ function NewContractInner() {
             </p>
 
             {issues.length ? (
-              <div className="mt-4 rounded-lg bg-panel p-3">
-                <p className="text-xs font-semibold text-maroon dark:text-gold">Before you can send it</p>
-                <ul className="mt-1.5 grid gap-1 text-xs text-ink-soft">
-                  {issues.map((i) => (
-                    <li key={i.message}>
-                      <button
-                        type="button"
-                        className="text-left underline-offset-4 hover:underline"
-                        onClick={() => scrollToBlock(layout.find((b) => b.type === STEP_BLOCK[i.step])?.id ?? "parties")}
-                      >
-                        {i.message}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <p className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-panel px-3 py-2 text-xs text-ink-soft">
+                <span>
+                  {issues.length === 1 ? "1 thing" : `${issues.length} things`} to fix before sending
+                </span>
+                <button type="button" onClick={showProblems} className="font-semibold text-gold underline-offset-4 hover:underline">
+                  Show me
+                </button>
+              </p>
             ) : null}
 
             {error ? (
@@ -646,10 +677,10 @@ function NewContractInner() {
                 ) : (
                   <p className="text-xs text-ink-faint">No client email — copy the link and send it yourself.</p>
                 )}
-                <Button disabled={busy !== null || issues.length > 0} onClick={() => submit("send")}>
+                <Button disabled={busy !== null} onClick={() => submit("send")}>
                   {busy === "send" ? "Sending…" : sendLabel}
                 </Button>
-                <Button variant="ghost" disabled={busy !== null || issues.length > 0} onClick={() => submit("copy")}>
+                <Button variant="ghost" disabled={busy !== null} onClick={() => submit("copy")}>
                   {busy === "copy" ? "Creating link…" : "Copy link"}
                 </Button>
                 {request ? null : (
@@ -657,27 +688,42 @@ function NewContractInner() {
                     {busy === "draft" ? "Saving…" : "Save as draft"}
                   </Button>
                 )}
-                <p className="text-xs text-ink-faint">Sending or copying the link holds your date for them.</p>
+                <Field
+                  label="Hold the date for (days)"
+                  type="number"
+                  min={1}
+                  max={60}
+                  placeholder={String(vendor.contract_hold_days ?? 7)}
+                  value={draft.holdDays}
+                  onChange={(e) => set({ holdDays: e.target.value })}
+                  hint="Sending or copying the link holds your date for them. If they haven't signed by then, it opens up again."
+                />
               </div>
             )}
           </div>
-
-          <PoliciesBlock
-            draft={draft}
-            set={set}
-            showHold={!editing}
-            defaultHoldDays={vendor.contract_hold_days ?? 7}
-          />
-
-          <TemplatesCard
-            templates={templates}
-            canPick={!editing}
-            onPick={pickTemplate}
-            onSave={saveAsTemplate}
-            notice={templateNotice}
-          />
         </aside>
       </div>
+
+      {/* On a phone the rail falls below a long document; keep the total and
+          the one action that matters in reach. */}
+      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-card-edge bg-card/95 px-4 py-3 shadow-[0_-8px_24px_rgba(42,12,25,0.08)] backdrop-blur lg:hidden">
+        <div className="min-w-0">
+          <p className="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Total</p>
+          <p className="serif text-lg text-ink">{money(total)}</p>
+        </div>
+        <Button disabled={busy !== null} onClick={primary.run}>
+          {primary.label}
+        </Button>
+      </div>
+
+      <ContractPreview
+        open={previewing}
+        onClose={() => setPreviewing(false)}
+        draft={draft}
+        title={draft.title || defaultTitle}
+        vendorName={vendorName}
+        clientName={clientName}
+      />
     </div>
   );
 }
