@@ -19,9 +19,9 @@ import {
   type LineChange,
   type PaymentChange,
   type WordPiece,
-} from "@/lib/contractDiff";
-import { describeDue, money } from "@/lib/contractDraft";
-import type { InstallmentTerms, LineItem, TermsVersion } from "@/lib/types";
+} from "../../lib/contractDiff";
+import { describeDue, money } from "../../lib/contractDraft";
+import type { InstallmentTerms, LineItem, TermsVersion } from "../../lib/contractTypes";
 
 const SECTIONS: { id: DiffSection; title: string }[] = [
   { id: "event", title: "Event details" },

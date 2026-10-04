@@ -1,8 +1,8 @@
 "use client";
 
-import { ContractPaper } from "@/components/negotiation/ContractPaper";
+import { ContractPaper } from "@jorna/shared/components/negotiation/ContractPaper";
 import { Drawer } from "@/components/vendor/ui";
-import type { Draft } from "@/lib/contractDraft";
+import type { Draft } from "@jorna/shared/lib/contractDraft";
 
 /**
  * "Preview as client": the draft as the client will read it, with the same

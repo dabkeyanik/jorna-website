@@ -60,7 +60,7 @@ import {
   type InstallmentDraft,
   type SchedulePreset,
   type Step,
-} from "@/lib/contractDraft";
+} from "@jorna/shared/lib/contractDraft";
 import { loadTemplates, saveTemplate, templateBody, templatesOfKind } from "@/lib/contractTemplates";
 import { guestBookingLink } from "@/lib/contractLink";
 import {

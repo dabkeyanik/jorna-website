@@ -23,7 +23,7 @@ import {
 } from "@/lib/jorna";
 import { KIND_LABEL, documentStatus } from "@/lib/attachedDocuments";
 import { downloadContractPdf, downloadDocumentPdf } from "@/lib/download";
-import { describeDue, describeWhen, money } from "@/lib/contractDraft";
+import { describeDue, describeWhen, money } from "@jorna/shared/lib/contractDraft";
 import {
   emailNotice,
   guestBookingLink,

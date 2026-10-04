@@ -14,7 +14,7 @@ import {
   deleteContractTemplate,
   listContractTemplates,
 } from "./jorna";
-import type { TemplateBody } from "./contractDraft";
+import type { TemplateBody } from "@jorna/shared/lib/contractDraft";
 import type { AttachedDocumentKind, SavedContractTemplate, TemplateKind } from "./types";
 
 const LEGACY_KEY = "jorna_contract_templates";

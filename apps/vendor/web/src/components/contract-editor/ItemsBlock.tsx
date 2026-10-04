@@ -10,7 +10,7 @@ import {
   subtotalCents,
   type Draft,
   type LineDraft,
-} from "@/lib/contractDraft";
+} from "@jorna/shared/lib/contractDraft";
 import { priceUnitLabel, type ServiceItem } from "@/lib/types";
 import { inputClass, smallButton, UNIT_WORD, type SetDraft } from "./shared";
 

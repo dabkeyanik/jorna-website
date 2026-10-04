@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { diffTerms, termsOf, wordDiff } from "./contractDiff";
 import { draftTerms, fromContract, proposalChanges, type ContractTermsSource } from "./contractDraft";
-import type { LineItem, TermsVersion } from "./types";
+import type { LineItem, TermsVersion } from "./contractTypes";
 
 const line = (over: Partial<LineItem> = {}): LineItem => ({
   id: "pkg",

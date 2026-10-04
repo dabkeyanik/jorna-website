@@ -9,7 +9,7 @@
 // key. Clause text is compared word by word.
 
 import { describeDue, money } from "./contractDraft";
-import type { Clause, InstallmentTerms, LineItem, TermsVersion } from "./types";
+import type { Clause, InstallmentTerms, LineItem, TermsVersion } from "./contractTypes";
 
 export type DiffSection = "event" | "items" | "schedule" | "terms" | "policies";
 

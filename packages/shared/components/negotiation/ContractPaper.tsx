@@ -6,8 +6,8 @@
 // the editing happens in the revision panel beside it.
 
 import type { ReactNode } from "react";
-import { describeDue, layoutOf, lineTotalCents, money, totalCents, toCents, type Draft } from "@/lib/contractDraft";
-import { lineId, showValue, type ValueKind } from "@/lib/negotiation";
+import { describeDue, layoutOf, lineTotalCents, money, totalCents, toCents, type Draft } from "../../lib/contractDraft";
+import { lineId, showValue, type ValueKind } from "../../lib/negotiation";
 
 export type Mark = "other" | "yours" | null;
 

@@ -10,8 +10,8 @@
 import type {
   BlockType,
   Clause,
-  Contract,
   ContractCreateInput,
+  ContractTerms,
   DueType,
   Installment,
   InstallmentInput,
@@ -21,12 +21,43 @@ import type {
   LineItem,
   LineItemKind,
   LineUnit,
-  ServiceItem,
   TermsChanges,
   TermsVersion,
-  VendorBooking,
-  VendorDetail,
-} from "./types";
+} from "./contractTypes";
+
+// What this file reads from each app's own (wider, and not yet shared) types:
+// only these fields, so either app's ServiceItem, VendorDetail, VendorBooking
+// or Contract fits as it is.
+
+/** A package from the vendor's listing, and its add-ons. */
+export interface PackageSource {
+  service_id: string;
+  name: string;
+  price: number;
+  price_unit?: string | null;
+  add_ons?: { id?: string; name: string; price: number; price_unit: string }[] | null;
+}
+
+/** The vendor's saved default clauses. */
+export interface VendorDefaultsSource {
+  default_contract_terms?: ContractTerms | null;
+}
+
+/** A marketplace request being answered with a contract. */
+export interface RequestSource {
+  client_name?: string | null;
+  date_iso?: string | null;
+  date_end?: string | null;
+  time_start?: string | null;
+  time_end?: string | null;
+  location?: string | null;
+  guest_count?: number | null;
+  service_id?: string | null;
+  service_name?: string | null;
+  price_unit?: string | null;
+  price: number;
+  price_pending_quantity?: boolean | null;
+}
 
 export interface LineDraft {
   key: string;
@@ -143,7 +174,7 @@ function lineUnit(unit: string | null | undefined): LineUnit {
   return unit === "person" || unit === "hour" || unit === "day" ? unit : unit === "event" || !unit ? "event" : "item";
 }
 
-export function packageLine(service: ServiceItem): LineDraft {
+export function packageLine(service: PackageSource): LineDraft {
   return {
     key: newKey(),
     kind: "package",
@@ -156,7 +187,7 @@ export function packageLine(service: ServiceItem): LineDraft {
   };
 }
 
-export function addonLine(service: ServiceItem, addonId: string): LineDraft | null {
+export function addonLine(service: PackageSource, addonId: string): LineDraft | null {
   const addon = service.add_ons?.find((a) => a.id === addonId);
   if (!addon) return null;
   return {
@@ -260,7 +291,7 @@ export function balanceLastPayment(draft: Draft): InstallmentDraft[] {
 // ── Terms ────────────────────────────────────────────────────────────
 
 /** The vendor's saved equipment/travel defaults, as clauses. */
-export function defaultClauses(vendor: VendorDetail | null): ClauseDraft[] {
+export function defaultClauses(vendor: VendorDefaultsSource | null): ClauseDraft[] {
   const terms = vendor?.default_contract_terms;
   const out: ClauseDraft[] = [];
   if (terms?.equipment_power) out.push({ key: "equipment_power", title: "Equipment & power", body: terms.equipment_power });
@@ -494,19 +525,29 @@ export function toDocument(draft: Draft) {
 
 /** What fromContract reads: a vendor's Contract, the client's
  *  GuestBooking, or either with a proposal's terms laid over it. */
-export type ContractTermsSource = Pick<
-  Contract,
-  | "date_iso" | "date_end" | "time_start" | "time_end" | "location" | "guest_count" | "amount_cents"
-  | "deposit_percent" | "cancellation_window_hours" | "overtime_rate_cents" | "contract_terms"
-  | "guest_name" | "guest_email" | "guest_phone"
-> &
-  Partial<Pick<Contract, "line_items" | "discount_cents" | "terms_clauses" | "document_title" | "document_layout">> & {
-    payment_schedule?: (Omit<Installment, "due_on" | "marked_paid_at" | "confirmed_at"> & Partial<Installment>)[] | null;
-  };
+export interface ContractTermsSource {
+  date_iso: string;
+  date_end: string | null;
+  time_start: string;
+  time_end: string;
+  location: string;
+  guest_count: number | null;
+  amount_cents: number;
+  deposit_percent: number | null;
+  cancellation_window_hours: number | null;
+  overtime_rate_cents: number | null;
+  contract_terms: ContractTerms | null;
+  guest_name: string | null;
+  guest_email: string | null;
+  guest_phone: string | null;
+  line_items?: LineItem[] | null;
+  discount_cents?: number | null;
+  terms_clauses?: Clause[] | null;
+  document_title?: string | null;
+  document_layout?: LayoutBlock[] | null;
+  payment_schedule?: (Omit<Installment, "due_on" | "marked_paid_at" | "confirmed_at"> & Partial<Installment>)[] | null;
+}
 
-/** An existing contract back into the builder, for editing. A contract made
- *  before schedules has no payment_schedule — its single deposit becomes a
- *  two-payment schedule the vendor can adjust. */
 export function fromContract(c: ContractTermsSource): Draft {
   const lines: LineDraft[] = (c.line_items ?? []).map((l) => ({
     key: newKey(),
@@ -571,7 +612,7 @@ export function fromContract(c: ContractTermsSource): Draft {
  * a per-guest or per-hour one whose count isn't known yet starts at the
  * rate with the quantity blank, for the vendor to fill in.
  */
-export function fromRequest(b: VendorBooking): Draft {
+export function fromRequest(b: RequestSource): Draft {
   const pending = Boolean(b.price_pending_quantity);
   return {
     ...emptyDraft(),
@@ -657,7 +698,7 @@ export function toTemplate(draft: Draft): TemplateBody {
 
 /** Lay a template over the draft: it replaces what it has, and leaves the
  *  client and the date alone. Lines whose package is gone are dropped. */
-export function applyTemplate(draft: Draft, body: TemplateBody, services: ServiceItem[]): Draft {
+export function applyTemplate(draft: Draft, body: TemplateBody, services: { service_id: string }[]): Draft {
   const live = new Set(services.map((s) => s.service_id));
   const next: Draft = { ...draft };
   if (body.lines?.length) {
