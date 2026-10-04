@@ -1,7 +1,7 @@
 // A contract's timeline in words — shared by the contract page and the Leads
 // drawer, so the two can't describe the same event differently.
 
-import { money } from "@/lib/contractDraft";
+import { money } from "@jorna/shared/lib/contractDraft";
 import type { ContractEvent } from "@/lib/types";
 
 export function prettyDate(iso?: string | null): string {

@@ -1,6 +1,6 @@
 "use client";
 
-import type { Draft } from "@/lib/contractDraft";
+import type { Draft } from "@jorna/shared/lib/contractDraft";
 import type { VendorBooking } from "@/lib/types";
 import { inputClass, type SetDraft } from "./shared";
 

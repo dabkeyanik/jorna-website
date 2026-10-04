@@ -12,7 +12,7 @@ import Link from "next/link";
 import { ApiError } from "@jorna/shared/lib/api";
 import { Button, Field } from "@jorna/shared/components/ui";
 import { updateMyVendor } from "@/lib/jorna";
-import { newKey } from "@/lib/contractDraft";
+import { newKey } from "@jorna/shared/lib/contractDraft";
 import type { PaymentPlan, VendorDetail } from "@/lib/types";
 import { Drawer } from "@/components/vendor/ui";
 

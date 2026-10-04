@@ -25,7 +25,7 @@ import {
   type Draft,
   type LineDraft,
 } from "./contractDraft";
-import type { ProposalHistory, TermsVersion } from "./types";
+import type { ProposalHistory, TermsVersion } from "./contractTypes";
 
 export type ValueKind = "text" | "date" | "time" | "count" | "money" | "days" | "longtext";
 

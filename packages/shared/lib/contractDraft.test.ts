@@ -17,10 +17,11 @@ import {
   toDocument,
   toTemplate,
   totalCents,
+  type ContractTermsSource,
   type Draft,
   type LineDraft,
+  type RequestSource,
 } from "./contractDraft";
-import type { Contract, ServiceItem, VendorBooking } from "./types";
 
 const pkg = (over: Partial<LineDraft> = {}): LineDraft => ({
   key: "p",
@@ -116,7 +117,7 @@ describe("toDocument", () => {
 describe("templates", () => {
   it("keep the schedule as shares, so they fit a different total", () => {
     const body = toTemplate(ready());
-    const services = [{ service_id: "svc-1" } as ServiceItem];
+    const services = [{ service_id: "svc-1" }];
     const bigger = applyTemplate(
       { ...emptyDraft(), lines: [] },
       { ...body, lines: [pkg({ price: "2800" })], discount: "" },
@@ -154,7 +155,7 @@ describe("fromContract", () => {
       ],
       payment_schedule: null,
       contract_terms: { travel: "30 miles included" },
-    } as unknown as Contract;
+    } as unknown as ContractTermsSource;
     const d = fromContract(c);
     expect(d.location).toBe("");
     expect(d.schedule.map((s) => toCents(s.amount))).toEqual([25_000, 75_000]);
@@ -163,7 +164,7 @@ describe("fromContract", () => {
 });
 
 describe("fromRequest", () => {
-  const request = (over: Partial<VendorBooking> = {}) =>
+  const request = (over: Partial<RequestSource> = {}) =>
     ({
       booking_id: "b",
       user_id: "u",
@@ -179,7 +180,7 @@ describe("fromRequest", () => {
       location: "Pines Manor",
       status: "pending",
       ...over,
-    }) as VendorBooking;
+    }) as RequestSource;
 
   it("starts from the request's total when it's known", () => {
     const d = fromRequest(request());
@@ -257,7 +258,7 @@ describe("layout", () => {
     d = { ...d, layout: moveBlock(d, "x", -1) };
     const body = toTemplate(d);
     expect(body.layout).toEqual(["parties", "event", "terms", "items", "schedule", "signature"]);
-    const applied = applyTemplate(emptyDraft(), body, [{ service_id: "svc-1" } as ServiceItem]);
+    const applied = applyTemplate(emptyDraft(), body, [{ service_id: "svc-1" }]);
     expect(types(applied)[2]).toMatch(/^terms:/);
     expect(applied.clauses[0].title).toBe("Scope");
   });

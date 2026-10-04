@@ -23,10 +23,10 @@ import {
   saveContractDraft,
   updateContract,
 } from "@/lib/jorna";
-import { defaultClauses, fromContract, problems, toDocument, type Draft } from "@/lib/contractDraft";
-import { draftToSave, roundOf } from "@/lib/negotiation";
+import { defaultClauses, fromContract, problems, toDocument, type Draft } from "@jorna/shared/lib/contractDraft";
+import { draftToSave, roundOf } from "@jorna/shared/lib/negotiation";
 import type { Contract, ProposalHistory, VendorDetail } from "@/lib/types";
-import { NegotiationWorkspace } from "./NegotiationWorkspace";
+import { NegotiationWorkspace } from "@jorna/shared/components/negotiation/NegotiationWorkspace";
 
 function todayIso(): string {
   const d = new Date();
