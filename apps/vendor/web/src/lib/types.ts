@@ -300,6 +300,8 @@ export interface VendorDetail {
   contract_hold_days?: number | null;
   /** The schedule they usually offer (backend 0070); null for the old rule. */
   default_payment_plan?: PaymentPlan | null;
+  /** Groups clients can't ask to change on a contract (backend 0072). */
+  negotiation_locks?: ("prices" | "event" | "policies" | "clauses")[] | null;
 }
 
 /** A vendor's usual payment schedule: which preset, and when the final
@@ -814,6 +816,8 @@ export interface VendorUpdateInput {
   /** Days a sent contract holds its date (1–60); null for the backend's 7. */
   contract_hold_days?: number | null;
   default_payment_plan?: PaymentPlan | null;
+  /** Groups clients can't ask to change on a contract (backend 0072). */
+  negotiation_locks?: ("prices" | "event" | "policies" | "clauses")[] | null;
 }
 
 // ── Moderation ───────────────────────────────────────────────────────

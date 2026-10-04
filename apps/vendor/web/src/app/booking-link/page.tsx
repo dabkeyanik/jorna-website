@@ -19,7 +19,10 @@ import {
   declineGuestBooking,
   fillGuestBookingDetails,
   getGuestBooking,
+  getGuestNegotiation,
   getGuestProposals,
+  saveGuestNegotiationDraft,
+  sendGuestNegotiation,
   guestMarkDepositPaid,
   guestMarkFullPaid,
   guestMarkInstallmentPaid,
@@ -33,6 +36,8 @@ import { ContractCompare } from "@jorna/shared/components/negotiation/ContractCo
 import type { GuestBooking, Installment, ProposalHistory } from "@/lib/types";
 import { DocumentView } from "./DocumentView";
 import { ClientNegotiation } from "@/components/negotiation/ClientNegotiation";
+import { FieldNegotiationWorkspace } from "@jorna/shared/components/negotiation/FieldNegotiationWorkspace";
+import type { FieldNegotiationState } from "@jorna/shared/lib/contractTypes";
 import { guestContractPdfUrl } from "@/lib/download";
 
 function money(cents: number): string {
@@ -119,6 +124,31 @@ function Schedule({
 
 function shortDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+/** Where a field-by-field negotiation stands, above the contract, and the
+ *  way into the workspace (backend DECISIONS #26). */
+function FieldStatus({ state, vendorName, onOpen }: { state: FieldNegotiationState; vendorName: string; onOpen: () => void }) {
+  const mine = state.turn === "client";
+  const waitingOnMe = state.fields.filter((f) => f.state === "waiting_client").length;
+  const waitingOnThem = state.fields.filter((f) => f.state === "waiting_vendor").length;
+  return (
+    <Card className="mt-6 p-5">
+      <p className="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-ink-faint">Round {state.round}</p>
+      <p className="mt-1 text-sm text-ink">
+        {waitingOnMe
+          ? `${vendorName} answered your changes. ${waitingOnMe === 1 ? "One needs" : `${waitingOnMe} need`} your answer before you sign.`
+          : waitingOnThem
+            ? `You asked for ${waitingOnThem === 1 ? "a change" : `${waitingOnThem} changes`}. It's ${vendorName}'s turn — we'll email you when they answer.`
+            : "Everything in the contract below is agreed. Read it over and sign, or ask for a change."}
+      </p>
+      {mine ? (
+        <Button type="button" variant={waitingOnMe ? "primary" : "ghost"} className="mt-3" onClick={onOpen}>
+          {waitingOnMe ? "Review and answer" : "Ask for a change"}
+        </Button>
+      ) : null}
+    </Card>
+  );
 }
 
 /**
@@ -257,6 +287,10 @@ function BookingLinkInner() {
   const [history, setHistory] = useState<ProposalHistory | null>(null);
   const [proposing, setProposing] = useState(params.get("propose") === "1" && !preview);
   const [proposalNotice, setProposalNotice] = useState<string | null>(null);
+  // Field-by-field contracts (backend DECISIONS #26) replace proposals; a
+  // 409 from the negotiation route leaves this null.
+  const [fields, setFields] = useState<FieldNegotiationState | null>(null);
+  const [signAsIs, setSignAsIs] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -264,6 +298,9 @@ function BookingLinkInner() {
     // An older backend has no proposals; the page reads fine without them.
     getGuestProposals(token)
       .then((h) => !cancelled && setHistory(h))
+      .catch(() => undefined);
+    getGuestNegotiation(token)
+      .then((f) => !cancelled && setFields(f))
       .catch(() => undefined);
     getGuestBooking(token, preview)
       .then((b) => {
@@ -302,7 +339,12 @@ function BookingLinkInner() {
         location: location.trim() || null,
         guest_count: guestCount ? Number(guestCount) : null,
       });
-      const signed = await signGuestBooking(token, signerName, booking?.revision);
+      const waiting = fields ? fields.waiting_count > 0 : false;
+      if (waiting && !signAsIs) {
+        setError("Some changes are still waiting. Answer them first, or tick “Sign it as it is”.");
+        return;
+      }
+      const signed = await signGuestBooking(token, signerName, booking?.revision, waiting && signAsIs);
       setBooking(signed);
     } catch (err) {
       // The vendor changed it after this page loaded: show the new version,
@@ -310,6 +352,7 @@ function BookingLinkInner() {
       if (err instanceof ApiError && err.status === 409) {
         getGuestBooking(token, preview).then(setBooking).catch(() => undefined);
         getGuestProposals(token).then(setHistory).catch(() => undefined);
+        getGuestNegotiation(token).then(setFields).catch(() => undefined);
       }
       setError(
         err instanceof ApiError ? err.message : "Couldn't send your reply. Check your connection and try again.",
@@ -562,7 +605,34 @@ function BookingLinkInner() {
         ) : null}
       </div>
 
-      {proposing && history ? (
+      {proposing && fields ? (
+        <div className="fixed inset-0 z-40 flex flex-col bg-ground">
+          <FieldNegotiationWorkspace
+            key={fields.round}
+            state={fields}
+            title={booking.document_title || `${booking.service_name ?? "Services"} agreement`}
+            vendorName={vendorName}
+            clientName={booking.guest_name || "You"}
+            onClose={() => setProposing(false)}
+            onSaveDraft={async (answers, message) => {
+              await saveGuestNegotiationDraft(token, answers, message);
+            }}
+            onSend={async (answers, message) => {
+              const next = await sendGuestNegotiation(token, fields.round, answers, message);
+              setFields(next);
+              setProposing(false);
+              setProposalNotice(
+                next.can_sign
+                  ? "Everything's agreed. You can sign below."
+                  : "Sent.",
+              );
+              getGuestBooking(token, true).then(setBooking).catch(() => undefined);
+              window.scrollTo({ top: 0 });
+            }}
+          />
+        </div>
+      ) : null}
+      {proposing && history && !fields ? (
         <div className="fixed inset-0 z-40 flex flex-col bg-ground">
           <ClientNegotiation
             token={token}
@@ -585,7 +655,17 @@ function BookingLinkInner() {
           {proposalNotice}
         </p>
       ) : null}
-      {history ? (
+      {fields ? (
+        <FieldStatus
+          state={fields}
+          vendorName={vendorName}
+          onOpen={() => {
+            setProposalNotice(null);
+            setProposing(true);
+          }}
+        />
+      ) : null}
+      {history && !fields ? (
         <ProposalStatus
           booking={booking}
           history={history}
@@ -642,7 +722,7 @@ function BookingLinkInner() {
         </a>
       </Card>
 
-      {!preview && history ? (
+      {!preview && history && !fields ? (
         <div className="mt-4 rounded-xl border border-dashed border-card-edge px-4 py-3 text-center text-sm text-ink-soft">
           Want something different?{" "}
           <button
@@ -732,6 +812,16 @@ function BookingLinkInner() {
             />
           </div>
         </Card>
+
+        {fields && fields.waiting_count > 0 ? (
+          <label className="flex items-start gap-2.5 rounded-lg border border-card-edge px-3 py-2.5 text-sm text-ink-soft">
+            <input type="checkbox" className="mt-1" checked={signAsIs} onChange={(e) => setSignAsIs(e.target.checked)} />
+            <span>
+              Sign it as it is. {fields.waiting_count === 1 ? "One change is" : `${fields.waiting_count} changes are`} still
+              open: {vendorName}&apos;s are taken, and anything you asked for that they haven&apos;t answered is dropped.
+            </span>
+          </label>
+        ) : null}
 
         {error ? (
           <p role="alert" className="rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">

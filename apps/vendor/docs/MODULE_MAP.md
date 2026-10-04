@@ -161,6 +161,12 @@ always "none, verify manually" until a test runner is added.
     `packages/shared/lib/contractDiff.ts`, both unit-tested. The contract's
     types are `packages/shared/lib/contractTypes.ts`, re-exported from
     `lib/types.ts`.
+  - Field-by-field negotiation (backend DECISIONS #26, behind its
+    `FIELD_NEGOTIATION` flag): `FieldNegotiationWorkspace` and
+    `lib/fieldNegotiation` in `packages/shared`. `VendorNegotiation` switches
+    to `VendorFieldNegotiation` when `GET /contracts/{id}/negotiation`
+    answers; the signing page does the same with the guest route, and gates
+    signing on nothing waiting (or "Sign it as it is").
   - `lib/contractTemplates.ts` — templates on the account (`/contract-
     templates`), made from the builder and managed in `vendor-profile/`;
     moves any a browser saved in `localStorage` before that onto the account

@@ -18,6 +18,17 @@ import { Drawer } from "@/components/vendor/ui";
 
 const DEFAULT_HOLD_DAYS = 7;
 
+type LockGroup = "prices" | "event" | "policies" | "clauses";
+
+// What a client can't ask to change once negotiation is field by field
+// (backend DECISIONS #26). Copied onto each contract when it's first sent.
+const LOCKS: { value: LockGroup; label: string; hint: string }[] = [
+  { value: "prices", label: "Prices", hint: "Line prices and the discount. Quantities stay open." },
+  { value: "event", label: "Event details", hint: "Date, times, venue and guest count." },
+  { value: "policies", label: "Policies", hint: "Cancellation window and overtime rate." },
+  { value: "clauses", label: "Sections", hint: "Clients can't ask to leave a section out." },
+];
+
 type Preset = PaymentPlan["preset"] | "";
 
 const PRESETS: { value: Preset; label: string; hint: string }[] = [
@@ -72,6 +83,7 @@ export function ContractDefaultsDrawer({
   const [preset, setPreset] = useState<Preset>(vendor.default_payment_plan?.preset ?? "");
   const [balanceDays, setBalanceDays] = useState(String(vendor.default_payment_plan?.balance_days_before ?? 14));
   const [clauses, setClauses] = useState<ClauseRow[]>(() => clausesOf(vendor));
+  const [locks, setLocks] = useState<LockGroup[]>(vendor.negotiation_locks ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -107,6 +119,7 @@ export function ContractDefaultsDrawer({
         default_overtime_rate_cents: overtime.trim() ? Math.round(Number(overtime) * 100) : null,
         contract_hold_days: hold,
         default_payment_plan: preset ? { preset, balance_days_before: preset === "full" ? 14 : balance } : null,
+        negotiation_locks: locks,
         default_contract_terms: kept.length
           ? { custom: kept.map((c) => ({ label: c.title.trim(), value: c.body.trim() })) }
           : null,
@@ -220,6 +233,29 @@ export function ContractDefaultsDrawer({
             onChange={(e) => setHoldDays(e.target.value)}
             hint="How long a sent contract holds the date before it opens up again."
           />
+        </section>
+
+        <section className="grid gap-2">
+          <h3 className="text-sm font-semibold text-ink">Not negotiable</h3>
+          <p className="-mt-1 text-xs text-ink-faint">
+            Clients can still see these, but can&apos;t ask to change them. Applies to contracts you send from now on.
+          </p>
+          {LOCKS.map((l) => (
+            <label key={l.value} className="flex items-start gap-2.5 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={locks.includes(l.value)}
+                onChange={(e) =>
+                  setLocks((cur) => (e.target.checked ? [...cur, l.value] : cur.filter((x) => x !== l.value)))
+                }
+              />
+              <span>
+                <span className="block text-ink">{l.label}</span>
+                <span className="block text-xs text-ink-faint">{l.hint}</span>
+              </span>
+            </label>
+          ))}
         </section>
 
         <section className="grid gap-3">

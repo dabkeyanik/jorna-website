@@ -1,0 +1,504 @@
+"use client";
+
+// The field-by-field negotiation workspace (backend 0072, its DECISIONS.md
+// #26), for either side. The contract as a page on the left, with every open
+// change highlighted where it prints; on the right, only what needs an
+// answer, each as a labeled card — so nobody has to reread the contract to
+// find what moved.
+//
+// The rules are the server's. This collects one send's answers — Accept,
+// Counter or Keep mine for each field waiting on the reader, plus any
+// changes they want — and hands them to the host, which knows which side's
+// endpoint to call.
+
+import { useState, type ReactNode } from "react";
+import { ApiError } from "../../lib/api";
+import type { FieldAnswer, NegotiationFieldView, FieldNegotiationState } from "../../lib/contractTypes";
+import {
+  answerValue,
+  centsToDollars,
+  daysToHours,
+  display,
+  dollarsToCents,
+  estimateTotal,
+  hoursToDays,
+  kindOf,
+  paperDraft,
+  paperIds,
+  waitingOn,
+} from "../../lib/fieldNegotiation";
+import { Button } from "../ui";
+import { ContractPaper, type Mark } from "./ContractPaper";
+
+export interface PackageOption {
+  service_id: string;
+  name: string;
+}
+
+const inputClass =
+  "w-full rounded-lg border border-card-edge bg-ground-2 px-3 py-2 text-sm text-ink outline-none transition focus:border-gold focus:ring-2 focus:ring-gold/30";
+const chip = (on: boolean) =>
+  `rounded-full border px-3 py-1 text-xs font-semibold transition ${
+    on ? "border-gold bg-gold/15 text-ink" : "border-card-edge text-ink-soft hover:border-gold hover:text-ink"
+  }`;
+
+const GROUP_NAMES: Record<string, string> = {
+  event: "Event",
+  items: "Items",
+  prices: "Prices",
+  policies: "Policies",
+  clauses: "Sections",
+};
+
+/** An input for one field's value, in the units a person thinks in. */
+function ValueInput({ field, value, onChange }: { field: NegotiationFieldView; value: unknown; onChange: (v: unknown) => void }) {
+  const k = kindOf(field.key);
+  if (k === "date") {
+    const v = (value ?? {}) as { date_iso?: string; date_end?: string | null };
+    return (
+      <div className="grid grid-cols-2 gap-2">
+        <input aria-label={`${field.label}: start`} type="date" className={inputClass} value={v.date_iso ?? ""}
+          onChange={(e) => onChange({ date_iso: e.target.value, date_end: v.date_end ?? null })} />
+        <input aria-label={`${field.label}: last day (optional)`} type="date" className={inputClass} value={v.date_end ?? ""}
+          onChange={(e) => onChange({ date_iso: v.date_iso ?? "", date_end: e.target.value || null })} />
+      </div>
+    );
+  }
+  if (k === "time") {
+    const v = (value ?? {}) as { time_start?: string; time_end?: string };
+    return (
+      <div className="grid grid-cols-2 gap-2">
+        <input aria-label={`${field.label}: start`} type="time" className={inputClass} value={v.time_start ?? ""}
+          onChange={(e) => onChange({ time_start: e.target.value, time_end: v.time_end ?? "" })} />
+        <input aria-label={`${field.label}: end`} type="time" className={inputClass} value={v.time_end ?? ""}
+          onChange={(e) => onChange({ time_start: v.time_start ?? "", time_end: e.target.value })} />
+      </div>
+    );
+  }
+  if (k === "bool") {
+    return (
+      <label className="flex items-center gap-2 text-sm text-ink-soft">
+        <input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />
+        Include it
+      </label>
+    );
+  }
+  if (k === "money") {
+    return (
+      <input aria-label={`${field.label} ($)`} type="number" min={0} step="0.01" className={inputClass}
+        value={centsToDollars(value)} onChange={(e) => onChange(e.target.value === "" ? null : dollarsToCents(e.target.value))} />
+    );
+  }
+  if (k === "hours") {
+    return (
+      <input aria-label={`${field.label} (days)`} type="number" min={0} className={inputClass}
+        value={hoursToDays(value)} onChange={(e) => onChange(e.target.value === "" ? null : daysToHours(e.target.value))} />
+    );
+  }
+  if (k === "count") {
+    return (
+      <input aria-label={field.label} type="number" min={1} step="any" className={inputClass}
+        value={value == null ? "" : String(value)} onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))} />
+    );
+  }
+  return (
+    <input aria-label={field.label} className={inputClass} value={value == null ? "" : String(value)}
+      onChange={(e) => onChange(e.target.value)} />
+  );
+}
+
+/** A field waiting on the reader: theirs against the agreed value, and three ways to answer. */
+function AnswerCard({
+  field,
+  answer,
+  otherName,
+  canCounter,
+  onAnswer,
+}: {
+  field: NegotiationFieldView;
+  answer: FieldAnswer | undefined;
+  otherName: string;
+  canCounter: boolean;
+  onAnswer: (a: FieldAnswer | null) => void;
+}) {
+  const action = answer?.action;
+  return (
+    <section aria-label={field.label} className="rounded-xl border border-gold/50 bg-card p-3.5">
+      <p className="text-sm font-semibold text-ink">{field.label}</p>
+      <dl className="mt-1.5 grid gap-0.5 text-xs">
+        <div className="flex gap-1.5"><dt className="text-ink-faint">Agreed:</dt><dd className="text-ink-soft">{display(field.key, field.value)}</dd></div>
+        <div className="flex gap-1.5"><dt className="text-ink-faint">{otherName} asked:</dt><dd className="font-semibold text-ink">{display(field.key, field.proposed)}</dd></div>
+      </dl>
+      {field.note ? <p className="mt-1.5 text-xs italic text-ink-soft">“{field.note}”</p> : null}
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
+        <button type="button" className={chip(action === "accept")} onClick={() => onAnswer(action === "accept" ? null : { key: field.key, action: "accept" })}>
+          Accept
+        </button>
+        {canCounter ? (
+          <button type="button" className={chip(action === "counter")}
+            onClick={() => onAnswer(action === "counter" ? null : { key: field.key, action: "counter", value: field.proposed })}>
+            Counter
+          </button>
+        ) : null}
+        <button type="button" className={chip(action === "keep")} onClick={() => onAnswer(action === "keep" ? null : { key: field.key, action: "keep" })}>
+          Keep mine
+        </button>
+      </div>
+      {action === "counter" ? (
+        <div className="mt-2.5">
+          <ValueInput field={field} value={answer?.value} onChange={(v) => onAnswer({ key: field.key, action: "counter", value: v })} />
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+export function FieldNegotiationWorkspace({
+  state,
+  title,
+  vendorName,
+  clientName,
+  packages,
+  onSend,
+  onSaveDraft,
+  onClose,
+  headerActions,
+  signSlot,
+}: {
+  state: FieldNegotiationState;
+  title: string;
+  vendorName: string;
+  clientName: string;
+  /** The vendor's packages, for "Add an item". Omitted where it isn't offered. */
+  packages?: PackageOption[];
+  onSend: (answers: FieldAnswer[], message: string | null) => Promise<void>;
+  onSaveDraft?: (answers: FieldAnswer[], message: string | null) => Promise<void>;
+  onClose?: () => void;
+  headerActions?: ReactNode;
+  /** The client's Sign block, shown once nothing is waiting. */
+  signSlot?: ReactNode;
+}) {
+  const side = state.side;
+  const otherName = side === "client" ? vendorName : clientName;
+  const myTurn = state.turn === side;
+  const usableDraft = state.draft && !state.draft.stale ? state.draft : null;
+
+  const [answers, setAnswers] = useState<Record<string, FieldAnswer>>(() =>
+    Object.fromEntries((usableDraft?.answers ?? []).map((a) => [a.key, a])),
+  );
+  const [message, setMessage] = useState(usableDraft?.message ?? "");
+  const [editing, setEditing] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"send" | "draft" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const waiting = waitingOn(state.fields, side);
+  const theirs = state.fields.filter((f) => f.proposed_by && f.proposed_by !== side && f.state !== "settled" && f.state !== "agreed");
+  const settled = state.fields.filter((f) => f.state === "settled");
+  const open = state.fields.filter(
+    (f) => f.state === "agreed" && !["schedule", "newline"].includes(kindOf(f.key)),
+  );
+  const list = Object.values(answers);
+  const mine = list.filter((a) => a.action === "change" || a.action === "reopen");
+  const unanswered = waiting.filter((f) => !answers[f.key]);
+
+  const set = (key: string, a: FieldAnswer | null) =>
+    setAnswers((prev) => {
+      const next = { ...prev };
+      if (a) next[key] = a;
+      else delete next[key];
+      return next;
+    });
+
+  // Rose: the other side's open asks. Gold: what the reader is changing now.
+  const marks = new Map<string, Mark>();
+  for (const f of theirs) for (const id of paperIds(f.key)) marks.set(id, "other");
+  for (const a of list) {
+    if (a.action === "change" || a.action === "counter" || a.action === "reopen") {
+      for (const id of paperIds(a.key)) marks.set(id, "yours");
+    }
+  }
+
+  const total = estimateTotal(state.terms, state.fields, list);
+  const byKey = new Map(state.fields.map((f) => [f.key, f]));
+
+  async function send() {
+    setBusy("send");
+    setError(null);
+    try {
+      await onSend(list, message.trim() || null);
+    } catch (err) {
+      setError(err instanceof ApiError || err instanceof Error ? err.message : "Couldn't send that. Try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function saveDraft() {
+    if (!onSaveDraft) return;
+    setBusy("draft");
+    setError(null);
+    try {
+      await onSaveDraft(list, message.trim() || null);
+      setNotice("Draft saved.");
+    } catch (err) {
+      setError(err instanceof ApiError || err instanceof Error ? err.message : "Couldn't save the draft.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-5 py-3.5">
+        <div className="min-w-0">
+          <p className="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-ink-faint">Round {state.round}</p>
+          <h2 className="serif truncate text-xl text-ink">{title}</h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-panel px-3 py-1 text-xs font-semibold text-ink-soft">
+            {myTurn ? "Your turn" : `${otherName}'s turn`}
+          </span>
+          {headerActions}
+          {onClose ? (
+            <button type="button" onClick={onClose} className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink-soft hover:text-ink">
+              Close
+            </button>
+          ) : null}
+        </div>
+      </header>
+
+      {state.nudge ? (
+        <p role="note" className="border-b border-line-soft bg-gold/10 px-5 py-2 text-sm text-ink-soft">
+          This is round {state.round}. If you&apos;re going back and forth, a quick call or message with {otherName} might settle it faster.
+        </p>
+      ) : null}
+
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] overflow-y-auto lg:grid-cols-[minmax(0,1fr)_25rem] lg:overflow-hidden">
+        <div className="min-w-0 px-5 py-6 lg:overflow-y-auto">
+          <div aria-label="Contract" role="region" className="mx-auto max-w-2xl">
+            <ContractPaper draft={paperDraft(state.terms)} markOf={(id) => marks.get(id) ?? null} vendorName={vendorName} clientName={clientName} title={title} />
+          </div>
+        </div>
+
+        {/* On a phone the answers come first — they're what needs doing; the
+            contract is below to check against. */}
+        <aside aria-label="Your answers" className="order-first flex flex-col border-b border-line-soft bg-ground lg:order-none lg:min-h-0 lg:border-b-0 lg:border-l">
+          <div className="grid content-start gap-5 p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+            {!myTurn ? (
+              <section className="rounded-xl bg-panel p-4 text-sm text-ink-soft">
+                <p className="font-semibold text-ink">Waiting on {otherName}</p>
+                <p className="mt-1">
+                  {state.last_send && state.last_send.side === side
+                    ? `You sent ${state.last_send.answers.length} answer${state.last_send.answers.length === 1 ? "" : "s"} in round ${state.last_send.round}. `
+                    : ""}
+                  We&apos;ll email you when they answer.
+                </p>
+                {theirs.length === 0 && waitingOn(state.fields, side === "client" ? "vendor" : "client").length ? (
+                  <ul className="mt-2 grid gap-1 text-xs">
+                    {waitingOn(state.fields, side === "client" ? "vendor" : "client").map((f) => (
+                      <li key={f.key}>{f.label}: you asked for {display(f.key, f.proposed)}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </section>
+            ) : null}
+
+            {myTurn && waiting.length ? (
+              <section aria-label="Waiting on you" className="grid gap-2.5">
+                <h3 className="text-sm font-semibold text-ink">Waiting on you ({waiting.length})</h3>
+                {waiting.map((f) => (
+                  <AnswerCard
+                    key={f.key}
+                    field={f}
+                    answer={answers[f.key]}
+                    otherName={otherName}
+                    canCounter={!(side === "client" && f.group === "schedule") && kindOf(f.key) !== "newline"}
+                    onAnswer={(a) => set(f.key, a)}
+                  />
+                ))}
+              </section>
+            ) : null}
+
+            {myTurn && mine.length ? (
+              <section aria-label="Your changes" className="grid gap-2">
+                <h3 className="text-sm font-semibold text-ink">Your changes</h3>
+                {mine.map((a) => {
+                  const f = byKey.get(a.key);
+                  return (
+                    <div key={a.key} className="rounded-lg border border-line-soft px-3 py-2 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-ink">{f?.label ?? display(a.key, a.value)}</span>
+                        <button type="button" className="text-xs text-ink-faint hover:text-maroon" onClick={() => set(a.key, null)}>
+                          Undo
+                        </button>
+                      </div>
+                      {f ? (
+                        <p className="text-xs text-ink-faint">
+                          {display(a.key, f.value)} → <strong className="text-ink">{display(a.key, answerValue(f, a))}</strong>
+                        </p>
+                      ) : (
+                        <p className="text-xs text-ink-faint">{display(a.key, a.value)}</p>
+                      )}
+                      {f && kindOf(f.key) === "bool" && a.value === false ? (
+                        <input
+                          aria-label={`Why leave out ${f.label.replace(/^Include /, "")}? (optional)`}
+                          placeholder="Why? (optional)"
+                          className={`${inputClass} mt-1.5`}
+                          value={a.note ?? ""}
+                          onChange={(e) => set(a.key, { ...a, note: e.target.value })}
+                        />
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </section>
+            ) : null}
+
+            {myTurn ? (
+              <details className="rounded-xl border border-line-soft">
+                <summary className="cursor-pointer px-3.5 py-2.5 text-sm font-semibold text-ink-soft">Change something else</summary>
+                <div className="grid gap-3 px-3.5 pb-3.5">
+                  {Object.entries(GROUP_NAMES).map(([group, name]) => {
+                    const rows = open.filter((f) => f.group === group);
+                    if (!rows.length) return null;
+                    return (
+                      <div key={group}>
+                        <p className="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-ink-faint">{name}</p>
+                        <div className="mt-1 grid gap-1.5">
+                          {rows.map((f) => {
+                            const a = answers[f.key];
+                            if (!f.can_change) {
+                              return (
+                                <p key={f.key} className="flex justify-between gap-2 text-sm text-ink-faint">
+                                  <span>{f.label}</span>
+                                  <span>{f.locked ? `Fixed by ${vendorName}` : display(f.key, f.value)}</span>
+                                </p>
+                              );
+                            }
+                            return (
+                              <div key={f.key} className="text-sm">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-ink-soft">{f.label}</span>
+                                  {editing === f.key || a ? null : (
+                                    <button type="button" className="text-xs font-semibold text-gold hover:underline"
+                                      onClick={() => {
+                                        setEditing(f.key);
+                                        set(f.key, { key: f.key, action: "change", value: kindOf(f.key) === "bool" ? !f.value : f.value });
+                                      }}>
+                                      {kindOf(f.key) === "bool" ? "Leave out" : "Change"}
+                                    </button>
+                                  )}
+                                </div>
+                                {a && a.action === "change" && kindOf(f.key) !== "bool" ? (
+                                  <div className="mt-1">
+                                    <ValueInput field={f} value={a.value} onChange={(v) => set(f.key, { ...a, value: v })} />
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {packages?.length && state.fields.some((f) => f.group === "items" && f.can_change) ? (
+                    <label className="grid gap-1 text-sm text-ink-soft">
+                      <span>Add an item</span>
+                      <select
+                        className={inputClass}
+                        value=""
+                        onChange={(e) => {
+                          const pkg = packages.find((p) => p.service_id === e.target.value);
+                          if (!pkg) return;
+                          const key = `line:new:${Math.random().toString(36).slice(2, 10)}`;
+                          set(key, { key, action: "change", value: { service_id: pkg.service_id, name: pkg.name, quantity: 1 } });
+                        }}
+                      >
+                        <option value="" disabled>Choose a package…</option>
+                        {packages.map((p) => (
+                          <option key={p.service_id} value={p.service_id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                </div>
+              </details>
+            ) : null}
+
+            {settled.length ? (
+              <details className="rounded-xl border border-line-soft">
+                <summary className="cursor-pointer px-3.5 py-2.5 text-sm font-semibold text-ink-soft">Settled ({settled.length})</summary>
+                <ul className="grid gap-1.5 px-3.5 pb-3.5 text-sm">
+                  {settled.map((f) => {
+                    const a = answers[f.key];
+                    return (
+                      <li key={f.key}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-ink-soft">{f.label}</span>
+                          <span className="text-ink">{display(f.key, f.value)}</span>
+                        </div>
+                        {side === "vendor" && myTurn && kindOf(f.key) !== "newline" ? (
+                          a ? (
+                            <div className="mt-1">
+                              <ValueInput field={f} value={a.value} onChange={(v) => set(f.key, { ...a, value: v })} />
+                            </div>
+                          ) : (
+                            <button type="button" className="text-xs font-semibold text-gold hover:underline"
+                              onClick={() => set(f.key, { key: f.key, action: "reopen", value: f.value })}>
+                              Reopen
+                            </button>
+                          )
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </details>
+            ) : null}
+
+            {state.can_sign && signSlot ? signSlot : null}
+          </div>
+
+          {myTurn ? (
+            <footer className="grid gap-2 border-t border-line-soft bg-card p-4">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-sm text-ink-soft">Total if this is agreed</span>
+                <strong className="serif text-lg text-ink">{display("discount", total)}</strong>
+              </div>
+              {state.terms.payment_schedule?.length && total !== state.terms.amount_cents ? (
+                <p className="text-xs text-ink-faint">If it&apos;s agreed, the payments are rescaled to the new total.</p>
+              ) : null}
+              <textarea
+                aria-label={`A note for ${otherName} (optional)`}
+                placeholder={`A note for ${otherName} (optional)`}
+                rows={2}
+                maxLength={2000}
+                className={inputClass}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+              />
+              {error ? <p role="alert" className="text-sm text-maroon dark:text-gold">{error}</p> : null}
+              {notice && !error ? <p role="status" className="text-xs text-ink-faint">{notice}</p> : null}
+              {unanswered.length ? (
+                <p className="text-xs text-ink-faint">
+                  Answer {unanswered.length === 1 ? "1 more field" : `${unanswered.length} more fields`} to send.
+                </p>
+              ) : null}
+              <div className="flex gap-2">
+                {onSaveDraft ? (
+                  <Button type="button" variant="ghost" disabled={busy !== null} onClick={saveDraft}>
+                    {busy === "draft" ? "Saving…" : "Save draft"}
+                  </Button>
+                ) : null}
+                <Button type="button" className="flex-1" disabled={busy !== null || unanswered.length > 0 || list.length === 0} onClick={send}>
+                  {busy === "send" ? "Sending…" : `Send ${list.length} answer${list.length === 1 ? "" : "s"}`}
+                </Button>
+              </div>
+            </footer>
+          ) : null}
+        </aside>
+      </div>
+    </div>
+  );
+}
