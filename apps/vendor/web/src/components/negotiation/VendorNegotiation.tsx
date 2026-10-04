@@ -18,6 +18,7 @@ import {
   acceptProposal,
   declineProposal,
   getContract,
+  getContractNegotiation,
   getContractProposals,
   getMyVendor,
   saveContractDraft,
@@ -27,6 +28,8 @@ import { defaultClauses, fromContract, problems, toDocument, type Draft } from "
 import { draftToSave, roundOf } from "@jorna/shared/lib/negotiation";
 import type { Contract, ProposalHistory, VendorDetail } from "@/lib/types";
 import { NegotiationWorkspace } from "@jorna/shared/components/negotiation/NegotiationWorkspace";
+import type { FieldNegotiationState } from "@jorna/shared/lib/contractTypes";
+import { VendorFieldNegotiation } from "./VendorFieldNegotiation";
 
 function todayIso(): string {
   const d = new Date();
@@ -54,16 +57,25 @@ export function VendorNegotiation({
   const [contract, setContract] = useState<Contract | null>(null);
   const [history, setHistory] = useState<ProposalHistory | null>(null);
   const [vendor, setVendor] = useState<VendorDetail | null>(null);
+  // Field-by-field contracts (backend DECISIONS #26). A 409 from the
+  // negotiation route means this one uses proposals, so it stays null.
+  const [fields, setFields] = useState<FieldNegotiationState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getContract(bookingId), getContractProposals(bookingId), getMyVendor().catch(() => null)])
-      .then(([c, h, v]) => {
+    Promise.all([
+      getContract(bookingId),
+      getContractProposals(bookingId),
+      getMyVendor().catch(() => null),
+      getContractNegotiation(bookingId).catch(() => null),
+    ])
+      .then(([c, h, v, f]) => {
         if (cancelled) return;
         setContract(c);
         setHistory(h);
         setVendor(v);
+        setFields(f);
       })
       .catch((err) => !cancelled && setError(err instanceof ApiError ? err.message : "Couldn't load this negotiation."));
     return () => {
@@ -112,6 +124,21 @@ export function VendorNegotiation({
 
   const client = contract.guest_name || "Your client";
   const vendorName = contract.vendor_display_name || "You";
+
+  if (fields) {
+    return (
+      <VendorFieldNegotiation
+        bookingId={bookingId}
+        initial={fields}
+        title={contract.document_title || `${contract.service_name ?? "Services"} agreement`}
+        clientName={client}
+        vendorName={vendorName}
+        onClose={onClose}
+        onDone={onDone}
+        headerActions={headerActions}
+      />
+    );
+  }
   const open = history.open_proposal;
   const latest = history.proposals[0];
   const answeredLast = latest && latest.status !== "open" && latest.responded_at;

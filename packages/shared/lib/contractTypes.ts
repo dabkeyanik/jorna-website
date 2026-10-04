@@ -207,3 +207,57 @@ export type TermsChanges = Partial<Omit<TermsVersion, "amount_cents" | "line_ite
   line_items?: LineItemInput[];
   payment_schedule?: InstallmentInput[];
 };
+
+// ── Field-by-field negotiation (backend 0072, its DECISIONS.md #26) ──
+
+export type NegotiationSide = "client" | "vendor";
+export type FieldState = "agreed" | "waiting_vendor" | "waiting_client" | "settled";
+export type FieldGroup = "event" | "items" | "prices" | "policies" | "clauses" | "schedule";
+export type LockGroup = "prices" | "event" | "policies" | "clauses";
+export type FieldAction = "accept" | "counter" | "keep" | "change" | "reopen";
+
+/** One negotiable value — `event.date`, `line:<id>.price`, `clause:<key>.included`, … */
+export interface NegotiationFieldView {
+  key: string;
+  group: FieldGroup;
+  label: string;
+  /** The contract's agreed value. */
+  value: unknown;
+  state: FieldState;
+  /** What the side in `proposed_by` wants, while the field is waiting. */
+  proposed: unknown;
+  proposed_by: NegotiationSide | null;
+  round: number | null;
+  note: string | null;
+  /** In a group the vendor made not negotiable. */
+  locked: boolean;
+  /** Whether the side reading this may propose a change to it. */
+  can_change: boolean;
+}
+
+export interface FieldAnswer {
+  key: string;
+  action: FieldAction;
+  value?: unknown;
+  note?: string | null;
+}
+
+/** GET …/negotiation, and every send's reply. */
+export interface FieldNegotiationState {
+  mode: "fields";
+  side: NegotiationSide;
+  round: number;
+  turn: NegotiationSide;
+  revision: number | null;
+  locks: LockGroup[];
+  /** From round 6: suggest talking it through. */
+  nudge: boolean;
+  can_sign: boolean;
+  waiting_count: number;
+  terms: TermsVersion;
+  previous_terms: TermsVersion | null;
+  original_terms: TermsVersion | null;
+  fields: NegotiationFieldView[];
+  last_send: { round: number; side: NegotiationSide; message: string | null; answers: FieldAnswer[]; sent_at: string } | null;
+  draft: { round: number; answers: FieldAnswer[]; message: string | null; updated_at: string; stale: boolean } | null;
+}

@@ -56,6 +56,7 @@ import type {
   TermsChanges,
   TermsVersion,
 } from "./types";
+import type { FieldAnswer, FieldNegotiationState } from "@jorna/shared/lib/contractTypes";
 
 /** Generate the three comparison bundles (Budget / Balanced / Top Rated). */
 export function generateBundles(req: BundleRequest): Promise<MultiBundleResponse> {
@@ -913,6 +914,49 @@ export function dropContractDraft(bookingId: string): Promise<void> {
   return apiFetch<void>(`/contracts/${bookingId}/proposals/draft`, { method: "DELETE" });
 }
 
+// ── Field-by-field negotiation (backend 0072, its DECISIONS.md #26) ──
+// A 409 from the GET means the contract uses the earlier proposals instead.
+
+export function getContractNegotiation(bookingId: string): Promise<FieldNegotiationState> {
+  return apiFetch<FieldNegotiationState>(`/contracts/${bookingId}/negotiation`);
+}
+
+export function sendContractNegotiation(
+  bookingId: string,
+  baseRound: number,
+  answers: FieldAnswer[],
+  message: string | null,
+): Promise<FieldNegotiationState> {
+  return apiFetch<FieldNegotiationState>(`/contracts/${bookingId}/negotiation/send`, {
+    method: "POST",
+    body: { base_round: baseRound, answers, message },
+  });
+}
+
+export function saveContractNegotiationDraft(bookingId: string, answers: FieldAnswer[], message: string | null): Promise<unknown> {
+  return apiFetch(`/contracts/${bookingId}/negotiation/draft`, { method: "PUT", body: { answers, message } });
+}
+
+export function getGuestNegotiation(token: string): Promise<FieldNegotiationState> {
+  return apiFetch<FieldNegotiationState>(`/guest-bookings/${token}/negotiation`);
+}
+
+export function sendGuestNegotiation(
+  token: string,
+  baseRound: number,
+  answers: FieldAnswer[],
+  message: string | null,
+): Promise<FieldNegotiationState> {
+  return apiFetch<FieldNegotiationState>(`/guest-bookings/${token}/negotiation/send`, {
+    method: "POST",
+    body: { base_round: baseRound, answers, message },
+  });
+}
+
+export function saveGuestNegotiationDraft(token: string, answers: FieldAnswer[], message: string | null): Promise<unknown> {
+  return apiFetch(`/guest-bookings/${token}/negotiation/draft`, { method: "PUT", body: { answers, message } });
+}
+
 export function saveGuestDraft(token: string, draft: Omit<DraftInput, "proposal_id">): Promise<NegotiationDraft> {
   return apiFetch<NegotiationDraft>(`/guest-bookings/${token}/proposals/draft`, { method: "PUT", body: draft });
 }
@@ -1109,10 +1153,13 @@ export function signGuestBooking(
   token: string,
   signerName: string,
   revision?: number | null,
+  /** Field-by-field contracts: sign while changes are waiting, taking the
+   *  vendor's and dropping your own (backend DECISIONS #26). */
+  asIs = false,
 ): Promise<GuestBooking> {
   return apiFetch<GuestBooking>(`/guest-bookings/${token}/sign`, {
     method: "POST",
-    body: { signer_name: signerName, ...(revision != null ? { revision } : {}) },
+    body: { signer_name: signerName, ...(revision != null ? { revision } : {}), ...(asIs ? { as_is: true } : {}) },
   });
 }
 
