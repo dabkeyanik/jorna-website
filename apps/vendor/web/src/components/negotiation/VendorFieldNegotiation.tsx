@@ -4,10 +4,10 @@
 // the shared workspace, sending through the vendor's routes. Chosen by
 // VendorNegotiation for contracts the server negotiates this way.
 
-import { useEffect, useState, type ReactNode } from "react";
-import { getMyVendor, listMyServices, saveContractNegotiationDraft, sendContractNegotiation } from "@/lib/jorna";
+import { useState, type ReactNode } from "react";
+import { saveContractNegotiationDraft, sendContractNegotiation } from "@/lib/jorna";
 import type { FieldNegotiationState } from "@jorna/shared/lib/contractTypes";
-import { FieldNegotiationWorkspace, type PackageOption } from "@jorna/shared/components/negotiation/FieldNegotiationWorkspace";
+import { FieldNegotiationWorkspace } from "@jorna/shared/components/negotiation/FieldNegotiationWorkspace";
 
 export function VendorFieldNegotiation({
   bookingId,
@@ -29,21 +29,6 @@ export function VendorFieldNegotiation({
   headerActions?: ReactNode;
 }) {
   const [state, setState] = useState(initial);
-  const [packages, setPackages] = useState<PackageOption[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    getMyVendor()
-      .then((v) => (v ? listMyServices(v.vendor_id) : null))
-      .then((res) => {
-        if (cancelled || !res) return;
-        setPackages(res.items.filter((s) => s.status !== "archived").map((s) => ({ service_id: s.service_id, name: s.name })));
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   return (
     <FieldNegotiationWorkspace
@@ -52,7 +37,6 @@ export function VendorFieldNegotiation({
       title={title}
       vendorName={vendorName}
       clientName={clientName}
-      packages={packages}
       onClose={onClose}
       headerActions={headerActions}
       onSaveDraft={async (answers, message) => {

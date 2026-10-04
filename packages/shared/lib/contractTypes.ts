@@ -260,4 +260,15 @@ export interface FieldNegotiationState {
   fields: NegotiationFieldView[];
   last_send: { round: number; side: NegotiationSide; message: string | null; answers: FieldAnswer[]; sent_at: string } | null;
   draft: { round: number; answers: FieldAnswer[]; message: string | null; updated_at: string; stale: boolean } | null;
+  /** What the reader may add as a new item on their turn (backend #104):
+   *  public packages for the client, every live one for the vendor. */
+  packages?: NegotiationPackage[];
+}
+
+export interface NegotiationPackage {
+  service_id: string;
+  name: string;
+  price_cents: number;
+  price_unit: string | null;
+  add_ons: { id: string; name: string; price_cents: number }[];
 }

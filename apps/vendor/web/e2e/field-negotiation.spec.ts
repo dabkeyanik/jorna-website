@@ -56,7 +56,6 @@ test.describe("field-by-field negotiation", () => {
     api.get("/contracts/c-1", contract);
     api.get("/contracts/c-1/proposals", history);
     api.get("/contracts/c-1/negotiation", state());
-    api.get("/services", { items: [{ service_id: "svc-1", name: "Reception set", status: "active" }], total: 1, limit: 100, offset: 0 });
     api.post("/contracts/c-1/negotiation/send", ({ route }: HandlerArgs) => {
       const body = route.request().postDataJSON();
       return body ? state({ round: 3, turn: "client", can_sign: true, waiting_count: 0 }) : state();
@@ -102,7 +101,6 @@ test.describe("field-by-field negotiation", () => {
     api.get("/vendors/me", mockVendorDetail());
     api.get("/contracts/c-1", contract);
     api.get("/contracts/c-1/proposals", history);
-    api.get("/services", { items: [], total: 0, limit: 100, offset: 0 });
     api.get("/contracts/c-1/negotiation", state({ turn: "client", fields: state().fields.map((f) => ({ ...f, state: "agreed", proposed: null })) }));
 
     await page.goto("contracts/changes/?id=c-1");
@@ -119,6 +117,10 @@ test.describe("field-by-field negotiation", () => {
         field("line:pkg.price", "Reception set: price", 140000, { locked: true, can_change: false }),
         field("event.guests", "Guest count", 200),
       ],
+      packages: [{
+        service_id: "svc-1", name: "Reception set", price_cents: 140000, price_unit: "event",
+        add_ons: [{ id: "fog", name: "Fog machine", price_cents: 7500 }],
+      }],
     });
     api.get("/guest-bookings/tok-1", contract);
     api.get("/guest-bookings/tok-1/proposals", history);
@@ -144,7 +146,10 @@ test.describe("field-by-field negotiation", () => {
     await lights.getByRole("button", { name: "Counter" }).click();
     await lights.getByLabel("Uplighting: quantity").fill("3");
     await page.getByRole("region", { name: "Overtime rate" }).getByRole("button", { name: "Accept" }).click();
-    await page.getByRole("button", { name: "Send 2 answers" }).click();
+    // Add one of the vendor's listed add-ons.
+    await page.getByLabel("Add an item").selectOption("svc-1|fog");
+    await expect(page.getByText("Fog machine × 1 at $75")).toBeVisible();
+    await page.getByRole("button", { name: "Send 3 answers" }).click();
 
     await expect(page.getByText("It's Arjun Kapoor's turn")).toBeVisible();
     const [sent] = api.requestsTo("POST", "/guest-bookings/tok-1/negotiation/send");
@@ -153,8 +158,10 @@ test.describe("field-by-field negotiation", () => {
       answers: [
         { key: "line:lights.quantity", action: "counter", value: 3 },
         { key: "policy.overtime", action: "accept" },
+        { action: "change", value: { service_id: "svc-1", addon_id: "fog", name: "Fog machine", quantity: 1, unit_price_cents: 7500 } },
       ],
     });
+    expect((sent.body as { answers: { key: string }[] }).answers[2].key).toMatch(/^line:new:/);
   });
 
   test("signing as it is sends as_is", async ({ page, api }) => {

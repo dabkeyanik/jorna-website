@@ -30,10 +30,6 @@ import {
 import { Button } from "../ui";
 import { ContractPaper, type Mark } from "./ContractPaper";
 
-export interface PackageOption {
-  service_id: string;
-  name: string;
-}
 
 const inputClass =
   "w-full rounded-lg border border-card-edge bg-ground-2 px-3 py-2 text-sm text-ink outline-none transition focus:border-gold focus:ring-2 focus:ring-gold/30";
@@ -158,7 +154,6 @@ export function FieldNegotiationWorkspace({
   title,
   vendorName,
   clientName,
-  packages,
   onSend,
   onSaveDraft,
   onClose,
@@ -169,8 +164,6 @@ export function FieldNegotiationWorkspace({
   title: string;
   vendorName: string;
   clientName: string;
-  /** The vendor's packages, for "Add an item". Omitted where it isn't offered. */
-  packages?: PackageOption[];
   onSend: (answers: FieldAnswer[], message: string | null) => Promise<void>;
   onSaveDraft?: (answers: FieldAnswer[], message: string | null) => Promise<void>;
   onClose?: () => void;
@@ -328,7 +321,9 @@ export function FieldNegotiationWorkspace({
                   return (
                     <div key={a.key} className="rounded-lg border border-line-soft px-3 py-2 text-sm">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-ink">{f?.label ?? display(a.key, a.value)}</span>
+                        <span className="text-ink">
+                          {f?.label ?? `Add ${(a.value as { name?: string } | undefined)?.name ?? "an item"}`}
+                        </span>
                         <button type="button" className="text-xs text-ink-faint hover:text-maroon" onClick={() => set(a.key, null)}>
                           Undo
                         </button>
@@ -402,23 +397,43 @@ export function FieldNegotiationWorkspace({
                       </div>
                     );
                   })}
-                  {packages?.length && state.fields.some((f) => f.group === "items" && f.can_change) ? (
+                  {state.packages?.length ? (
                     <label className="grid gap-1 text-sm text-ink-soft">
                       <span>Add an item</span>
                       <select
                         className={inputClass}
                         value=""
                         onChange={(e) => {
-                          const pkg = packages.find((p) => p.service_id === e.target.value);
-                          if (!pkg) return;
+                          // "<service_id>" for a package, "<service_id>|<addon id>" for an add-on.
+                          const [serviceId, addonId] = e.target.value.split("|");
+                          const pkg = state.packages?.find((p) => p.service_id === serviceId);
+                          const addon = addonId ? pkg?.add_ons.find((x) => x.id === addonId) : undefined;
+                          if (!pkg || (addonId && !addon)) return;
                           const key = `line:new:${Math.random().toString(36).slice(2, 10)}`;
-                          set(key, { key, action: "change", value: { service_id: pkg.service_id, name: pkg.name, quantity: 1 } });
+                          set(key, {
+                            key,
+                            action: "change",
+                            value: {
+                              service_id: pkg.service_id,
+                              ...(addon ? { addon_id: addon.id } : {}),
+                              name: addon ? addon.name : pkg.name,
+                              quantity: 1,
+                              unit_price_cents: addon ? addon.price_cents : pkg.price_cents,
+                            },
+                          });
                         }}
                       >
-                        <option value="" disabled>Choose a package…</option>
-                        {packages.map((p) => (
-                          <option key={p.service_id} value={p.service_id}>{p.name}</option>
-                        ))}
+                        <option value="" disabled>Choose a package or add-on…</option>
+                        {state.packages.map((p) => [
+                          <option key={p.service_id} value={p.service_id}>
+                            {p.name} — {display("discount", p.price_cents)}
+                          </option>,
+                          ...p.add_ons.map((x) => (
+                            <option key={`${p.service_id}|${x.id}`} value={`${p.service_id}|${x.id}`}>
+                              {"  "}+ {x.name} — {display("discount", x.price_cents)}
+                            </option>
+                          )),
+                        ])}
                       </select>
                     </label>
                   ) : null}
