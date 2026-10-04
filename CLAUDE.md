@@ -24,9 +24,10 @@ What lives at the root instead of in each app:
 
 The apps still duplicate what had drifted apart before the merge
 (`web/src/lib/jorna.ts`, most of `types.ts`, and components built on them).
-Auth is shared (`@jorna/shared/lib/auth`); each app's `lib/auth.tsx` only
-wraps it with its own caches and sign-out destination. Until those are reconciled into `packages/shared`, a fix to one
-usually belongs in both apps — check the other copy.
+Until those are reconciled into `packages/shared`, a fix to one usually
+belongs in both apps — check the other copy. Auth already is shared
+(`@jorna/shared/lib/auth`); each app's `lib/auth.tsx` only wraps it with its
+own caches and sign-out destination.
 
 `main` is protected: branch per change, open a PR, merge once CI is green
 (no approval is required for now — ask for a review on anything touching
