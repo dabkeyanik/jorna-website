@@ -755,3 +755,17 @@ Found in a local end-to-end run of the negotiation workspace.
 - **Who asked for what.** On the couple's side, after the vendor answers, each difference is read against what the couple asked for (`attribute`). Their own ask the vendor took shows as theirs ("You asked for this — … accepted it", gold), not the vendor's. A countered ask shows original / you asked / theirs. An ask the vendor kept as it was says so. Only changes nobody asked for are the vendor's (rose). Items and clauses get the same labels.
 - **"We emailed the link" only when we did.** The backend now returns `email_sent` (true / false / null) from create, send, lead convert, accept-with-a-proposal and accept-with-usual-terms. The app claims an email only on true, says to share the link on false, and stays neutral when it isn't told. The timeline shows "Couldn't email the link" on a failure.
 - **The booking card reads the contract.** `bookingMoney.balanceDue` comes from the next unpaid payment on the schedule (`describeDue`), e.g. "Due May 31, 2030 (14 days before the event)", instead of the hard-coded "Due after the event". All payments confirmed reads as paid in full. Contracts without a schedule keep the old wording.
+
+## Decision: signing asks for an emailed code and the e-records consent (2026-10-07)
+
+Backend DECISIONS #27. The signing page (`booking-link/SignatureStep.tsx`, shared by contracts and attached documents) now asks for three things before it signs:
+
+- **The typed name.** Unchanged.
+- **A 6-digit code emailed to the client.** On a contract, the email typed on the form is saved first, because the code goes to the email on file.
+- **The consent box.** Its words come from the backend (`esign_consent`) and are shown exactly as sent. The signature sends their version back.
+
+The backend adds the IP address and browser and puts it all in the signed copy's certificate. The vendor app shows no client IPs. The timeline only says a code was asked for and that signed copies were emailed.
+
+An older backend sends no `esign_consent`. Then the page signs with the name alone, as before, so this can ship ahead of the backend flag (`SIGNING_REQUIRE_CODE`).
+
+The staging round trip signs with `STAGING_E2E_SIGNING_CODE`, which must equal the staging backend's `SIGNING_TEST_CODE`.

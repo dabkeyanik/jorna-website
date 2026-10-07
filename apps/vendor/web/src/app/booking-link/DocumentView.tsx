@@ -8,11 +8,12 @@
 
 import { useEffect, useState } from "react";
 import { ApiError } from "@jorna/shared/lib/api";
-import { declineGuestDocument, getGuestDocument, signGuestDocument } from "@/lib/jorna";
+import { declineGuestDocument, getGuestDocument, requestDocumentSigningCode, signGuestDocument } from "@/lib/jorna";
 import { KIND_LABEL } from "@/lib/attachedDocuments";
 import { guestDocumentPdfUrl } from "@/lib/download";
 import { Button, Card, Field } from "@jorna/shared/components/ui";
-import type { AttachedDocument } from "@/lib/types";
+import type { AttachedDocument, SigningProof } from "@/lib/types";
+import { SignatureStep } from "./SignatureStep";
 
 function prettyDate(iso?: string | null): string | null {
   if (!iso) return null;
@@ -54,6 +55,7 @@ export function DocumentView({ token, preview }: { token: string; preview: boole
   const [doc, setDoc] = useState<AttachedDocument | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [signerName, setSignerName] = useState("");
+  const [proof, setProof] = useState<SigningProof | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [declining, setDeclining] = useState(false);
@@ -191,27 +193,29 @@ export function DocumentView({ token, preview }: { token: string; preview: boole
         className="mt-6 grid gap-4"
         onSubmit={(e) => {
           e.preventDefault();
-          act(() => signGuestDocument(token, signerName.trim()));
+          act(() => signGuestDocument(token, signerName.trim(), proof));
         }}
       >
-        <Card className="p-5">
-          <p className="text-sm font-medium text-ink-soft">Your signature</p>
-          <p className="mt-1 text-xs text-ink-soft">Type your full legal name to electronically sign this {kindLabel}</p>
-          <div className="mt-3">
-            <Field
-              placeholder="Type your full name to sign"
-              value={signerName}
-              onChange={(e) => setSignerName(e.target.value)}
-              required
-            />
-          </div>
-        </Card>
+        <SignatureStep
+          kindLabel={kindLabel}
+          signerName={signerName}
+          onSignerName={setSignerName}
+          consent={doc.esign_consent}
+          onProof={setProof}
+          disabled={preview}
+          sendCode={() => requestDocumentSigningCode(token)}
+        />
         {error ? (
           <p role="alert" className="rounded-lg bg-maroon/10 px-3 py-2 text-sm text-maroon dark:text-gold">
             {error}
           </p>
         ) : null}
-        <Button type="submit" size="lg" className="w-full" disabled={busy || preview || !signerName.trim()}>
+        <Button
+          type="submit"
+          size="lg"
+          className="w-full"
+          disabled={busy || preview || !signerName.trim() || (!!doc.esign_consent && !proof)}
+        >
           {busy ? "Signing…" : `Sign the ${kindLabel} →`}
         </Button>
       </form>

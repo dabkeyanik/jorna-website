@@ -1250,6 +1250,29 @@ export interface AttachedDocument {
   location: string | null;
   /** The vendor's view only — the couple's link is the token. */
   token?: string;
+  /** The couple's view only (backend DECISIONS #27). */
+  esign_consent?: EsignConsent;
+  signing_code_required?: boolean;
+}
+
+/** The e-records consent the signing page shows, word for word, and sends
+ *  back by version (backend DECISIONS #27). */
+export interface EsignConsent {
+  version: string;
+  text: string;
+}
+
+/** What a signature by link sends besides the name (backend DECISIONS #27). */
+export interface SigningProof {
+  code: string;
+  consent: true;
+  consent_version: string;
+}
+
+export interface SigningCodeSent {
+  /** Masked, e.g. "p••••@example.com". */
+  sent_to: string;
+  expires_in_minutes: number;
 }
 
 /** The public, no-login view of a guest booking — GET/PATCH
@@ -1258,6 +1281,9 @@ export interface AttachedDocument {
  *  token is already the credential the client used to get here). */
 export interface GuestBooking {
   booking_id: string;
+  /** Older backends send neither (backend DECISIONS #27). */
+  esign_consent?: EsignConsent;
+  signing_code_required?: boolean;
   vendor_display_name: string | null;
   vendor_venmo_handle: string | null;
   vendor_zelle_contact: string | null;
