@@ -95,6 +95,12 @@ export function describeEvent(e: ContractEvent, c: { signer_name?: string | null
       return `Your client declined an attached document${typeof d.reason === "string" && d.reason ? ` — “${d.reason}”` : ""}`;
     case "document_voided":
       return "You voided an attached document";
+    // Signing evidence (backend DECISIONS #27). The IP each event carries
+    // stays in the signed PDF's certificate, not here.
+    case "code_sent":
+      return d.document_id ? "Your client asked for a code to sign a document" : "Your client asked for a code to sign";
+    case "copy_sent":
+      return d.to === "vendor" ? "A signed copy was emailed to you" : "A signed copy was emailed to your client";
     default:
       return e.kind;
   }

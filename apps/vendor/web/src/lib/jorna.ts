@@ -53,6 +53,8 @@ import type {
   VendorAvailability,
   NegotiationDraft,
   ProposalHistory,
+  SigningCodeSent,
+  SigningProof,
   TermsChanges,
   TermsVersion,
 } from "./types";
@@ -1126,8 +1128,24 @@ export function getGuestDocument(token: string, preview = false): Promise<Attach
   return apiFetch(`/guest-documents/${token}${preview ? "?preview=true" : ""}`);
 }
 
-export function signGuestDocument(token: string, signerName: string): Promise<AttachedDocument> {
-  return apiFetch(`/guest-documents/${token}/sign`, { method: "POST", body: { signer_name: signerName } });
+export function signGuestDocument(
+  token: string,
+  signerName: string,
+  proof?: SigningProof | null,
+): Promise<AttachedDocument> {
+  return apiFetch(`/guest-documents/${token}/sign`, {
+    method: "POST",
+    body: { signer_name: signerName, ...(proof ?? {}) },
+  });
+}
+
+/** Email the client the 6-digit code they sign with (backend DECISIONS #27). */
+export function requestGuestSigningCode(token: string): Promise<SigningCodeSent> {
+  return apiFetch(`/guest-bookings/${token}/signing-code`, { method: "POST" });
+}
+
+export function requestDocumentSigningCode(token: string): Promise<SigningCodeSent> {
+  return apiFetch(`/guest-documents/${token}/signing-code`, { method: "POST" });
 }
 
 export function declineGuestDocument(token: string, reason: string | null): Promise<AttachedDocument> {
@@ -1158,10 +1176,17 @@ export function signGuestBooking(
   /** Field-by-field contracts: sign while changes are waiting, taking the
    *  vendor's and dropping your own (backend DECISIONS #26). */
   asIs = false,
+  /** The emailed code and the consent box (backend DECISIONS #27). */
+  proof?: SigningProof | null,
 ): Promise<GuestBooking> {
   return apiFetch<GuestBooking>(`/guest-bookings/${token}/sign`, {
     method: "POST",
-    body: { signer_name: signerName, ...(revision != null ? { revision } : {}), ...(asIs ? { as_is: true } : {}) },
+    body: {
+      signer_name: signerName,
+      ...(revision != null ? { revision } : {}),
+      ...(asIs ? { as_is: true } : {}),
+      ...(proof ?? {}),
+    },
   });
 }
 

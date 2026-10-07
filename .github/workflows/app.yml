@@ -275,6 +275,7 @@ jobs:
           STAGING_VENDOR_URL: https://staging.${{ inputs.pages_project }}.pages.dev
           STAGING_E2E_VENDOR_PASSWORD: ${{ secrets.STAGING_E2E_VENDOR_PASSWORD }}
           STAGING_E2E_CLIENT_PASSWORD: ${{ secrets.STAGING_E2E_CLIENT_PASSWORD }}
+          STAGING_E2E_SIGNING_CODE: ${{ secrets.STAGING_E2E_SIGNING_CODE }}
 
       - name: Upload the staging report
         if: always()

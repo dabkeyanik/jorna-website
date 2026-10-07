@@ -62,6 +62,16 @@ test.describe("staging: contract round trip", () => {
 
     // Sign.
     await page.getByPlaceholder("Type your full name to sign").fill(`${CLIENT.f_name} ${CLIENT.l_name}`);
+    // The emailed code and consent box (backend DECISIONS #27). The suite
+    // can't read email, so it enters staging's SIGNING_TEST_CODE.
+    const emailCode = page.getByRole("button", { name: "Email me a code" });
+    if (await emailCode.isVisible()) {
+      const code = process.env.STAGING_E2E_SIGNING_CODE;
+      test.skip(!code, "Set STAGING_E2E_SIGNING_CODE (staging's SIGNING_TEST_CODE) to sign");
+      await emailCode.click();
+      await page.getByLabel("6-digit code").fill(code!);
+      await page.getByRole("checkbox", { name: /I agree to sign this agreement electronically/ }).check();
+    }
     await page.getByRole("button", { name: "Confirm booking →" }).click();
     await expect(page.getByText(/Signed by/)).toBeVisible({ timeout: 20_000 });
 

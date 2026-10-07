@@ -27,14 +27,16 @@ import {
   guestMarkFullPaid,
   guestMarkInstallmentPaid,
   signGuestBooking,
+  requestGuestSigningCode,
   withdrawGuestProposal,
 } from "@/lib/jorna";
 import { describeDue } from "@jorna/shared/lib/contractDraft";
 import { termsOf } from "@jorna/shared/lib/contractDiff";
 import { Button, Card, Field } from "@jorna/shared/components/ui";
 import { ContractCompare } from "@jorna/shared/components/negotiation/ContractCompare";
-import type { GuestBooking, Installment, ProposalHistory } from "@/lib/types";
+import type { GuestBooking, Installment, ProposalHistory, SigningProof } from "@/lib/types";
 import { DocumentView } from "./DocumentView";
+import { SignatureStep } from "./SignatureStep";
 import { ClientNegotiation } from "@/components/negotiation/ClientNegotiation";
 import { FieldNegotiationWorkspace } from "@jorna/shared/components/negotiation/FieldNegotiationWorkspace";
 import type { FieldNegotiationState } from "@jorna/shared/lib/contractTypes";
@@ -291,6 +293,8 @@ function BookingLinkInner() {
   // 409 from the negotiation route leaves this null.
   const [fields, setFields] = useState<FieldNegotiationState | null>(null);
   const [signAsIs, setSignAsIs] = useState(false);
+  // The emailed code + consent box (backend DECISIONS #27); null until both are in.
+  const [proof, setProof] = useState<SigningProof | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -344,7 +348,7 @@ function BookingLinkInner() {
         setError("Some changes are still waiting. Answer them first, or tick “Sign it as it is”.");
         return;
       }
-      const signed = await signGuestBooking(token, signerName, booking?.revision, waiting && signAsIs);
+      const signed = await signGuestBooking(token, signerName, booking?.revision, waiting && signAsIs, proof);
       setBooking(signed);
     } catch (err) {
       // The vendor changed it after this page loaded: show the new version,
@@ -800,18 +804,20 @@ function BookingLinkInner() {
           </Card>
         ) : null}
 
-        <Card className="p-5">
-          <p className="text-sm font-medium text-ink-soft">Your signature</p>
-          <p className="mt-1 text-xs text-ink-soft">Type your full legal name to electronically sign this agreement</p>
-          <div className="mt-3">
-            <Field
-              placeholder="Type your full name to sign"
-              value={signerName}
-              onChange={(e) => setSignerName(e.target.value)}
-              required
-            />
-          </div>
-        </Card>
+        <SignatureStep
+          kindLabel="agreement"
+          signerName={signerName}
+          onSignerName={setSignerName}
+          consent={booking.esign_consent}
+          onProof={setProof}
+          disabled={preview}
+          sendCode={async () => {
+            // The code goes to the email on file, so save what's typed first.
+            if (!guestEmail.trim()) throw new ApiError(400, "Add your email above first");
+            await fillGuestBookingDetails(token, { guest_email: guestEmail.trim() });
+            return requestGuestSigningCode(token);
+          }}
+        />
 
         {fields && fields.waiting_count > 0 ? (
           <label className="flex items-start gap-2.5 rounded-lg border border-card-edge px-3 py-2.5 text-sm text-ink-soft">
@@ -830,11 +836,16 @@ function BookingLinkInner() {
         ) : null}
 
         <div>
-          <Button type="submit" size="lg" className="w-full" disabled={busy || preview || !signerName.trim()}>
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full"
+            disabled={busy || preview || !signerName.trim() || (!!booking.esign_consent && !proof)}
+          >
             {busy ? "Confirming…" : "Confirm booking →"}
           </Button>
           <p className="mt-2 text-center text-xs text-ink-faint">
-            By confirming, you electronically sign this agreement. A summary will be sent to your email.
+            By confirming, you electronically sign this agreement. We&apos;ll email you and {vendorName} a signed copy.
           </p>
         </div>
       </form>
